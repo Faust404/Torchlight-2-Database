@@ -167,9 +167,14 @@
   // ever the second thing. The dps figure has no element, so it carries the word
   // instead of a mark -- without it a bare number at the head of a row of bare
   // numbers reads as one more damage type.
+  //
+  // `stv-dps`, not `dps`. The detail view already owns `.dps` -- its 15px gold
+  // headline figure -- and names it as a *bare* selector, so a card pair called
+  // `dps` silently inherited both the size and the colour and stood taller than
+  // the damage numbers beside it. `stv-` is the card's namespace for this row.
   function statRow(o) {
     if (o.dmg) {
-      return (o.dps ? '<span class="stv dps"><b>' + esc(o.dps) + '</b> dps</span>' : '') +
+      return (o.dps ? '<span class="stv stv-dps"><b>' + esc(o.dps) + '</b> dps</span>' : '') +
         statPairs(o.dmg);
     }
     if (o.arm) return statPairs(o.arm);
@@ -376,7 +381,7 @@
     var btn = document.getElementById('onlyset');
     btn.classList.toggle('on', !!S.setOnly);
     btn.setAttribute('aria-pressed', S.setOnly ? 'true' : 'false');
-    btn.innerHTML = 'Only sets <span class="ct">' + SETCOUNT + '</span>';
+    btn.innerHTML = 'Only Sets <span class="ct">' + SETCOUNT + '</span>';
   }
 
   function renderRail() {

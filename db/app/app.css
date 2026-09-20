@@ -192,6 +192,12 @@ button,input,select{font:inherit; color:inherit}
    the rail's rows do -- .ct is scoped per container everywhere else, so it
    needs naming here too. */
 #bar button .ct{color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums}
+/* The set toggle is not a tier, so it does not wear the toolbar's gold: it wears
+   the Set colour the game gives a set name, which --t-set already holds. Two
+   ids deep because `#bar button.on` is (1,1,1) and `#onlyset.on` alone would be
+   (1,1,0) -- the toolbar's rule would win. */
+#bar #onlyset:hover,#bar #onlyset.on{border-color:var(--t-set); color:var(--t-set)}
+#bar #onlyset.on{background:color-mix(in srgb,var(--t-set) 20%,#1b1917)}
 
 /* ------------------------------------------------------------- tier strip
    The rarity filter, out of the rail and onto its own row under the toolbar --

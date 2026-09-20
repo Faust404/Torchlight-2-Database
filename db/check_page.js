@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 158 assertions.
+ * view, provenance and hash deep links -- 159 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -1034,7 +1034,7 @@ async function go(hash) {
     // which is exactly how a sixth type would arrive, silently.
     const pairsOf = c => [].map.call(c.querySelectorAll('.st .stv'), p => {
       const i = p.querySelector('i'), b = p.querySelector('b');
-      if (p.classList.contains('dps')) return 'dps=' + (b ? b.textContent : '(none)');
+      if (p.classList.contains('stv-dps')) return 'dps=' + (b ? b.textContent : '(none)');
       const m = /background-position:-(\d+)px/.exec(i ? i.getAttribute('style') || '' : '');
       return (m ? +m[1] : 'x') + ':' + (b ? b.textContent : '(none)');
     });
@@ -1063,6 +1063,25 @@ async function go(hash) {
        missing.length === 0, missing.slice(0, 3).join(' | '));
     ok('a weapon leads with its own dps figure', badDps.length === 0,
        badDps.slice(0, 4).join(', '));
+    // The dps pair is a member of the *card's* row, and the card row and the
+    // detail block once shared a class name for it. The detail block names its
+    // parts as bare selectors (`.dps`, `.fspd`, `.frng`), so a card pair called
+    // plainly `dps` silently inherited the 15px gold headline figure and stood
+    // a head taller than the damage numbers beside it. `stv-` is the card's own
+    // namespace for this row. Asserted twice over -- the bare class is absent,
+    // *and* the size it would have moved is unmoved -- because either check
+    // alone passes while the other breaks.
+    const collided = [].filter.call(cards(), c => {
+      const p = c.querySelector('.stv-dps');
+      const s = c.querySelector('.stv:not(.stv-dps)');
+      if (!p || !s) return false;
+      return w.getComputedStyle(p).fontSize !== w.getComputedStyle(s).fontSize;
+    });
+    const bare = d.querySelectorAll('#grid .dps').length;
+    ok('the card\'s dps is set at the row\'s own size, not the detail\'s',
+       collided.length === 0 && bare === 0,
+       collided.slice(0, 3).map(c => c.getAttribute('data-id')).join(', ') +
+       ` | bare .dps under #grid: ${bare}`);
     // The words the card used to print. "Fire Armor 140-174" would mean the
     // value is still being labelled rather than left to its mark, which is the
     // whole change. Checked as "nothing but numbers and the one `dps`" rather
