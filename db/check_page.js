@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 159 assertions.
+ * view, provenance and hash deep links -- 167 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -1000,6 +1000,47 @@ async function go(hash) {
   click(hdr('Weapons'));
   ok('and clears them again', /6,051/.test(cnt()), cnt());
   await wait(30);
+
+  // The four main categories fold, the way a section does, with the glyph in the
+  // slot the section headers put theirs. A subgroup header has one action -- the
+  // bulk toggle -- so its span stays empty, which is also what keeps the two
+  // levels' labels on the same step of the indent ladder.
+  {
+    const glyphs = sel => [].map.call(rb.querySelectorAll(sel),
+                                      e => e.querySelector('.tog').textContent);
+    ok('each of the four categories carries a fold glyph',
+       glyphs('.grp[data-grp]').join('') === '−−−−', glyphs('.grp[data-grp]').join('|'));
+    ok('...and a subgroup header carries none', glyphs('.sgrp[data-grp]').join('') === '');
+    // the rows the category owns, by the same walk toggleGroup uses
+    const owned = [];
+    for (let el = hdr('Weapons').nextElementSibling;
+         el && !el.classList.contains('grp'); el = el.nextElementSibling) owned.push(el);
+    click(hdr('Weapons').querySelector('.tog'));
+    ok('a click on the glyph folds the category',
+       hdr('Weapons').querySelector('.tog').textContent === '+' &&
+       owned.every(e => e.hidden),
+       `${owned.filter(e => e.hidden).length}/${owned.length} hidden`);
+    ok('...taking its subgroup headers with it',
+       owned.some(e => e.classList.contains('sgrp')) &&
+       owned.filter(e => e.classList.contains('sgrp')).every(e => e.hidden));
+    ok('...and folding nothing outside it',
+       [].every.call(rb.querySelectorAll('.f'), e => owned.includes(e) || !e.hidden));
+    // Folding is a view preference, like a section's: it must not touch the
+    // filter, the URL or the result count.
+    ok('folding is not a filter',
+       /6,051/.test(cnt()) && !/type=/.test(w.location.hash), `${cnt()} ${w.location.hash}`);
+    // The rail is rebuilt on every route change and the rebuild renders every
+    // row, so a fold that is not re-applied springs silently open.
+    await go('#q=fish');
+    ok('a fold survives the rail being rebuilt',
+       hdr('Weapons').querySelector('.tog').textContent === '+' &&
+       hdr('Weapons').nextElementSibling.hidden === true);
+    click(hdr('Weapons').querySelector('.tog'));
+    ok('...and unfolding restores every row',
+       hdr('Weapons').querySelector('.tog').textContent === '−' &&
+       [].every.call(rb.querySelectorAll('.f'), e => !e.hidden));
+    await go('');
+  }
 
   // a legacy #cat= link named a facet that no longer exists; it must still
   // resolve, to the group it now names

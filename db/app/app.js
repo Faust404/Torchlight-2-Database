@@ -299,12 +299,38 @@
   // level, which is what the count-walk in paintCounts keys off. The subgroup
   // class is `sgrp`, not `sub`: `.card .sub` is the card's type line, and a
   // bare `.sub` rule would leak the rail header's uppercase onto every card.
+  //
+  // The four top-level categories fold, so they carry the same minus the section
+  // headers do. A subgroup does not -- its header has one action, the bulk
+  // toggle -- but it still emits the span, empty: both levels then put their
+  // label in the same slot, which is what keeps the rail's indent ladder
+  // straight (see the `.tog` rule in app.css for the arithmetic).
   function groupRow(g, sub) {
     var path = sub ? g + '/' + sub : g;
+    var closed = !sub && GRP[path] === true;
     return '<div class="' + (sub ? 'sgrp' : 'grp') + '" data-grp="' + esc(path) + '">' +
-      '<span class="mk"></span>' +
+      '<span class="tog">' + (sub ? '' : closed ? '+' : '−') + '</span>' +
       '<span class="lbl">' + esc(sub || g) + '</span>' +
       '<span class="ct"></span></div>';
+  }
+
+  // Folded categories, by data-grp path -- `SEC` below does the same job for the
+  // sections. Two lists rather than one because they fold different things: a
+  // section hides its whole body in CSS, a category hides the rows that follow
+  // it in the flat rail, which has to be done to the DOM.
+  var GRP = Object.create(null);
+
+  // A rebuild renders every row, so a fold has to be re-applied after it: the
+  // markup carries the glyph, never the hiding. One walk from the header, down
+  // to the next *category* -- so folding Weapons takes its subgroups and their
+  // rows with it, which is the only pair of levels this has to handle.
+  function foldGroup(h) {
+    var closed = GRP[h.getAttribute('data-grp')] === true;
+    h.querySelector('.tog').textContent = closed ? '+' : '−';
+    for (var el = h.nextElementSibling; el && !el.classList.contains('grp');
+         el = el.nextElementSibling) {
+      el.hidden = closed;
+    }
   }
 
   // The Type section is the only grouped facet: category -> [subgroup] -> type.
@@ -416,7 +442,13 @@
       '<label class="f' + (S.sock ? '' : ' off') + '"><input type="checkbox" id="sock"' +
       (S.sock ? ' checked' : '') + '><span class="lbl">Has sockets</span></label>');
 
-    document.getElementById('railbody').innerHTML = h;
+    var rb = document.getElementById('railbody');
+    rb.innerHTML = h;
+    // Every rebuild renders all four categories open, so the ones the user has
+    // folded are re-folded here. The markup already wrote their `+`, so this is
+    // only about the rows.
+    var hs = rb.querySelectorAll('.grp');
+    for (var i = 0; i < hs.length; i++) foldGroup(hs[i]);
     paintCounts();
   }
 
@@ -1091,7 +1123,7 @@
     writeHash(); render(); paintCounts();
   }
 
-  // rail: group bulk toggle, section collapse
+  // rail: group bulk toggle, category fold, section collapse
   document.getElementById('railbody').addEventListener('click', function (e) {
     // Tested first, and it must be: the collapse branch below reads data-sec
     // off its target's parentNode, so handing it a group header would key
@@ -1100,7 +1132,19 @@
     // in .sec-b, a *sibling* of .sec-h -- but that safety rests entirely on the
     // class name, which is exactly what a later edit would be tempted to change.
     var g = e.target.closest ? e.target.closest('[data-grp]') : null;
-    if (g) { toggleGroup(g); return; }
+    if (g) {
+      // The glyph folds; the rest of the header is still the bulk toggle it has
+      // always been. Only a category carries a glyph -- a subgroup's span is
+      // empty and matches nothing here -- so a subgroup header has one action.
+      var k = e.target.closest ? e.target.closest('.grp .tog') : null;
+      if (k) {
+        var path = g.getAttribute('data-grp');
+        GRP[path] = GRP[path] !== true;
+        foldGroup(g);
+        return;
+      }
+      toggleGroup(g); return;
+    }
     var h = e.target.closest ? e.target.closest('.sec-h') : null;
     if (!h) return;
     var sec = h.parentNode, k = sec.getAttribute('data-sec');

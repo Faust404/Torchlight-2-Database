@@ -115,7 +115,13 @@ button,input,select{font:inherit; color:inherit}
   font-size:10px; letter-spacing:.13em; text-transform:uppercase;
 }
 .sec-h:hover{color:var(--gold)}
-.sec-h .tog{font-family:ui-monospace,Consolas,monospace; width:9px; color:var(--muted)}
+/* The fold glyph, shared by the section headers and the four category headers.
+   Its 9px box plus the 6px gap is what a rail label's slot is made of, and the
+   rows below step in by the same 9px -- `.f.s0`/`.f.s1` -- so that a folded
+   category's rows still line up under the label they belong to. */
+.sec-h .tog,.grp .tog,.sgrp .tog{
+  font-family:ui-monospace,Consolas,monospace; width:9px; color:var(--muted);
+}
 .sec-h .n{margin-left:auto; color:var(--muted); letter-spacing:0; font-size:10px}
 .sec-b{padding:2px 10px 9px}
 .sec.closed .sec-b{display:none}
@@ -154,14 +160,21 @@ button,input,select{font:inherit; color:inherit}
 .grp .lbl,.sgrp .lbl{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .grp .ct,.sgrp .ct{color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums}
 .grp.off,.sgrp.off{opacity:.45}
+/* A folded category hides the rows that follow it -- and its subgroups, headers
+   included -- with the native attribute, so they leave the accessibility tree
+   too. The id is load-bearing: a bare `[hidden]` rule loses to `.f{display:flex}`,
+   which is the trap that attribute always springs. */
+#rail .sec-b [hidden]{display:none}
 /* tri-state: the header is the only thing that says what a click will do, so
    "all of it" and "some of it" must not look the same */
 .grp.on,.sgrp.on{color:var(--gold)}
 .grp.part .lbl:after,.sgrp.part .lbl:after{content:"·"; color:var(--gold); margin-left:4px}
 /* the rows a group owns step in under it -- one class per depth, set by
-   typesBody(), so this does not depend on nesting */
-.f.s0{padding-left:14px}
-.f.s1{padding-left:26px}
+   typesBody(), so this does not depend on nesting. Both depths carry the 9px
+   the fold glyph added to the headers above them, so the indent ladder reads
+   the same as it did: 19px label, 27px subgroup, 23px and 35px rows. */
+.f.s0{padding-left:23px}
+.f.s1{padding-left:35px}
 
 .rng{display:flex; align-items:center; gap:6px; padding:3px 4px}
 .rng input{width:100%; min-width:0; padding:4px 6px; background:#0e0d0c;
