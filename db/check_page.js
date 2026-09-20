@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 151 assertions.
+ * view, provenance and hash deep links -- 158 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -1011,6 +1011,96 @@ async function go(hash) {
   ok('a legacy #cat=Jewelry link resolves to Accessories',
      /2,042/.test(dj.getElementById('count').textContent),
      dj.getElementById('count').textContent);
+
+  // ------------------------------------------------------- card stat line
+  // The card used to show one "primary" type and its value, chosen as the
+  // largest. It now shows every type the item carries, each as an element mark
+  // and its own number, and a weapon leads with its dps. What that has to mean,
+  // and what a lone specimen cannot show, is that the pairs are complete and in
+  // the detail view's own order -- so every rendered card is checked against its
+  // own item rather than one case being eyeballed.
+  await go('');
+  {
+    // DMGTYPES, which statPairs and the detail's statLines both read
+    const ORDER = ['physical', 'fire', 'ice', 'electric', 'poison'];
+    const byId = new Map(w.DB.items.map(o => [o.id, o]));
+    const want = o => {
+      if (o.dmg) return ORDER.filter(k => o.dmg[k]).map(k => `${k}=${o.dmg[k]}`);
+      if (o.arm) return ORDER.filter(k => o.arm[k]).map(k => `${k}=${o.arm[k]}`);
+      return null;
+    };
+    // The mark's tile is a background-position offset into the strip build.py
+    // inlines, so a pair with no offset is a type the strip has no tile for --
+    // which is exactly how a sixth type would arrive, silently.
+    const pairsOf = c => [].map.call(c.querySelectorAll('.st .stv'), p => {
+      const i = p.querySelector('i'), b = p.querySelector('b');
+      if (p.classList.contains('dps')) return 'dps=' + (b ? b.textContent : '(none)');
+      const m = /background-position:-(\d+)px/.exec(i ? i.getAttribute('style') || '' : '');
+      return (m ? +m[1] : 'x') + ':' + (b ? b.textContent : '(none)');
+    });
+    const bad = [], wrongOrder = [], badDps = [], missing = [];
+    [].forEach.call(cards(), c => {
+      const o = byId.get(c.getAttribute('data-id'));
+      const got = pairsOf(c);
+      const exp = want(o);
+      if (!exp) { if (got.length) missing.push(`${o.id} has no stats but renders ${got.length}`); return; }
+      // the offsets are the strip's own, so compare by tile index rather than
+      // by the pixel the strip happens to place it at
+      const tiles = ORDER.map(k => w.DB.elem[k]);
+      const expTiles = exp.map(s => tiles[ORDER.indexOf(s.split('=')[0])] + ':' + s.split('=')[1]);
+      const expAll = (o.dmg && o.dps ? ['dps=' + o.dps] : []).concat(expTiles);
+      if (got.join(' ') !== expAll.join(' ')) {
+        if (got.length !== expAll.length) bad.push(`${o.id}: ${got.length} got / ${expAll.length} expected`);
+        else wrongOrder.push(`${o.id}: ${got.join(' ')} != ${expAll.join(' ')}`);
+      }
+      if (o.dmg && o.dps && !new RegExp('^dps=' + o.dps + '\\b').test(got[0] || '')) badDps.push(o.id);
+    });
+    ok('every card shows one mark-and-value pair per type its item carries',
+       bad.length === 0, bad.slice(0, 6).join(' | '));
+    ok('...in the detail view\'s own order, and none with a mark the strip lacks',
+       wrongOrder.length === 0, wrongOrder.slice(0, 4).join(' | '));
+    ok('...and stats-less items render no stat row at all',
+       missing.length === 0, missing.slice(0, 3).join(' | '));
+    ok('a weapon leads with its own dps figure', badDps.length === 0,
+       badDps.slice(0, 4).join(', '));
+    // The words the card used to print. "Fire Armor 140-174" would mean the
+    // value is still being labelled rather than left to its mark, which is the
+    // whole change. Checked as "nothing but numbers and the one `dps`" rather
+    // than a list of type names, because the effect row is a sentence and an
+    // effect is allowed to say "Poison Damage".
+    const words = [].filter.call(cards(), c => {
+      const o = byId.get(c.getAttribute('data-id'));
+      if (!(o.dmg || o.arm)) return false;
+      const st = c.querySelector('.st');
+      return !st || st.textContent
+        .replace(/[-+.,%]?\d+(?:[.,]\d+)?%?/g, '').replace(/\bdps\b/g, '').trim() !== '';
+    });
+    ok('no card spells a damage or armor type out any more',
+       words.length === 0,
+       words.slice(0, 3).map(c => c.querySelector('.st').textContent).join(' | '));
+  }
+  // One specimen per shape, each the extreme of its kind, since the sweep above
+  // reads whatever the first 500 happen to hold: Bitterbite is the only armor in
+  // the corpus carrying all five types, and the Hammer is the only weapon
+  // carrying five plus a dps.
+  {
+    const one = async (hash, id) => {
+      const doc = await deep(hash);
+      return doc.querySelector(`#grid .card[data-id="${id}"]`);
+    };
+    const bit = await one('#q=bitterbite', 'collar_unique_spiked');
+    ok('an armor card shows all five types side by side, marks and numbers only',
+       bit && bit.querySelectorAll('.st .stv').length === 5 &&
+       [].every.call(bit.querySelectorAll('.st .stv i'), i =>
+         /background-position/.test(i.getAttribute('style') || '')) &&
+       !/Armor/.test(bit.querySelector('.st').textContent),
+       bit ? bit.querySelector('.st').textContent : '(no card)');
+    const ham = await one('#q=official%20rebuke', 'hammer_u07b');
+    ok('the densest weapon reads dps then all five damage types',
+       ham && /^878\s*dps/.test(ham.querySelector('.st').textContent.replace(/\s+/g, ' ')) &&
+       ham.querySelectorAll('.st .stv').length === 6,
+       ham ? ham.querySelector('.st').textContent : '(no card)');
+  }
 
   // ---------------------------------------------------------------- icons
   await go('');

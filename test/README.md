@@ -1068,17 +1068,22 @@ placeholder. All 1,053 icons pack into one 1,485×1,440 sheet at native size
 ### The browser
 
 `out\index.html` opens from `file://` with no server and no network. Filters live
-in the rail with live counts: type, tier, damage type, set, level
-range, stat-requirement caps, sockets. **Type is grouped** into the three-level
+in the rail with live counts — type, damage type, level range, stat-requirement
+caps, sockets — except for the two that sit with the results they order: the
+**rarity strip** of count-bearing pills between the toolbar and the grid, and
+the toolbar's own **set** toggle and set select. The default sort is
+tier-then-level, the same order the strip reads in. **Type is grouped** into the three-level
 taxonomy above rather than listed flat, and each group header is itself a
 control — clicking it checks or clears every type beneath it, and it carries a
 tri-state marker so it is visible whether the group is fully, partly or not at
 all applied. There is no separate Category facet: since the header toggles the
 types it names, "category is Weapons" and "every weapon type is checked" are the
 same filter, and keeping both would only restore the empty grid that the
-grouping exists to remove. Results are 350px cards showing the item's
-**primary type and its value** (`Physical 169`, `Fire Armor 140-174`) — not a
-summed total, which the game never shows. Clicking one opens a full detail view
+grouping exists to remove. Results are 350px cards showing **every type the item
+carries**, each as an element mark and its own value, in the detail view's order
+— a weapon leads with its `dps` figure, which is the one value with no element
+and so the one that carries a word. Never a summed total, which the game never
+shows, and the row wraps rather than dropping a type. Clicking one opens a full detail view
 with the leader-dot stat rows, affix lines and a provenance footer naming the
 `.DAT` path and whether the numbers are TIDBI's rendered values or a flagged
 DAT base value. Its **Item** block lists Item Level, attack speed, **Weapon
@@ -1239,7 +1244,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 151
+`db\check_page.js` goes further and drives the built page in a real DOM — 158
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a

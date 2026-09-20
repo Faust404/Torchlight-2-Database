@@ -148,20 +148,33 @@
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-  // The card's one-line stat is the item's *primary* type with its own value --
-  // "Physical 169", "Fire Armor 140-174". A summed total would be an invention:
-  // no such number is shown in game, and the user asked for it removed.
-  function primary(map, suffix) {
-    var best = null, k;
-    for (k in map) if (best === null || avg(map[k]) > avg(map[best])) best = k;
-    return { k: cap(best) + suffix, v: map[best] };
+  // The card's stat line shows *every* type the item carries, each as an element
+  // mark and its own value, rather than the one primary type it used to pick.
+  // Picking a largest said the least about the items where it mattered most: a
+  // weapon split three ways off a small physical base read as a weak physical
+  // weapon, when the split is the thing you would look at. Order is DMGTYPES',
+  // the same order the detail view prints, so the two cannot disagree.
+  //
+  // Still no summed total anywhere -- that would be an invention, since no such
+  // number is shown in game.
+  function statPairs(map) {
+    return DMGTYPES.filter(function (k) { return map[k]; }).map(function (k) {
+      return '<span class="stv">' + elemMark(k) + '<b>' + esc(map[k]) + '</b></span>';
+    }).join('');
   }
 
-  function headline(o) {
-    if (o.dmg) return primary(o.dmg, '');
-    if (o.arm) return primary(o.arm, ' Armor');
-    if (o.fx && o.fx.length) return { k: 'Effect', v: o.fx[0] };
-    return null;
+  // A weapon leads with its output, then the damage it is made of; armor is only
+  // ever the second thing. The dps figure has no element, so it carries the word
+  // instead of a mark -- without it a bare number at the head of a row of bare
+  // numbers reads as one more damage type.
+  function statRow(o) {
+    if (o.dmg) {
+      return (o.dps ? '<span class="stv dps"><b>' + esc(o.dps) + '</b> dps</span>' : '') +
+        statPairs(o.dmg);
+    }
+    if (o.arm) return statPairs(o.arm);
+    if (o.fx && o.fx.length) return '<span class="fxn">Effect <b>' + esc(o.fx[0]) + '</b></span>';
+    return '';
   }
 
   // ---------------------------------------------------------------- predicate
@@ -464,14 +477,14 @@
   function cardHTML(o) {
     var h = memo[o.id];
     if (h) return h;
-    var hl = headline(o);
+    var st = statRow(o);
     var sub = esc(o.t) + (n(o.lv) ? ' · Lv ' + n(o.lv) : '') +
       (o.set ? ' · ' + esc(o.set) : '');
     h = '<a class="card ' + (TIERCLS[ownTier(o)] || 'q-unclassified') + '" data-id="' + esc(o.id) + '">' +
       '<span class="art">' + iconHTML(o) + '</span>' +
       '<span class="meta"><span class="nm">' + esc(o.n) + '</span>' +
       '<span class="sub">' + sub + '</span>' +
-      (hl ? '<span class="st">' + hl.k + ' <b>' + esc(hl.v) + '</b></span>' : '') +
+      (st ? '<span class="st">' + st + '</span>' : '') +
       '</span></a>';
     memo[o.id] = h;
     return h;

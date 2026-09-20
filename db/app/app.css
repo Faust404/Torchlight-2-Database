@@ -244,8 +244,19 @@ button,input,select{font:inherit; color:inherit}
 .card .nm{display:block; font-size:14px; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap}
 .card .sub{display:block; color:var(--muted); font-size:11.5px; margin-top:1px}
-.card .st{display:block; margin-top:4px; font-size:11.5px; color:var(--label)}
-.card .st b{color:#d8cfc0; font-weight:600}
+/* The stat line: one mark-and-value pair per type, wrapping. Five types do not
+   fit the ~272px the meta column gets, so the row wraps to a second line rather
+   than clipping or dropping any -- the whole point is that every type is
+   visible. Aligned on `center`, not `baseline`: the mark is a flex item with no
+   text in it, so it has no baseline to align a number against. */
+.card .st{display:flex; flex-wrap:wrap; align-items:center; gap:3px 10px;
+  margin-top:4px; font-size:11.5px; color:var(--label)}
+.card .st .stv{display:inline-flex; align-items:center; gap:4px}
+/* the mark's own 5px side margins are the detail view's spacing between a value
+   and its word; here `gap` is doing that, so only the inside edge is kept */
+.card .st .em{margin:0}
+.card .st .fxn{flex:1 1 100%}   /* an effect is a sentence, and gets the row */
+.card .st b{color:#d8cfc0; font-weight:600; font-variant-numeric:tabular-nums}
 
 /* tier colours -- one bare class on the card root, inherited by the subtree */
 .q-normal  .nm{color:var(--t-normal)}
