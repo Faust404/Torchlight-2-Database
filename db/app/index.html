@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Torchlight II Item Database</title>
+<style>
+:root{--sprite:url(data:image/png;base64,__SPRITE__)}
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div id="app">
+
+  <aside id="rail">
+    <div class="brand">
+      Torchlight II
+      <small>Item Database</small>
+      <a href="#reset" id="reset">reset</a>
+    </div>
+    <div class="rsearch">
+      <input id="q" type="search" placeholder="Search name or type&hellip;" autocomplete="off">
+    </div>
+    <div id="railbody"></div>
+  </aside>
+  <div id="railscrim"></div>
+
+  <main id="main">
+    <div id="grid-wrap">
+      <div id="bar">
+        <button id="railbtn" title="Filters">&#9776;</button>
+        <span class="count" id="count"></span>
+        <span class="sp"></span>
+        <label for="sort">Sort</label>
+        <select id="sort">
+          <option value="name">Name</option>
+          <option value="level">Level</option>
+          <option value="type">Type</option>
+          <option value="tier">Tier</option>
+          <option value="damage">Damage</option>
+          <option value="armor">Armor</option>
+        </select>
+        <button id="dir" title="Reverse order">&#8595;</button>
+      </div>
+      <div id="scroll"><div id="grid"></div><div id="more"></div></div>
+    </div>
+    <div id="detail"></div>
+  </main>
+
+</div>
+<script>window.DB=/*__DATA__*/;</script>
+<script>window.TAXONOMY=/*__TAXONOMY__*/;</script>
+<script>/*__JS__*/</script>
+</body>
+</html>

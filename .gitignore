@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+node_modules/
+
+# Build output. `python db/build.py` regenerates all of it from the sources in
+# test/, and two of the files make it a bad thing to carry in history: icons.png
+# is cropped game art, and index.html is 8.3 MB rewritten on every build.
+db/out/
+
+# A scrape of grimtools.com kept for reference while designing the rail and the
+# card. Not ours, and not something this repo should republish.
+test/grimtools_ui_reference/

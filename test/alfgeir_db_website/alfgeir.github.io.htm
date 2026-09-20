@@ -1,0 +1,1403 @@
+<html data-darkreader-mode="dynamic" data-darkreader-scheme="dark"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><style class="darkreader darkreader--fallback" media="screen"></style><style class="darkreader darkreader--user-agent" media="screen">@layer {
+html {
+    background-color: var(--darkreader-background-ffffff, #181a1b) !important;
+}
+html {
+    color-scheme: dark !important;
+}
+iframe {
+    color-scheme: dark !important;
+}
+html, body {
+    background-color: var(--darkreader-background-ffffff, #181a1b);
+}
+html, body {
+    border-color: var(--darkreader-border-4c4c4c, #736b5e);
+    color: var(--darkreader-text-000000, #e8e6e3);
+}
+a {
+    color: var(--darkreader-text-0040ff, #3391ff);
+}
+table {
+    border-color: var(--darkreader-border-808080, #545b5e);
+}
+mark {
+    color: var(--darkreader-text-000000, #e8e6e3);
+}
+::placeholder {
+    color: var(--darkreader-text-a9a9a9, #b2aba1);
+}
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+    background-color: var(--darkreader-background-faffbd, #404400) !important;
+    color: var(--darkreader-text-000000, #e8e6e3) !important;
+}
+::selection {
+    background-color: var(--darkreader-background-0060d4, #004daa) !important;
+    color: var(--darkreader-text-ffffff, #e8e6e3) !important;
+}
+::-moz-selection {
+    background-color: var(--darkreader-background-0060d4, #004daa) !important;
+    color: var(--darkreader-text-ffffff, #e8e6e3) !important;
+}
+}</style><style class="darkreader darkreader--text" media="screen"></style><style class="darkreader darkreader--invert" media="screen">c-wiz div > svg > circle, .jfk-bubble.gtx-bubble, .captcheck_answer_label > input + img, span#closed_text > img[src^="https://www.gstatic.com/images/branding/googlelogo"], span[data-href^="https://www.hcaptcha.com/"] > #icon, img.Wirisformula, a[data-testid="headerMediumLogo"]>svg, .d2l-navigation-link-image-container, .d2l-iframe-loading-container, div.mc-ip-hide[style*="background: rgb(255, 255, 255) !important"], [style*="color: rgb(0, 0, 1) !important;"] {
+    filter: invert(100%) hue-rotate(180deg) contrast(90%) !important;
+}</style><style class="darkreader darkreader--inline" media="screen">[data-darkreader-inline-bgcolor] {
+  background-color: var(--darkreader-inline-bgcolor) !important;
+}
+[data-darkreader-inline-bgimage] {
+  background-image: var(--darkreader-inline-bgimage) !important;
+}
+[data-darkreader-inline-border] {
+  border-color: var(--darkreader-inline-border) !important;
+}
+[data-darkreader-inline-border-bottom] {
+  border-bottom-color: var(--darkreader-inline-border-bottom) !important;
+}
+[data-darkreader-inline-border-left] {
+  border-left-color: var(--darkreader-inline-border-left) !important;
+}
+[data-darkreader-inline-border-right] {
+  border-right-color: var(--darkreader-inline-border-right) !important;
+}
+[data-darkreader-inline-border-top] {
+  border-top-color: var(--darkreader-inline-border-top) !important;
+}
+[data-darkreader-inline-boxshadow] {
+  box-shadow: var(--darkreader-inline-boxshadow) !important;
+}
+[data-darkreader-inline-color] {
+  color: var(--darkreader-inline-color) !important;
+}
+[data-darkreader-inline-fill] {
+  fill: var(--darkreader-inline-fill) !important;
+}
+[data-darkreader-inline-stroke] {
+  stroke: var(--darkreader-inline-stroke) !important;
+}
+[data-darkreader-inline-outline] {
+  outline-color: var(--darkreader-inline-outline) !important;
+}
+[data-darkreader-inline-stopcolor] {
+  stop-color: var(--darkreader-inline-stopcolor) !important;
+}
+[data-darkreader-inline-bg] {
+  background: var(--darkreader-inline-bg) !important;
+}
+[data-darkreader-inline-border-short] {
+  border: var(--darkreader-inline-border-short) !important;
+}
+[data-darkreader-inline-border-bottom-short] {
+  border-bottom: var(--darkreader-inline-border-bottom-short) !important;
+}
+[data-darkreader-inline-border-left-short] {
+  border-left: var(--darkreader-inline-border-left-short) !important;
+}
+[data-darkreader-inline-border-right-short] {
+  border-right: var(--darkreader-inline-border-right-short) !important;
+}
+[data-darkreader-inline-border-top-short] {
+  border-top: var(--darkreader-inline-border-top-short) !important;
+}
+[data-darkreader-inline-invert] {
+    filter: invert(100%) hue-rotate(180deg);
+}</style><style class="darkreader darkreader--variables" media="screen">:root {
+   --darkreader-neutral-background: var(--darkreader-background-ffffff, #181a1b);
+   --darkreader-neutral-text: var(--darkreader-text-000000, #e8e6e3);
+   --darkreader-selection-background: var(--darkreader-background-0060d4, #004daa);
+   --darkreader-selection-text: var(--darkreader-text-ffffff, #e8e6e3);
+}</style><style class="darkreader darkreader--root-vars" media="screen"></style><style type="text/css">:root, :host {
+  --fa-font-solid: normal 900 1em/1 "Font Awesome 7 Free";
+  --fa-font-regular: normal 400 1em/1 "Font Awesome 7 Free";
+  --fa-font-light: normal 300 1em/1 "Font Awesome 7 Pro";
+  --fa-font-thin: normal 100 1em/1 "Font Awesome 7 Pro";
+  --fa-font-duotone: normal 900 1em/1 "Font Awesome 7 Duotone";
+  --fa-font-duotone-regular: normal 400 1em/1 "Font Awesome 7 Duotone";
+  --fa-font-duotone-light: normal 300 1em/1 "Font Awesome 7 Duotone";
+  --fa-font-duotone-thin: normal 100 1em/1 "Font Awesome 7 Duotone";
+  --fa-font-brands: normal 400 1em/1 "Font Awesome 7 Brands";
+  --fa-font-sharp-solid: normal 900 1em/1 "Font Awesome 7 Sharp";
+  --fa-font-sharp-regular: normal 400 1em/1 "Font Awesome 7 Sharp";
+  --fa-font-sharp-light: normal 300 1em/1 "Font Awesome 7 Sharp";
+  --fa-font-sharp-thin: normal 100 1em/1 "Font Awesome 7 Sharp";
+  --fa-font-sharp-duotone-solid: normal 900 1em/1 "Font Awesome 7 Sharp Duotone";
+  --fa-font-sharp-duotone-regular: normal 400 1em/1 "Font Awesome 7 Sharp Duotone";
+  --fa-font-sharp-duotone-light: normal 300 1em/1 "Font Awesome 7 Sharp Duotone";
+  --fa-font-sharp-duotone-thin: normal 100 1em/1 "Font Awesome 7 Sharp Duotone";
+  --fa-font-slab-regular: normal 400 1em/1 "Font Awesome 7 Slab";
+  --fa-font-slab-press-regular: normal 400 1em/1 "Font Awesome 7 Slab Press";
+  --fa-font-whiteboard-semibold: normal 600 1em/1 "Font Awesome 7 Whiteboard";
+  --fa-font-thumbprint-light: normal 300 1em/1 "Font Awesome 7 Thumbprint";
+  --fa-font-notdog-solid: normal 900 1em/1 "Font Awesome 7 Notdog";
+  --fa-font-notdog-duo-solid: normal 900 1em/1 "Font Awesome 7 Notdog Duo";
+  --fa-font-etch-solid: normal 900 1em/1 "Font Awesome 7 Etch";
+  --fa-font-jelly-regular: normal 400 1em/1 "Font Awesome 7 Jelly";
+  --fa-font-jelly-fill-regular: normal 400 1em/1 "Font Awesome 7 Jelly Fill";
+  --fa-font-jelly-duo-regular: normal 400 1em/1 "Font Awesome 7 Jelly Duo";
+  --fa-font-chisel-regular: normal 400 1em/1 "Font Awesome 7 Chisel";
+  --fa-font-utility-semibold: normal 600 1em/1 "Font Awesome 7 Utility";
+  --fa-font-utility-duo-semibold: normal 600 1em/1 "Font Awesome 7 Utility Duo";
+  --fa-font-utility-fill-semibold: normal 600 1em/1 "Font Awesome 7 Utility Fill";
+}
+
+.svg-inline--fa {
+  box-sizing: content-box;
+  display: var(--fa-display, inline-block);
+  height: 1em;
+  overflow: visible;
+  vertical-align: -0.125em;
+  width: var(--fa-width, 1.25em);
+}
+.svg-inline--fa.fa-2xs {
+  vertical-align: 0.1em;
+}
+.svg-inline--fa.fa-xs {
+  vertical-align: 0em;
+}
+.svg-inline--fa.fa-sm {
+  vertical-align: -0.0714285714em;
+}
+.svg-inline--fa.fa-lg {
+  vertical-align: -0.2em;
+}
+.svg-inline--fa.fa-xl {
+  vertical-align: -0.25em;
+}
+.svg-inline--fa.fa-2xl {
+  vertical-align: -0.3125em;
+}
+.svg-inline--fa.fa-pull-left,
+.svg-inline--fa .fa-pull-start {
+  float: inline-start;
+  margin-inline-end: var(--fa-pull-margin, 0.3em);
+}
+.svg-inline--fa.fa-pull-right,
+.svg-inline--fa .fa-pull-end {
+  float: inline-end;
+  margin-inline-start: var(--fa-pull-margin, 0.3em);
+}
+.svg-inline--fa.fa-li {
+  width: var(--fa-li-width, 2em);
+  inset-inline-start: calc(-1 * var(--fa-li-width, 2em));
+  inset-block-start: 0.25em; /* syncing vertical alignment with Web Font rendering */
+}
+
+.fa-layers-counter, .fa-layers-text {
+  display: inline-block;
+  position: absolute;
+  text-align: center;
+}
+
+.fa-layers {
+  display: inline-block;
+  height: 1em;
+  position: relative;
+  text-align: center;
+  vertical-align: -0.125em;
+  width: var(--fa-width, 1.25em);
+}
+.fa-layers .svg-inline--fa {
+  inset: 0;
+  margin: auto;
+  position: absolute;
+  transform-origin: center center;
+}
+
+.fa-layers-text {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+}
+
+.fa-layers-counter {
+  background-color: var(--fa-counter-background-color, #ff253a);
+  border-radius: var(--fa-counter-border-radius, 1em);
+  box-sizing: border-box;
+  color: var(--fa-inverse, #fff);
+  line-height: var(--fa-counter-line-height, 1);
+  max-width: var(--fa-counter-max-width, 5em);
+  min-width: var(--fa-counter-min-width, 1.5em);
+  overflow: hidden;
+  padding: var(--fa-counter-padding, 0.25em 0.5em);
+  right: var(--fa-right, 0);
+  text-overflow: ellipsis;
+  top: var(--fa-top, 0);
+  transform: scale(var(--fa-counter-scale, 0.25));
+  transform-origin: top right;
+}
+
+.fa-layers-bottom-right {
+  bottom: var(--fa-bottom, 0);
+  right: var(--fa-right, 0);
+  top: auto;
+  transform: scale(var(--fa-layers-scale, 0.25));
+  transform-origin: bottom right;
+}
+
+.fa-layers-bottom-left {
+  bottom: var(--fa-bottom, 0);
+  left: var(--fa-left, 0);
+  right: auto;
+  top: auto;
+  transform: scale(var(--fa-layers-scale, 0.25));
+  transform-origin: bottom left;
+}
+
+.fa-layers-top-right {
+  top: var(--fa-top, 0);
+  right: var(--fa-right, 0);
+  transform: scale(var(--fa-layers-scale, 0.25));
+  transform-origin: top right;
+}
+
+.fa-layers-top-left {
+  left: var(--fa-left, 0);
+  right: auto;
+  top: var(--fa-top, 0);
+  transform: scale(var(--fa-layers-scale, 0.25));
+  transform-origin: top left;
+}
+
+.fa-1x {
+  font-size: 1em;
+}
+
+.fa-2x {
+  font-size: 2em;
+}
+
+.fa-3x {
+  font-size: 3em;
+}
+
+.fa-4x {
+  font-size: 4em;
+}
+
+.fa-5x {
+  font-size: 5em;
+}
+
+.fa-6x {
+  font-size: 6em;
+}
+
+.fa-7x {
+  font-size: 7em;
+}
+
+.fa-8x {
+  font-size: 8em;
+}
+
+.fa-9x {
+  font-size: 9em;
+}
+
+.fa-10x {
+  font-size: 10em;
+}
+
+.fa-2xs {
+  font-size: calc(10 / 16 * 1em); /* converts a 10px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 10 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 10 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-xs {
+  font-size: calc(12 / 16 * 1em); /* converts a 12px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 12 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 12 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-sm {
+  font-size: calc(14 / 16 * 1em); /* converts a 14px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 14 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 14 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-lg {
+  font-size: calc(20 / 16 * 1em); /* converts a 20px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 20 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 20 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-xl {
+  font-size: calc(24 / 16 * 1em); /* converts a 24px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 24 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 24 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-2xl {
+  font-size: calc(32 / 16 * 1em); /* converts a 32px size into an em-based value that's relative to the scale's 16px base */
+  line-height: calc(1 / 32 * 1em); /* sets the line-height of the icon back to that of it's parent */
+  vertical-align: calc((6 / 32 - 0.375) * 1em); /* vertically centers the icon taking into account the surrounding text's descender */
+}
+
+.fa-width-auto {
+  --fa-width: auto;
+}
+
+.fa-fw,
+.fa-width-fixed {
+  --fa-width: 1.25em;
+}
+
+.fa-ul {
+  list-style-type: none;
+  margin-inline-start: var(--fa-li-margin, 2.5em);
+  padding-inline-start: 0;
+}
+.fa-ul > li {
+  position: relative;
+}
+
+.fa-li {
+  inset-inline-start: calc(-1 * var(--fa-li-width, 2em));
+  position: absolute;
+  text-align: center;
+  width: var(--fa-li-width, 2em);
+  line-height: inherit;
+}
+
+/* Heads Up: Bordered Icons will not be supported in the future!
+  - This feature will be deprecated in the next major release of Font Awesome (v8)!
+  - You may continue to use it in this version *v7), but it will not be supported in Font Awesome v8.
+*/
+/* Notes:
+* --@{v.$css-prefix}-border-width = 1/16 by default (to render as ~1px based on a 16px default font-size)
+* --@{v.$css-prefix}-border-padding =
+  ** 3/16 for vertical padding (to give ~2px of vertical whitespace around an icon considering it's vertical alignment)
+  ** 4/16 for horizontal padding (to give ~4px of horizontal whitespace around an icon)
+*/
+.fa-border {
+  border-color: var(--fa-border-color, #eee);
+  border-radius: var(--fa-border-radius, 0.1em);
+  border-style: var(--fa-border-style, solid);
+  border-width: var(--fa-border-width, 0.0625em);
+  box-sizing: var(--fa-border-box-sizing, content-box);
+  padding: var(--fa-border-padding, 0.1875em 0.25em);
+}
+
+.fa-pull-left,
+.fa-pull-start {
+  float: inline-start;
+  margin-inline-end: var(--fa-pull-margin, 0.3em);
+}
+
+.fa-pull-right,
+.fa-pull-end {
+  float: inline-end;
+  margin-inline-start: var(--fa-pull-margin, 0.3em);
+}
+
+.fa-beat {
+  animation-name: fa-beat;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, ease-in-out);
+}
+
+.fa-bounce {
+  animation-name: fa-bounce;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.28, 0.84, 0.42, 1));
+}
+
+.fa-fade {
+  animation-name: fa-fade;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.4, 0, 0.6, 1));
+}
+
+.fa-beat-fade {
+  animation-name: fa-beat-fade;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, cubic-bezier(0.4, 0, 0.6, 1));
+}
+
+.fa-flip {
+  animation-name: fa-flip;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, ease-in-out);
+}
+
+.fa-shake {
+  animation-name: fa-shake;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, linear);
+}
+
+.fa-spin {
+  animation-name: fa-spin;
+  animation-delay: var(--fa-animation-delay, 0s);
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 2s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, linear);
+}
+
+.fa-spin-reverse {
+  --fa-animation-direction: reverse;
+}
+
+.fa-pulse,
+.fa-spin-pulse {
+  animation-name: fa-spin;
+  animation-direction: var(--fa-animation-direction, normal);
+  animation-duration: var(--fa-animation-duration, 1s);
+  animation-iteration-count: var(--fa-animation-iteration-count, infinite);
+  animation-timing-function: var(--fa-animation-timing, steps(8));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-beat,
+  .fa-bounce,
+  .fa-fade,
+  .fa-beat-fade,
+  .fa-flip,
+  .fa-pulse,
+  .fa-shake,
+  .fa-spin,
+  .fa-spin-pulse {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@keyframes fa-beat {
+  0%, 90% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(var(--fa-beat-scale, 1.25));
+  }
+}
+@keyframes fa-bounce {
+  0% {
+    transform: scale(1, 1) translateY(0);
+  }
+  10% {
+    transform: scale(var(--fa-bounce-start-scale-x, 1.1), var(--fa-bounce-start-scale-y, 0.9)) translateY(0);
+  }
+  30% {
+    transform: scale(var(--fa-bounce-jump-scale-x, 0.9), var(--fa-bounce-jump-scale-y, 1.1)) translateY(var(--fa-bounce-height, -0.5em));
+  }
+  50% {
+    transform: scale(var(--fa-bounce-land-scale-x, 1.05), var(--fa-bounce-land-scale-y, 0.95)) translateY(0);
+  }
+  57% {
+    transform: scale(1, 1) translateY(var(--fa-bounce-rebound, -0.125em));
+  }
+  64% {
+    transform: scale(1, 1) translateY(0);
+  }
+  100% {
+    transform: scale(1, 1) translateY(0);
+  }
+}
+@keyframes fa-fade {
+  50% {
+    opacity: var(--fa-fade-opacity, 0.4);
+  }
+}
+@keyframes fa-beat-fade {
+  0%, 100% {
+    opacity: var(--fa-beat-fade-opacity, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(var(--fa-beat-fade-scale, 1.125));
+  }
+}
+@keyframes fa-flip {
+  50% {
+    transform: rotate3d(var(--fa-flip-x, 0), var(--fa-flip-y, 1), var(--fa-flip-z, 0), var(--fa-flip-angle, -180deg));
+  }
+}
+@keyframes fa-shake {
+  0% {
+    transform: rotate(-15deg);
+  }
+  4% {
+    transform: rotate(15deg);
+  }
+  8%, 24% {
+    transform: rotate(-18deg);
+  }
+  12%, 28% {
+    transform: rotate(18deg);
+  }
+  16% {
+    transform: rotate(-22deg);
+  }
+  20% {
+    transform: rotate(22deg);
+  }
+  32% {
+    transform: rotate(-12deg);
+  }
+  36% {
+    transform: rotate(12deg);
+  }
+  40%, 100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes fa-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.fa-rotate-90 {
+  transform: rotate(90deg);
+}
+
+.fa-rotate-180 {
+  transform: rotate(180deg);
+}
+
+.fa-rotate-270 {
+  transform: rotate(270deg);
+}
+
+.fa-flip-horizontal {
+  transform: scale(-1, 1);
+}
+
+.fa-flip-vertical {
+  transform: scale(1, -1);
+}
+
+.fa-flip-both,
+.fa-flip-horizontal.fa-flip-vertical {
+  transform: scale(-1, -1);
+}
+
+.fa-rotate-by {
+  transform: rotate(var(--fa-rotate-angle, 0));
+}
+
+.svg-inline--fa .fa-primary {
+  fill: var(--fa-primary-color, currentColor);
+  opacity: var(--fa-primary-opacity, 1);
+}
+
+.svg-inline--fa .fa-secondary {
+  fill: var(--fa-secondary-color, currentColor);
+  opacity: var(--fa-secondary-opacity, 0.4);
+}
+
+.svg-inline--fa.fa-swap-opacity .fa-primary {
+  opacity: var(--fa-secondary-opacity, 0.4);
+}
+
+.svg-inline--fa.fa-swap-opacity .fa-secondary {
+  opacity: var(--fa-primary-opacity, 1);
+}
+
+.svg-inline--fa mask .fa-primary,
+.svg-inline--fa mask .fa-secondary {
+  fill: black;
+}
+
+.svg-inline--fa.fa-inverse {
+  fill: var(--fa-inverse, #fff);
+}
+
+.fa-stack {
+  display: inline-block;
+  height: 2em;
+  line-height: 2em;
+  position: relative;
+  vertical-align: middle;
+  width: 2.5em;
+}
+
+.fa-inverse {
+  color: var(--fa-inverse, #fff);
+}
+
+.svg-inline--fa.fa-stack-1x {
+  --fa-width: 1.25em;
+  height: 1em;
+  width: var(--fa-width);
+}
+.svg-inline--fa.fa-stack-2x {
+  --fa-width: 2.5em;
+  height: 2em;
+  width: var(--fa-width);
+}
+
+.fa-stack-1x,
+.fa-stack-2x {
+  inset: 0;
+  margin: auto;
+  position: absolute;
+  z-index: var(--fa-stack-z-index, auto);
+}</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1">
+  <link rel="stylesheet" href="alfgeir.github.io_files/config_Y_fa.css"><style class="darkreader darkreader--sync" media="screen"></style>
+  <style>
+    body {
+      margin:     0 0 1.5em 0;
+      min-width:  fit-content;
+      background: #000;
+      overflow-y: scroll;
+    }
+
+    a, label {
+      white-space:     nowrap;
+      text-decoration: none;
+    }
+
+    .header {
+      position:   fixed;
+      box-sizing: border-box;
+      left:       0;
+      top:        0;
+      width:      100%;
+      background: #888e;
+      z-index:    1;
+    }
+    .header>* {
+      padding:    .5em;
+    }
+    @media (max-width:1080px) {
+      .header:has(.showFilters:not(:checked)) div {
+        display:  none;
+      }
+    }
+    @media not (max-width:1080px) {
+      label:has(.showFilters) {
+        display:  none;
+      }
+    }
+
+    nav {
+      background:   #ccce;
+      line-height:  1.5em;
+    }
+    nav>* {
+      margin-right: 1em;
+      padding:      0 .1em;
+      color:        initial;
+    }
+
+    nav~*>label:not(:last-child) {
+      margin-right: 2em;
+    }
+    nav~* input:not([type]) {
+      width:        10em;
+    }
+    nav~* input:checked,
+    nav~* input:not([type]):not(:placeholder-shown),
+    nav~* select:has(option:first-child:not(:checked)) {
+      outline:      4px solid yellow;
+    }
+
+    #combined:empty {
+      display:     none;
+    }
+    #combined, #list {
+      display:     flex;
+      flex-wrap:   wrap;
+      gap:         4px;
+      margin:      .5em;
+    }
+    #combined>div div>div, #list>div div>div {
+      margin-left: 1em;
+    }
+
+    .Normal, .Magical, .Rare, .Epic, .Legendary {
+      display:        flex;
+      flex-direction: column;
+      position:       relative;
+      max-width:      1000px;
+      white-space:    pre-wrap;
+      break-inside:   avoid;
+    }
+
+    .png {
+      position: absolute;
+      right:    26px;
+      top:      3px;
+      cursor:   pointer;
+    }
+    .link {
+      position: absolute;
+      right:    2px;
+      top:      3px;
+    }
+    .link:not(:empty)+.link {
+      display:  none;
+    }
+
+    .completionBonus {
+      display:               grid;
+      grid-template-columns: 1fr auto;
+      grid-auto-rows:        min-content;
+      padding:               1em 8px 0;
+      flex-grow:             1;
+      background:            #fff8;
+    }
+    .completionBonus>:nth-child(even) {
+      padding-left:          1em;
+      text-align:            right;
+    }
+    .completionBonus .multiline {
+      margin-bottom:         2px;
+      background:            #0001;
+    }
+
+    .loot {
+      display:               grid;
+      grid-template-columns: max-content 1fr max-content 1fr max-content;
+      grid-auto-rows:        min-content;
+      gap:                   0 .5em;
+      height:                10em;
+      background:            #0004;
+      overflow-y:            scroll;
+    }
+
+    .help {
+      display:     inline-block;
+      position:    relative;
+      margin-left: .5em;
+      top:         -2px;
+      width:       18px;
+      background:  #fff8;
+      font:        15px/18px "Noto Sans JP";
+      text-align:  center;
+      cursor:      help;
+    }
+    .help::after {
+      content:     "？";
+    }
+
+    .bookmark {
+      position: relative;
+      left:     -1px;
+      top:      -1px;
+      opacity:  .33;
+      cursor:   pointer;
+    }
+    .bookmark.ed {
+      opacity: 1;
+    }
+
+    .combine {
+      display:     flex;
+      align-items: stretch;
+      gap:         .25em;
+      position:    fixed;
+      right:       0;
+      bottom:      0;
+    }
+    .combine button {
+      height:      20px;
+    }
+    .combine :not(button) {
+      padding:     0 .2em;
+      background:  #888e;
+      font-size:   15px;
+    }
+    body:has(.selectCount) .combine span {
+      display:     none;
+    }
+    body:not(:has(.selectCount)) .combine button {
+      display:     none;
+    }
+    .selectCount {
+      display:     block;
+      background:  #ff08;
+    }
+    body:has(#highlight:checked)                  .selectable { box-shadow: 0 0 40px #ff0c inset; }
+    body:has(#highlight:checked) .completionBonus .selectable { box-shadow: 0 0 10px #ff0c inset; }
+
+    .canvas                       { align-self: start; }
+    .canvas .png,
+    .canvas .link,
+    .canvas .help,
+    .canvas .bookmark,
+    .canvas span:has(>.loot)      { display: none; }
+    .canvas span:has(>.loot)+span { padding-top: 1lh!important; }
+    .canvas:has(.selectCount) .completionBonus { grid-template-columns: 1fr; }
+    .canvas:has(.selectCount) .completionBonus>span:nth-child(even),
+    .canvas:has(.selectCount) .selectable:not(:has(.selectCount)),
+    .canvas:has(.selectCount) span:has(+hr),
+    .canvas:has(.selectCount) hr,
+    .canvas:not(:has(.selectCount)) .canvasCountOnly,
+    #list>:not(.canvas) .canvasOnly,
+    #list>:not(.canvas) .canvasCountOnly,
+    #list>:not(.canvas) :has(>.canvasOnly):not(:has(>:not(.canvasOnly))) {
+      display: none;
+    }
+
+    @media print {
+      .header, .png, .link, .bookmark, .combine, span:has(>.loot) {
+        display: none;
+      }
+
+      span:has(>.loot)+span {
+        padding-top: 1lh!important;
+      }
+    }
+  </style><style class="darkreader darkreader--sync" media="screen"></style>
+  <script src="alfgeir.github.io_files/config_Y_fa.js"></script>
+  <script src="alfgeir.github.io_files/classification_Y_fa.js"></script>
+  <script src="alfgeir.github.io_files/mastery_Y_fa.js"></script>
+  <script src="alfgeir.github.io_files/link_Y_fa.js"></script>
+  <script src="alfgeir.github.io_files/function_Y_fa.js"></script>
+<title></title><meta name="darkreader" content="732a414f7c5b4c2b823fba272fa257df"><style class="darkreader darkreader--override" media="screen">c-wiz div {
+    --action-items-action-item-background-color: var(--darkreader-neutral-background) !important;
+}
+.jfk-bubble.gtx-bubble {
+    background-color: white !important;
+}
+.vimvixen-hint {
+    background-color: var(--darkreader-background-ffd76e, #684b00) !important;
+    border-color: var(--darkreader-background-c59d00, #9e7e00) !important;
+    color: var(--darkreader-text-302505, #d7d4cf) !important;
+}
+#vimvixen-console-frame {
+    color-scheme: light !important;
+}
+::placeholder {
+    opacity: 0.5 !important;
+}
+#edge-translate-panel-body,
+.MuiTypography-body1,
+.nfe-quote-text {
+    color: var(--darkreader-neutral-text) !important;
+}
+gr-main-header {
+    background-color: var(--darkreader-background-add8e6, #1b4958) !important;
+}
+.tou-z65h9k,
+.tou-mignzq,
+.tou-1b6i2ox,
+.tou-lnqlqk {
+    background-color: var(--darkreader-neutral-background) !important;
+}
+.tou-75mvi {
+    background-color: var(--darkreader-background-cfecf5, #0f3a47) !important;
+}
+.tou-ta9e87,
+.tou-1w3fhi0,
+.tou-1b8t2us,
+.tou-py7lfi,
+.tou-1lpmd9d,
+.tou-1frrtv8,
+.tou-17ezmgn {
+    background-color: var(--darkreader-background-f5f5f5, #1e2021) !important;
+}
+.tou-uknfeu {
+    background-color: var(--darkreader-background-faedda, #432c09) !important;
+}
+.tou-6i3zyv {
+    background-color: var(--darkreader-background-85c3d8, #245d70) !important;
+}
+div.mermaid-viewer-control-panel .btn {
+    background-color: var(--darkreader-neutral-background);
+    fill: var(--darkreader-neutral-text);
+}
+svg g rect.er {
+    fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.entityBox {
+    fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.attributeBoxOdd {
+    fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.attributeBoxEven {
+    fill: var(--darkreader-selection-background);
+    fill-opacity: 0.8 !important;
+}
+svg rect.er.relationshipLabelBox {
+    fill: var(--darkreader-neutral-background) !important;
+}
+svg g g.nodes rect,
+svg g g.nodes polygon {
+    fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.task {
+    fill: var(--darkreader-selection-background) !important;
+}
+svg line.messageLine0,
+svg line.messageLine1 {
+    stroke: var(--darkreader-neutral-text) !important;
+}
+div.mermaid .actor {
+    fill: var(--darkreader-neutral-background) !important;
+}
+mitid-authenticators-code-app > .code-app-container {
+    background-color: white !important;
+    padding-top: 1rem;
+}
+iframe#unpaywall[src$="unpaywall.html"] {
+    color-scheme: light !important;
+}
+select {
+    --darkreader-bg--form-control-background-color: rgba(22, 22, 22, 0) !important;
+}
+body#tumblr {
+    --darkreader-bg--secondary-accent: 31, 32, 34 !important;
+    --darkreader-bg--white: 23, 23, 23 !important;
+    --darkreader-text--black: 228, 224, 218 !important;
+}
+:host {
+    --d2l-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+    --d2l-button-icon-background-color-hover: var(--darkreader-bg--d2l-color-gypsum) !important;
+    --d2l-color-ferrite: var(--darkreader-neutral-text) !important;
+    --d2l-color-sylvite: var(--darkreader-bg--d2l-color-sylvite) !important;
+    --d2l-dropdown-background-color: var(--darkreader-neutral-background) !important;
+    --d2l-dropdown-border-color: var(--darkreader-border--d2l-color-mica) !important;
+    --d2l-input-backgroud-color: var(--darkreader-neutral-background) !important;
+    --d2l-menu-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+    --d2l-tooltip-background-color: var(--darkreader-neutral-background) !important;
+    --d2l-tooltip-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+:host([_floating]) .d2l-floating-buttons-container {
+    background-color: var(--darkreader-neutral-background) !important;
+    border-top-color: var(--darkreader-border--d2l-color-mica) !important;
+    opacity: 0.88 !important;
+}
+d2l-card {
+    background: var(--darkreader-neutral-background) !important;
+    border-color: var(--darkreader-border--d2l-color-gypsum) !important;
+}
+d2l-dropdown-content > div,
+d2l-menu-item {
+    background-color: var(--darkreader-neutral-background) !important;
+    border-radius: 10px !important;
+}
+d2l-empty-state-simple {
+    border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-button-filter > ul > li > a.vui-button {
+    border-color: var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-label-text:has(.d2l-button-subtle-content):hover,
+.d2l-label-text:has(.d2l-button-subtle-content):focus,
+.d2l-label-text:has(.d2l-button-subtle-content):active {
+    background-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-navigation-centerer {
+    color: inherit !important;
+}
+.d2l-tabs-layout {
+    border-color: var(--darkreader-border--d2l-color-gypsum) !important;
+}
+.d2l-input,
+.d2l-calendar-date,
+.d2l-htmleditor-container {
+    background-color: var(--darkreader-neutral-background) !important;
+}
+.d2l-collapsible-panel {
+    border: 1px solid var(--darkreader-border--d2l-color-mica) !important;
+    border-radius: 0.4rem !important;
+}
+.d2l-collapsible-panel-divider {
+    border-bottom: 1px solid var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-w2d-flex {
+    border-bottom: 2px solid var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-collapsible-panel scrolled,
+.d2l-collapsible-panel-header,
+.d2l-w2d-collection-fixed {
+    background-color: var(--darkreader-neutral-background) !important;
+}
+.d2l-loading-spinner-bg {
+    fill: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-loading-spinner-bg-stroke {
+    stroke: var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-loading-spinner-wrapper svg path,
+.d2l-loading-spinner-wrapper svg circle {
+    fill: var(--darkreader-neutral-background) !important;
+}
+.d2l-twopanelselector-side.d2l-twopanelselector-side-sep {
+    background: var(--darkreader-bg--d2l-color-mica) !important;
+}
+.d2l-le-TreeAccordionItem-anchor::before {
+    background: var(--darkreader-bg--d2l-color-corundum) !important;
+}
+table[class|="moz-header"] {
+    background: none;
+}
+*[style*="color: rgba(0,0,0,"]:not([style*="color: rgba(0,0,0,0)"]),
+*[style*="color: rgba(0, 0, 0,"]:not([style*="color: rgba(0, 0, 0, 0)"]),
+*[style*="color:#000"]:not(.cell-input > span),
+*[style*="color:black"]:not(.cell-input > span),
+*[style*="color:#282828"]:not(.cell-input > span),
+*[style*="color:#444"]:not(.cell-input > span),
+*[style*="color: #222222"]:not(.cell-input > span) {
+    color: var(--darkreader-neutral-text) !important;
+}
+*[style*="background:#fff"],
+*[style*="background-color:#fff"],
+*[style*="background: #fff"],
+*[style*="background: rgb(255, 255, 255)"] {
+    background: var(--darkreader-neutral-background) !important;
+}
+*[bgcolor="#F5F5F5"],
+*[style*="background-color: #F5F5F5"] {
+    background: var(--darkreader-background-f5f5f5, #1e2021) !important;
+}
+*[style*="background: #e6e6e6"] {
+    background: var(--darkreader-background-e6e6e6, #26292b) !important;
+}
+body[style*="background: rgb(255, 255, 255) !important"] *:not(a),
+.body[style*="background-color: rgb(254, 254, 254) !important"] *:not(a) {
+    background-color: var(--darkreader-neutral-background) !important;
+}
+div[style*="www.gstatic.com/android/"] {
+    background: none !important;
+}
+*[style*="background:#f9f9f9"] {
+    background: var(--darkreader-background-f9f9f9, #1b1e1f) !important;
+}
+body.mediawiki.skin-vector #mw-page-base {
+    background-image: none !important;
+}
+.overflow-hidden .spinning-bg,
+.overflow-hidden .solid-bg {
+    background: transparent !important;
+}
+*[style*="color: rgb(0,0,0) !imoprtant"][style*="--darkreader-inline-color"],
+*[style*="color: rgb(0, 0, 0) !important"][style*="--darkreader-inline-color"] {
+    -webkit-text-fill-color: var(--darkreader-inline-color) !important;
+}
+embed[type="application/pdf"] { filter: invert(100%) contrast(90%); }</style></head>
+
+<body>
+
+<div class="header">
+  <nav>
+    <a href="#" style="--darkreader-inline-bgimage: none; background: yellow; --darkreader-inline-bgcolor: var(--darkreader-background-ffff00, #999900);" data-darkreader-inline-bgcolor="" data-darkreader-inline-bgimage="">Home</a>
+    <a href="https://alfgeir.github.io/support.html" target="_blank">Support</a>
+    <a>|</a>
+    <script>
+      var n = document.querySelector('nav');
+      menu.forEach(s => {
+        if (!s) return n.innerHTML += '<a>|</a>';
+
+        var a = document.createElement('a');
+        a.href = '#' + s.replace('/','').replace(/.*\.\.\..*/,'All');
+        a.innerText = s;
+        n.append(a);
+        n.append(' ');
+      });
+    </script><a href="#Collar">Collar</a> <a href="#Fish">Fish</a> <a href="#Spell">Spell</a> <a href="#Gem">Gem</a> <a href="#Set" style="--darkreader-inline-bgimage: none;">Set</a> <a>|</a><a href="#Helmet">Helmet</a> <a href="#Chest">Chest</a> <a href="#Belt">Belt</a> <a href="#Leggings" style="--darkreader-inline-bgimage: none;">Leggings</a> <a href="#Boots" style="--darkreader-inline-bgimage: none;">Boots</a> <a href="#Shoulder">Shoulder</a> <a href="#Gloves">Gloves</a> <a href="#Shield">Shield</a> <a href="#Ring">Ring</a> <a href="#Necklace">Necklace</a> <a>|</a><a href="#Axe">Axe</a> <a href="#Claw">Claw</a> <a href="#Greataxe">Greataxe</a> <a href="#Greathammer" style="--darkreader-inline-bgimage: none;">Greathammer</a> <a href="#Greatsword">Greatsword</a> <a href="#Mace">Mace</a> <a href="#Polearm">Polearm</a> <a href="#Staff">Staff</a> <a href="#Sword">Sword</a> <a>|</a><a href="#Bow">Bow</a> <a href="#Cannon">Cannon</a> <a href="#Crossbows">Crossbows</a> <a href="#Pistol">Pistol</a> <a href="#Shotgonne" style="--darkreader-inline-bgimage: none;">Shotgonne</a> <a href="#Wand">Wand</a> <a>|</a><a href="#All">Helmet...Wand</a> 
+    <a>|</a>
+    <a href="#Bookmark">🔖</a>
+    <a href="#SaveBookmark" onclick="exportBookmark(); return false">Save🔖</a>
+    <label style="cursor:pointer">
+      <input type="file" style="display:none" onchange="importBookmark(this.files[0]); this.value = ''">
+      Load🔖
+    </label>
+    <select id="lang" onchange="localStorage.setItem('lang',this.value); load()">
+      <script> languages.forEach(_ => document.write(`<option>${_}</option>`)); </script><option selected="selected">EN</option>
+    </select>
+    <a href="#lang" onclick="location.hash = location.hash.slice(1).replace(/#.*/,''); return false" style="display: none;">🔄</a>
+    <script> lang.value = localStorage.getItem('lang') || 'EN'; </script>
+    <label><input type="checkbox" class="showFilters"> filters</label>
+  </nav>
+
+  <script> document.write(filters); </script>
+  <div>
+    <label>
+      Name: <input id="byName" placeholder="" oninput="filter()">
+    </label>
+
+    <label style="display:inline-block">
+      Properties:
+      <input id="byProperties" placeholder="RegExp;RegExp\n" oninput="filter()">
+      <input id="byPropertiesNot" placeholder="(exclude)" oninput="filter()">
+      <div style="position: absolute; margin-top: 4px; font: 12px Arial; color: rgb(136, 0, 0); --darkreader-inline-color: var(--darkreader-text-880000, #ff6d6d);" data-darkreader-inline-color=""></div>
+    </label>
+
+    <label>
+      DPS
+      <select id="byDps" onchange="filter()">
+        <option selected="selected"></option>
+        <option value="100">&gt;=100</option><option value="200">&gt;=200</option><option value="300">&gt;=300</option><option value="400">&gt;=400</option><option value="500">&gt;=500</option><option value="600">&gt;=600</option><option value="700">&gt;=700</option><option value="800">&gt;=800</option><option value="900">&gt;=900</option><option value="1000">&gt;=1000</option><option value="1100">&gt;=1100</option><option value="1200">&gt;=1200</option><option value="1300">&gt;=1300</option><option value="1400">&gt;=1400</option><option value="1500">&gt;=1500</option>
+      </select>
+    </label>
+  </div>
+
+  <div>
+    <span>
+      
+          <label>
+            Strength
+            <select id="byReqStrength" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Dexterity
+            <select id="byReqDexterity" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Focus
+            <select id="byReqFocus" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Vitality
+            <select id="byReqVitality" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Level
+            <select id="byReqLevel" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="10">&lt;=10</option><option value="20">&lt;=20</option><option value="30">&lt;=30</option><option value="40">&lt;=40</option><option value="50">&lt;=50</option><option value="60">&lt;=60</option><option value="70">&lt;=70</option><option value="80">&lt;=80</option><option value="90">&lt;=90</option><option value="100">&lt;=100</option>
+            </select>
+          </label>
+        
+          <label>
+            Class
+            <select id="byReqClass" onchange="filter()">
+              <option selected="selected"></option>
+              
+                  <option>Berserker</option>
+                  <option>Embermage</option>
+                  <option>Engineer</option>
+                  <option>Outlander</option>
+                
+            </select>
+          </label>
+        
+    </span>
+  </div>
+
+  <div>
+    <label>
+      Rarity
+      <select id="byRarity" style="width:10em" onchange="filter()">
+        <option selected="selected"></option>
+        <option class="Magical" value="Magical">Magical</option><option class="Rare" value="Rare">Rare</option><option class="Epic" value="Epic">Unique</option><option class="Legendary" value="Legendary">Legendary</option>
+      </select>
+    </label>
+    <label>
+      Socket
+      <select id="bySocket" onchange="filter()">
+        <option selected="selected"></option>
+        <option value="1">&gt;=1</option><option value="2">&gt;=2</option><option value="3">&gt;=3</option><option value="4">&gt;=4</option><option value="5">&gt;=5</option>
+      </select>
+    </label>
+    <label><input id="byInvert" type="checkbox" onchange="filter()" value=""> Invert</label>
+    <label><input id="byBookmark" type="checkbox" onchange="filter()" value=""> 🔖</label>
+    <label><button id="reset" onclick="document.body.querySelectorAll('nav~* input, nav~* select').forEach(_ => _.checked = _.value = ''); filter()">Reset</button></label>
+    <label>Found: <span class="count">1 / 1</span></label>
+  </div>
+
+</div>
+<div class="header" style="position:relative;visibility:hidden">
+  <nav>
+    <a href="#">Home</a>
+    <a href="https://alfgeir.github.io/support.html" target="_blank">Support</a>
+    <a>|</a>
+    <script>
+      var n = document.querySelector('nav');
+      menu.forEach(s => {
+        if (!s) return n.innerHTML += '<a>|</a>';
+
+        var a = document.createElement('a');
+        a.href = '#' + s.replace('/','').replace(/.*\.\.\..*/,'All');
+        a.innerText = s;
+        n.append(a);
+        n.append(' ');
+      });
+    </script><a href="#Collar">Collar</a> <a href="#Fish">Fish</a> <a href="#Spell">Spell</a> <a href="#Gem">Gem</a> <a href="#Set">Set</a> <a>|</a><a href="#Helmet">Helmet</a> <a href="#Chest">Chest</a> <a href="#Belt">Belt</a> <a href="#Leggings">Leggings</a> <a href="#Boots">Boots</a> <a href="#Shoulder">Shoulder</a> <a href="#Gloves">Gloves</a> <a href="#Shield">Shield</a> <a href="#Ring">Ring</a> <a href="#Necklace">Necklace</a> <a>|</a><a href="#Axe">Axe</a> <a href="#Claw">Claw</a> <a href="#Greataxe">Greataxe</a> <a href="#Greathammer">Greathammer</a> <a href="#Greatsword">Greatsword</a> <a href="#Mace">Mace</a> <a href="#Polearm">Polearm</a> <a href="#Staff">Staff</a> <a href="#Sword">Sword</a> <a>|</a><a href="#Bow">Bow</a> <a href="#Cannon">Cannon</a> <a href="#Crossbows">Crossbows</a> <a href="#Pistol">Pistol</a> <a href="#Shotgonne">Shotgonne</a> <a href="#Wand">Wand</a> <a>|</a><a href="#All">Helmet...Wand</a> 
+    <a>|</a>
+    <a href="#Bookmark">🔖</a>
+    <a href="#SaveBookmark" onclick="exportBookmark(); return false">Save🔖</a>
+    <label style="cursor:pointer">
+      <input type="file" style="display:none" onchange="importBookmark(this.files[0]); this.value = ''">
+      Load🔖
+    </label>
+    <select data-id="lang" onchange="localStorage.setItem('lang',this.value); load()">
+      <script> languages.forEach(_ => document.write(`<option>${_}</option>`)); </script><option selected="selected">EN</option>
+    </select>
+    <a href="#lang" onclick="location.hash = location.hash.slice(1).replace(/#.*/,''); return false" style="display: none;">🔄</a>
+    <script> lang.value = localStorage.getItem('lang') || 'EN'; </script>
+    <label><input type="checkbox" class="showFilters"> filters</label>
+  </nav>
+
+  <script> document.write(filters); </script>
+  <div>
+    <label>
+      Name: <input data-id="byName" placeholder="" oninput="filter()">
+    </label>
+
+    <label style="display:inline-block">
+      Properties:
+      <input data-id="byProperties" placeholder="RegExp;RegExp\n" oninput="filter()">
+      <input data-id="byPropertiesNot" placeholder="(exclude)" oninput="filter()">
+      <div style="position: absolute; margin-top: 4px; font: 12px Arial; color: rgb(136, 0, 0); --darkreader-inline-color: var(--darkreader-text-880000, #ff6d6d);" data-darkreader-inline-color=""></div>
+    </label>
+
+    <label>
+      DPS
+      <select data-id="byDps" onchange="filter()">
+        <option selected="selected"></option>
+        <option value="100">&gt;=100</option><option value="200">&gt;=200</option><option value="300">&gt;=300</option><option value="400">&gt;=400</option><option value="500">&gt;=500</option><option value="600">&gt;=600</option><option value="700">&gt;=700</option><option value="800">&gt;=800</option><option value="900">&gt;=900</option><option value="1000">&gt;=1000</option><option value="1100">&gt;=1100</option><option value="1200">&gt;=1200</option><option value="1300">&gt;=1300</option><option value="1400">&gt;=1400</option><option value="1500">&gt;=1500</option>
+      </select>
+    </label>
+  </div>
+
+  <div>
+    <span>
+      
+          <label>
+            Strength
+            <select data-id="byReqStrength" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Dexterity
+            <select data-id="byReqDexterity" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Focus
+            <select data-id="byReqFocus" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Vitality
+            <select data-id="byReqVitality" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="40">&lt;=40</option><option value="80">&lt;=80</option><option value="120">&lt;=120</option><option value="160">&lt;=160</option><option value="200">&lt;=200</option><option value="240">&lt;=240</option><option value="280">&lt;=280</option><option value="320">&lt;=320</option><option value="360">&lt;=360</option><option value="400">&lt;=400</option>
+            </select>
+          </label>
+        
+          <label>
+            Level
+            <select data-id="byReqLevel" onchange="filter()">
+              <option selected="selected"></option>
+              <option value="10">&lt;=10</option><option value="20">&lt;=20</option><option value="30">&lt;=30</option><option value="40">&lt;=40</option><option value="50">&lt;=50</option><option value="60">&lt;=60</option><option value="70">&lt;=70</option><option value="80">&lt;=80</option><option value="90">&lt;=90</option><option value="100">&lt;=100</option>
+            </select>
+          </label>
+        
+          <label>
+            Class
+            <select data-id="byReqClass" onchange="filter()">
+              <option selected="selected"></option>
+              
+                  <option>Berserker</option>
+                  <option>Embermage</option>
+                  <option>Engineer</option>
+                  <option>Outlander</option>
+                
+            </select>
+          </label>
+        
+    </span>
+  </div>
+
+  <div>
+    <label>
+      Rarity
+      <select data-id="byRarity" style="width:10em" onchange="filter()">
+        <option selected="selected"></option>
+        <option class="Magical" value="Magical"></option><option class="Rare" value="Rare"></option><option class="Epic" value="Epic"></option><option class="Legendary" value="Legendary"></option>
+      </select>
+    </label>
+    <label>
+      Socket
+      <select data-id="bySocket" onchange="filter()">
+        <option selected="selected"></option>
+        <option value="1">&gt;=1</option><option value="2">&gt;=2</option><option value="3">&gt;=3</option><option value="4">&gt;=4</option><option value="5">&gt;=5</option>
+      </select>
+    </label>
+    <label><input data-id="byInvert" type="checkbox" onchange="filter()" value=""> Invert</label>
+    <label><input data-id="byBookmark" type="checkbox" onchange="filter()" value=""> 🔖</label>
+    <label><button data-id="reset" onclick="document.body.querySelectorAll('nav~* input, nav~* select').forEach(_ => _.checked = _.value = ''); filter()">Reset</button></label>
+    <label>Found: <span class="count">1 / 1</span></label>
+  </div>
+
+</div>
+
+<div id="list" style="opacity: 1;"><div class="Normal" style="opacity: 1;"><span style="position: relative; padding: 4px 52px 4px 4px; background: rgba(255, 255, 255, 0.267); --darkreader-inline-bgcolor: var(--darkreader-background-ffffff44, rgba(24, 26, 27, 0.27)); --darkreader-inline-bgimage: none;" data-darkreader-inline-bgcolor="" data-darkreader-inline-bgimage="">Welcome to the Torchlight II Database<a class="png" target="_blank" href="#" style="display: none;">🎨</a><a class="link" style="display: none;"></a><a class="link" href="# #EN#Welcome_to_the_Torchlight_II_Database" style="display: none;" title="">🔗</a></span><span style="padding: 0px 4px 4px; background: rgba(255, 255, 255, 0.267); text-align: right; display: none; --darkreader-inline-bgcolor: var(--darkreader-background-ffffff44, rgba(24, 26, 27, 0.27)); --darkreader-inline-bgimage: none;" data-darkreader-inline-bgcolor="" data-darkreader-inline-bgimage=""><span> <br></span></span><div style="padding: 8px; background: rgba(255, 255, 255, 0.533); flex-grow: 1; --darkreader-inline-bgcolor: var(--darkreader-background-ffffff88, rgba(24, 26, 27, 0.53)); --darkreader-inline-bgimage: none;" data-darkreader-inline-bgcolor="" data-darkreader-inline-bgimage="">Data source:
+•  http://www.dethguild.com/torchlight_item_database.php
+•  https://torchlight.fandom.com/wiki/Items_(T2)
+</div></div></div>
+<div id="combined"></div>
+<span class="combine" style="display: none;">
+  <button onclick="confirm('Deselect?') &amp;&amp; document.querySelectorAll('.selectCount').forEach(_ => _.remove())">Deselect</button>
+  <button onclick="combine()">Combine</button>
+  <span>Alt + click to select</span>
+  <label><input id="highlight" type="checkbox" style="margin:0"> highlight selectable</label>
+</span>
+
+<script>
+  var f = document.querySelectorAll('.header');
+  f[1].innerHTML = f[0].innerHTML.replaceAll('id=','data-id=');
+
+  var lastHash = location.hash;
+  onpopstate = e => {
+    if (e.state)
+      document.body.querySelectorAll('nav~* input, nav~* select').forEach((_,i) => _.checked = _.value = e.state[i]);
+    else if (lastHash.split('#').length > 3 && location.hash.split('#').length < 4)
+      reset.click();
+
+    lastHash = location.hash;
+    load();
+  };
+
+  load();
+</script>
+<harper-render-box popover="manual" style="pointer-events: none; border: medium; --darkreader-inline-border-top: medium; --darkreader-inline-border-right: medium; --darkreader-inline-border-bottom: medium; --darkreader-inline-border-left: medium; visibility: hidden !important;" data-darkreader-inline-border-top="" data-darkreader-inline-border-right="" data-darkreader-inline-border-bottom="" data-darkreader-inline-border-left=""></harper-render-box></body></html>

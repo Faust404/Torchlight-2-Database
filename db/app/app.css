@@ -1,0 +1,336 @@
+/* Torchlight II item database -- visual language borrowed from grimtools.com/db:
+   a fixed dark palette, the leader-dot stat row, and 350px flex cards. The tier
+   colours are TL2's own, not Grim Dawn's. */
+
+:root{
+  --bg:#12110f; --panel:#171614; --line:#211e1c; --div:#2b251b;
+  --head:#dec2a3; --label:#a88054; --gold:#e3ba6b; --teal:#4db4b9; --muted:#999;
+
+  /* Tier colours, read out of the game's own art rather than guessed at.
+     TL2 paints item quality with the QUALITY_OVERLAY_* images, which live in
+     MEDIA/UI/HUD/INGAMETEXTURESHEETS6.DDS (the tile rects are declared in the
+     matching .IMAGESET). Sampling the saturated pixels of each tile gives the
+     game's palette directly:
+        magical #319C00   rare #2182FF   unique #EF6100   set #7B00CE
+        quest   #D38E00   unidentified #E90008
+     Three of those map onto tiers this site has -- rare, unique, set -- and are
+     used verbatim below.
+
+     `set` is the one exception. #7B00CE is a glow meant to sit on icon art and
+     only reaches 2.35:1 against the panel, which is unreadable as text, so it is
+     lifted to #A855F7 (4.57:1, AA) along the same hue. The others land above
+     4.9:1 and are untouched.
+
+     Two tiers have no overlay to read: the game draws Normal items uncoloured
+     (so --t-normal is simply near-white) and ships no legendary overlay at all,
+     so --t-legendary keeps the red this project already used.
+
+     `set` is now defined but not worn by any item: Set is a membership rather
+     than a rarity, so every set piece is painted in the colour of what it
+     actually is -- Rare blue or Unique orange -- and `t-`/`q-set` survive for
+     the tier's own sake, not for anything on the page. The value is kept
+     because it is the game's, and because the tier is still a live filter. */
+  --t-normal:#e6e6e6; --t-rare:#2182ff; --t-unique:#ef6100;
+  --t-set:#a855f7; --t-legendary:#ff3100; --t-none:#8a8a8a;
+
+  --rail:220px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:#c9c2b6;
+  font:13px/1.45 "Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  overflow:hidden;
+}
+a{color:inherit; text-decoration:none}
+button,input,select{font:inherit; color:inherit}
+
+/* ------------------------------------------------------------------ shell */
+#app{display:flex; flex-flow:row nowrap; height:100vh}
+
+#rail{
+  min-width:var(--rail); width:var(--rail); flex:0 0 var(--rail);
+  background:var(--panel); border-right:1px solid var(--div);
+  overflow-y:auto; overflow-x:hidden;
+}
+#main{flex:1 1 auto; display:flex; flex-direction:column; min-width:0; min-height:0}
+#grid-wrap{flex:1 1 auto; display:flex; flex-direction:column; min-height:0}
+
+/* ------------------------------------------------------------------- rail */
+.brand{
+  padding:12px 14px 10px; border-bottom:1px solid var(--line);
+  color:var(--head); font-size:14px; letter-spacing:.02em;
+}
+.brand small{display:block; color:var(--label); font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; margin-top:3px}
+.brand a{float:right; color:var(--label); font-size:11px; margin-top:2px}
+.brand a:hover{color:var(--gold)}
+
+.rsearch{padding:8px 10px; border-bottom:1px solid var(--line)}
+.rsearch input{
+  width:100%; padding:6px 8px; background:#0e0d0c; border:1px solid var(--div);
+  border-radius:3px; outline:none;
+}
+.rsearch input:focus{border-color:var(--label)}
+
+.sec{border-bottom:1px solid var(--line)}
+.sec-h{
+  display:flex; align-items:center; gap:6px; padding:7px 10px;
+  cursor:pointer; user-select:none; color:var(--label);
+  font-size:10px; letter-spacing:.13em; text-transform:uppercase;
+}
+.sec-h:hover{color:var(--gold)}
+.sec-h .tog{font-family:ui-monospace,Consolas,monospace; width:9px; color:var(--muted)}
+.sec-h .n{margin-left:auto; color:var(--muted); letter-spacing:0; font-size:10px}
+.sec-b{padding:2px 10px 9px}
+.sec.closed .sec-b{display:none}
+
+/* facet rows: checkbox, label, right-aligned count */
+.f{
+  display:flex; align-items:center; gap:7px; padding:2px 4px; border-radius:3px;
+  cursor:pointer; line-height:1.7;
+}
+.f:hover{background:#1e1c19}
+.f input{margin:0; accent-color:#8a6a3a; flex:0 0 auto}
+.f .lbl{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.f .ct{color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums}
+.f.off .lbl,.f.off .ct{opacity:.38}
+.f.off input{opacity:.5}
+
+/* grouped type rows. A group header is a bulk toggle over the types beneath
+   it, so it is a control -- but it still has to read as a caption over the rows
+   it rules, which is why it is the one rail element that is not 10px uppercase
+   and why its rows step in below it. grimtools does the same.
+
+   The subgroup header is `sgrp` and not `sub` on purpose: `.card .sub` is the
+   card's type line, which predates this block, and a bare `.sub` rule here
+   would leak text-transform and letter-spacing onto every card -- which is
+   exactly what happened, rendering "Quest Item" as "QUEST ITEM". */
+.grp,.sgrp{
+  display:flex; align-items:center; gap:6px; padding:5px 4px 3px;
+  cursor:pointer; user-select:none; border-radius:3px; margin-top:3px;
+}
+.grp{color:var(--head); font-size:11.5px; letter-spacing:.03em}
+.sgrp{
+  color:var(--label); font-size:10px; letter-spacing:.13em;
+  text-transform:uppercase; padding-left:12px; margin-top:1px;
+}
+.grp:hover,.sgrp:hover{background:#1e1c19; color:var(--gold)}
+.grp .lbl,.sgrp .lbl{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.grp .ct,.sgrp .ct{color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums}
+.grp.off,.sgrp.off{opacity:.45}
+/* tri-state: the header is the only thing that says what a click will do, so
+   "all of it" and "some of it" must not look the same */
+.grp.on,.sgrp.on{color:var(--gold)}
+.grp.part .lbl:after,.sgrp.part .lbl:after{content:"·"; color:var(--gold); margin-left:4px}
+/* the rows a group owns step in under it -- one class per depth, set by
+   typesBody(), so this does not depend on nesting */
+.f.s0{padding-left:14px}
+.f.s1{padding-left:26px}
+
+.rng{display:flex; align-items:center; gap:6px; padding:3px 4px}
+.rng input{width:100%; min-width:0; padding:4px 6px; background:#0e0d0c;
+  border:1px solid var(--div); border-radius:3px; outline:none}
+.rng input:focus{border-color:var(--label)}
+.rng span{color:var(--muted)}
+/* the requirement-label column: wide enough for "Dexterity", which is the
+   longest of the four stat names (see REQLABEL in app.js) */
+.rng .rl{flex:0 0 60px; color:var(--label)}
+
+/* ---------------------------------------------------------------- toolbar */
+#bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:9px 14px; background:var(--panel); border-bottom:1px solid var(--div);
+}
+#bar .count{color:var(--label)}
+#bar .count b{color:var(--head); font-weight:600}
+#bar .sp{flex:1 1 auto}
+#bar button{
+  background:#22201d; border:1px solid var(--div); border-radius:3px;
+  padding:5px 11px; cursor:pointer;
+}
+#bar button:hover{border-color:var(--label); color:var(--gold)}
+#bar button.on{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+#bar select{background:#22201d; border:1px solid var(--div); border-radius:3px; padding:5px 7px}
+#bar label{color:var(--label)}
+
+/* ------------------------------------------------------------------- grid */
+#scroll{flex:1 1 auto; overflow-y:auto; padding:12px 14px 60px}
+#grid{display:flex; flex-flow:row wrap; align-content:flex-start; margin:-4px}
+
+.card{
+  flex:0 0 350px; width:350px; margin:4px; padding:9px 10px;
+  background:var(--panel); border:1px solid var(--line); border-radius:4px;
+  display:flex; gap:10px; align-items:flex-start; cursor:pointer;
+  /* the browser skips layout+paint for offscreen cards; the honest hint keeps
+     the scrollbar from jittering as they resolve */
+  content-visibility:auto; contain-intrinsic-size:auto 74px;
+}
+.card:hover{border-color:var(--label); background:#1c1a17}
+.card .art{flex:0 0 auto; width:46px; height:46px; display:flex;
+  align-items:center; justify-content:center}
+.card .art i{background-image:var(--sprite); background-repeat:no-repeat; display:block}
+.card .ph{
+  width:42px; height:42px; border:1px solid var(--div); border-radius:3px;
+  display:flex; align-items:center; justify-content:center; color:#5c5650;
+  font-size:15px; font-weight:600; background:#100f0e;
+}
+.card .meta{flex:1 1 auto; min-width:0}
+.card .nm{display:block; font-size:14px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+.card .sub{display:block; color:var(--muted); font-size:11.5px; margin-top:1px}
+.card .st{display:block; margin-top:4px; font-size:11.5px; color:var(--label)}
+.card .st b{color:#d8cfc0; font-weight:600}
+
+/* tier colours -- one bare class on the card root, inherited by the subtree */
+.q-normal  .nm{color:var(--t-normal)}
+.q-rare    .nm{color:var(--t-rare)}
+.q-unique  .nm{color:var(--t-unique)}
+.q-set     .nm{color:var(--t-set)}
+.q-legendary .nm{color:var(--t-legendary)}
+.q-unclassified .nm{color:var(--t-none)}
+
+.q-normal  {border-left:3px solid var(--t-normal)}
+.q-rare    {border-left:3px solid var(--t-rare)}
+.q-unique  {border-left:3px solid var(--t-unique)}
+.q-set     {border-left:3px solid var(--t-set)}
+.q-legendary {border-left:3px solid var(--t-legendary)}
+.q-unclassified {border-left:3px solid var(--t-none)}
+
+#more{padding:16px 4px; color:var(--label)}
+#more button{margin-left:8px; background:#22201d; border:1px solid var(--div);
+  border-radius:3px; padding:5px 11px; cursor:pointer}
+#more button:hover{border-color:var(--gold); color:var(--gold)}
+
+/* ---------------------------------------------------------- detail (item) */
+#detail{flex:1 1 auto; overflow-y:auto; padding:16px 18px 60px; display:none}
+#app.item #grid-wrap{display:none}
+#app.item #detail{display:block}
+
+.dwrap{max-width:760px}
+.dtop{display:flex; gap:18px; align-items:flex-start; margin-bottom:14px}
+.dart{
+  flex:0 0 auto; background:#100f0e; border:1px solid var(--div); border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  /* cell sized by equip slot, imitating the in-game inventory silhouette */
+}
+.dart.weapon{width:68px; height:130px}
+.dart.chest{width:68px; height:100px}
+.dart.head{width:68px; height:68px}
+.dart.waist{width:68px; height:36px}
+.dart.jewel{width:36px; height:36px}
+.dart i{background-image:var(--sprite); background-repeat:no-repeat; display:block}
+
+.dname{color:var(--head); font-size:21px; margin:0 0 4px}
+/* The type line reads "<tier> <type>" -- "Rare Pistol" -- with the tier word
+   painted in its own tier colour, since that is the one word in the line
+   carrying information the type does not. It used to read "Pistol Rare" with
+   the tier in flat teal, a colour no tier owns.
+
+   The `.q-*` rules above cannot do this job: they colour a *descendant* named
+   `.nm` and draw the card's left rule, and this line is neither a card nor an
+   `.nm`. So the tiers get a second, plainer class that colours whatever it is
+   put on. The two lists cannot drift: app.js derives the `t-` name from the
+   `q-` one, so a tier added to one is added to both. */
+.dtype{color:var(--muted); font-size:12.5px}
+.dtype em{font-style:normal}
+.t-normal{color:var(--t-normal)}
+.t-rare{color:var(--t-rare)}
+.t-unique{color:var(--t-unique)}
+.t-set{color:var(--t-set)}
+.t-legendary{color:var(--t-legendary)}
+.t-unclassified{color:var(--t-none)}
+.back{color:var(--label); font-size:12px; display:inline-block; margin-bottom:10px}
+.back:hover{color:var(--gold)}
+
+.block{margin:14px 0 0; border-top:1px solid var(--line); padding-top:10px}
+.block h3{margin:0 0 7px; color:var(--label); font-size:10px; letter-spacing:.13em;
+  text-transform:uppercase; font-weight:600}
+
+/* leader-dot row -- carries most of grimtools' visual identity */
+.row{display:flex; align-items:baseline; gap:6px; padding:2px 0}
+.row .k{color:var(--label)}
+.row .fill{flex:1 1 auto; border-bottom:1px dashed rgba(168,128,84,.12);
+  transform:translateY(-3px)}
+.row .v{color:#d8cfc0; font-variant-numeric:tabular-nums}
+.row .v.big{color:var(--gold); font-weight:600}
+
+/* dividers that part two groups inside a tooltip: the "or" between an item's
+   requirement branches, the line marking an augmented weapon's unlockable stats
+   as conditional (both in renderDetail), and one per rung of a set's bonus
+   ladder. All three are the same object -- a word ruled off on both sides. */
+.or,.cond,.thr{display:flex; align-items:center; gap:8px; padding:3px 0; color:var(--label);
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase}
+.or:before,.or:after,.cond:before,.cond:after,.thr:before,.thr:after{content:""; flex:1 1 auto;
+  border-top:1px solid var(--line)}
+.cond{color:var(--gold)}
+.cond:before,.cond:after{border-top-style:dashed; border-top-color:var(--div)}
+
+/* A ladder's rungs need more room above them than the two `or`/`cond` dividers
+   do: those part two groups and read fine tight, while a rung follows a bonus
+   line and would collide with it. */
+.thr{padding-top:7px}
+
+/* The rungs a set gates above the number of pieces it ships: 15 of the 80 sets
+   declare one, Twinferno's 2-piece bonus sitting on a one-piece set being the
+   extreme. They are drawn, not dropped, because the game's own set file
+   declares them and a player comparing this page to the wiki should see the
+   same ladder -- but they are dimmed, since nothing a player does reaches them.
+
+   `.fx.locked` above is deliberately not reused. It means something else (a
+   stat the item has, gated behind a task the player can still complete) and it
+   is asserted on by name in check_page.js, so borrowing it would make those
+   assertions quietly match more than they were written to. */
+.thr.over{color:#6f6862}
+.fx.over li{color:#8d8579}
+.fx.over li:before{color:#6b645c}
+
+/* the set a ladder belongs to, once, above its rungs */
+.seth{margin:0 0 2px; color:var(--head)}
+.seth .ct{color:var(--muted); font-size:11.5px; margin-left:7px}
+
+/* the task whose completion unlocks them -- the one thing the player must do */
+.task{display:inline-block; padding:3px 9px; margin:1px 0 2px; color:var(--gold);
+  background:#241d12; border:1px solid var(--div); border-radius:3px}
+
+.fx{margin:0; padding:0; list-style:none}
+.fx li{padding:2px 0 2px 12px; position:relative; color:#bdb4a6}
+.fx li:before{content:"\2022"; position:absolute; left:2px; color:var(--label)}
+
+/* the unlockable group, which is not yet active and so must not read like the
+   affixes above: dimmer, and ruled off to the left of the bullet */
+.fx.locked li{color:#8d8579; border-left:2px solid var(--div); margin-left:1px;
+  padding-left:16px}
+.fx.locked li:before{left:7px; color:#6b645c}
+
+.dmg span{display:inline-block; margin-right:14px; white-space:nowrap}
+.dmg .k{color:var(--label); margin-right:4px}
+
+.prov{margin-top:18px; border-top:1px solid var(--line); padding-top:9px;
+  color:#6f6862; font-size:11px; font-family:ui-monospace,Consolas,monospace;
+  word-break:break-all; line-height:1.7}
+.prov b{color:#8b837b; font-weight:600}
+.tag{display:inline-block; padding:1px 5px; border:1px solid var(--div);
+  border-radius:3px; color:var(--label); font-size:10px; margin-left:6px}
+
+/* --------------------------------------------------------------- empty/msg */
+.msg{padding:40px 6px; color:var(--label); text-align:center}
+
+/* -------------------------------------------------------------- responsive */
+#railbtn{display:none}
+@media (max-width:768px){
+  #rail{
+    position:absolute; left:0; top:0; bottom:0; z-index:20;
+    transform:translateX(-100%); transition:transform .16s ease;
+    box-shadow:0 0 22px #000;
+  }
+  #rail.floating{transform:none}
+  #railbtn{display:inline-block}
+  #railscrim{display:none; position:absolute; inset:0; z-index:19; background:rgba(0,0,0,.5)}
+  #railscrim.on{display:block}
+  .card{flex:1 1 auto; width:auto; min-width:0}
+  /* the group headers are controls now, not just captions -- give them a
+     finger-sized target on the drawer */
+  .grp,.sgrp{padding-top:8px; padding-bottom:7px}
+}

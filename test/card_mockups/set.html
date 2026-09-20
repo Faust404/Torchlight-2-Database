@@ -1,0 +1,260 @@
+<!doctype html>
+<title>Torchlight II Set Bonuses</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;600&display=swap">
+<style>
+/* One question about the set block: what the ladder should look like now that
+   the affixes above it are Bitter serif with lifted cream values. Four
+   treatments, then the four of them together.
+
+   The specimens sit on --panel, the ground the card actually gives the ladder,
+   and the card's tokens are copied verbatim from mock.tpl.html. */
+
+:root{
+  color-scheme:dark;
+  --bg:#12110f; --panel:#171614; --line:#211e1c; --div:#2b251b;
+  --head:#dec2a3; --label:#a88054; --gold:#e3ba6b; --muted:#999;
+  --body:#c9c2b6; --val:#d8cfc0; --dim:#8b837b; --faint:#6f6862;
+  --magic:#7cc24a;
+  --t-normal:#e6e6e6; --t-rare:#2182ff; --t-unique:#ef6100;
+  --t-set:#a855f7; --t-legendary:#ff3100; --t-none:#8a8a8a;
+  --ui:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --doc:Bitter,Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0; padding-block:26px 100px; padding-inline:22px;
+  background:var(--bg); color:var(--body); font:13px/1.45 var(--ui);
+}
+.pg{max-width:1600px;margin:0 auto}
+h1{color:var(--head);font-family:var(--doc);font-size:26px;line-height:1.2;
+  margin:0 0 8px;font-weight:600;text-wrap:balance}
+.sub{color:var(--dim);font-family:var(--doc);font-size:15px;line-height:1.5;
+  max-width:64ch;margin:0 0 20px;text-wrap:balance}
+h2{color:var(--head);font-family:var(--doc);font-size:16px;font-weight:600;
+  margin:34px 0 4px}
+h2 span{color:var(--faint);font-family:var(--ui);font-size:12px;font-weight:400;
+  margin-left:9px}
+
+.note{color:var(--faint);font-size:12px;max-width:86ch;margin:0 0 30px;
+  border-left:2px solid var(--div);padding-left:11px}
+.note b{color:var(--label);font-weight:600}
+.note code{font-family:ui-monospace,Consolas,monospace;color:var(--dim)}
+.note i{font-style:normal;color:var(--val)}
+.lede{color:var(--dim);font-size:12.5px;max-width:86ch;margin:0 0 16px}
+.lede b{color:var(--label);font-weight:600}
+
+.grid{display:grid;gap:14px;align-items:start;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+figure{margin:0;min-width:0}
+figcaption{display:flex;align-items:baseline;gap:7px;margin:0 0 6px}
+figcaption b{color:var(--head);font-family:var(--doc);font-size:13.5px;
+  font-weight:600}
+figcaption span{color:var(--faint);font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase}
+
+/* The card's ground, and nothing else of the card. */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:11px 12px}
+.who{margin:0 0 2px;color:var(--faint);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase}
+.who em{font-style:normal;letter-spacing:0;text-transform:none;color:#5f5952;
+  font-family:ui-monospace,Consolas,monospace;font-size:10px;margin-left:5px}
+/* The two counts on their own line rather than trailing the name: at a 300px
+   column the pair does not fit beside the item id, and a wrapped count reads
+   as a second specimen. */
+.cnt{margin:0 0 5px;color:var(--label);font-size:10px;
+  font-family:ui-monospace,Consolas,monospace}
+.rule{height:1px;background:var(--line);margin:12px 0}
+.card > div:last-child .rule{display:none}
+
+/* ------------------------------------------------------- the ladder, verbatim
+   Copied from mock.tpl.html so that S1 is the card as it ships and nothing here
+   is a restatement of the thing under study. */
+.sname{margin:0 0 4px;color:var(--t-set);font-size:12.5px}
+.sname .ct{color:color-mix(in srgb,var(--t-set) 46%,#8b837b);font-size:11.5px;
+  margin-left:6px}
+.rung{display:flex;gap:7px;align-items:baseline;margin:0;padding:1.5px 0}
+.rung .rn{flex:0 0 auto;min-width:19px;height:16px;padding:0 5px;border-radius:8px;
+  background:color-mix(in srgb,var(--t-set) 26%,#1a1520);
+  color:color-mix(in srgb,var(--t-set) 40%,#fff);
+  font-size:10px;line-height:16px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.rung .rt{color:#bdb4a6}
+.rung.over .rn{background:color-mix(in srgb,var(--t-set) 9%,#1a1520);
+  color:color-mix(in srgb,var(--t-set) 30%,#8b837b)}
+.rung.over .rt{color:#8d8579}
+
+/* ----------------------------------------------------------- S4: the serif */
+.s4 .rung .rt{font-family:var(--doc)}
+
+/* ------------------------------------------------------ S5: values lifted */
+.s5 .rung .rt .n{color:var(--head);font-weight:600;
+  font-variant-numeric:tabular-nums}
+/* The lift out-specifies the muting, so an unreachable rung keeps the one
+   brightest thing on it. Restated on the number, weight kept: the value dims
+   with the words it belongs to. */
+.s5 .rung.over .rt .n,.s7 .rung.over .rt .n,.s8 .rung.over .rt .n{color:inherit}
+
+/* ---------------------------------------------------------- S6: quiet rung
+   The pill becomes a figure. Same column, same tabular alignment, no lozenge
+   and no tinted ground -- the set already says purple in the heading above. */
+.s6 .rung .rn{background:none;padding:0;min-width:15px;text-align:right;
+  color:color-mix(in srgb,var(--t-set) 58%,#fff)}
+.s6 .rung.over .rn{background:none;
+  color:color-mix(in srgb,var(--t-set) 24%,#8b837b)}
+
+/* ------------------------------------------------------------- S7: all of it
+   The proposal: S2's heading and S3's dimming, S4's face, S5's values, S6's
+   rung. S8 is S7 plus the heading the card ended up shipping, kept beside it so
+   the sheet does not claim S7's heading is the one in use. */
+.s7 .rung .rt,.s8 .rung .rt{font-family:var(--doc)}
+.s7 .rung .rt .n,.s8 .rung .rt .n{color:var(--head);font-weight:600;
+  font-variant-numeric:tabular-nums}
+.s7 .rung .rn,.s8 .rung .rn{background:none;padding:0;min-width:15px;
+  text-align:right;color:color-mix(in srgb,var(--t-set) 58%,#fff)}
+.s7 .rung.over .rn,.s8 .rung.over .rn{background:none;
+  color:color-mix(in srgb,var(--t-set) 24%,#8b837b)}
+</style>
+
+<body>
+<div class="pg">
+  <h1>Set bonuses: the ladder</h1>
+  <p class="sub">One block, four questions — what it counts, the face it is set
+     in, the values inside it, and the marker down its left edge — in the seven
+     settings that turned out to be worth showing.</p>
+
+  <p class="note">
+    <b>The heading quotes a number that is not a piece count.</b> It reads
+    <code>16 pieces (10 piece set)</code> on Mondon's Vestment, and those are
+    two different quantities wearing the same word. The 16 is a <i>record
+    count</i>: <code>sets.json</code>'s <code>c</code> is how many entries in
+    <code>items.json</code> carry that <code>setid</code>, and Mondon's ships
+    two item levels of the same seven armour slots — Mondon's at 99 and
+    Outercore at 105 — plus one necklace and one ring, so 7&#215;2+1+1=16
+    records.
+    <br><br>
+    <b>The 10 is right, though, and the set does not have ten items — it has
+    nine.</b> The ladder counts pieces <i>worn</i>, and a character has two ring
+    slots. That is the game's own slot list rather than an inference:
+    <code>MEDIA/INVENTORY/</code> ships <code>HEAD</code> <code>TORSO</code>
+    <code>SHOULDERS</code> <code>GLOVES</code> <code>PANTS</code>
+    <code>BOOTS</code> <code>BELT</code> <code>NECKLACE</code>
+    <code>RING1</code> <code>RING2</code> <code>RIGHTHAND</code>
+    <code>LEFTHAND</code>, and <code>RING1.DAT</code> and
+    <code>RING2.DAT</code> differ only in their own names — both declare
+    <code>UNIT_TYPE = RING</code>. Mondon's Ring fills both, so nine item types
+    wear as ten pieces.
+    <br><br>
+    Which gives the number the <i>dimming</i> should be using. A set's capacity
+    is 2 for a ring, 2 for each one-handed weapon type, 1 for everything else —
+    and <b>52 of the 80 ladders top out at exactly that</b>, with none above it
+    but Cornerstone, whose seven single-slot items carry a nine-rung ladder.
+    Xtro's Blades is the clearest case: a claw and a ring, two item types, a
+    ladder that runs to 4. Twinferno is the same shape and names itself for it —
+    one wand, a ladder of two, worn as a pair.
+    <br><br>
+    The shipped test is <code>rung &gt; c</code>, the record count, and it errs
+    in <b>one direction only</b>: it dims <b>15 rungs across 14 sets</b> that a
+    character can reach, and admits none that it cannot. Twinferno's only rung
+    is one of the 15 — the card dims the single bonus of a set built to be
+    dual-wielded.
+    <br><br>
+    <b>The card's heading keeps both numbers and gives each its own word</b> —
+    <code>16 items · 10 piece set</code> — so neither is lost and the pair no
+    longer contradicts itself. That is S8 below, and it is what the card ships.
+  </p>
+
+  <h2>Variations <span>S1 is what ships today · S8 is what the card now carries</span></h2>
+  <p class="lede">Three specimens. <b>Mondon's Belt</b> is the inflated heading
+     — 16 records, 9 item types, 10 worn — and the only ladder long enough to
+     read as a ladder. <b>Twinferno Wand</b> is one wand with a two-piece
+     ladder, which is the <code>1 pieces</code> bug and the wrongly dimmed rung
+     at once. <b>Aristocrat Belt</b> is a set that agrees with itself on every
+     count, and the only specimen with a rung carrying four bonuses, which is
+     where the blank continuation marker appears.</p>
+  <div class="grid" id="vars"></div>
+</div>
+
+<script>
+var M = {"spec":[{"n":"Mondon's Belt","id":"engineer_06_belt_alt_set","set":"Mondon’s Vestment","c":16,"slots":9,"cap":10,"b":[[2,["+5% Attack Speed"]],[3,["87 Health stolen on hit"]],[4,["231 Physical Damage Reflected"]],[5,["-235 to All Armor per hit"]],[6,["-7,5% Physical Damage Taken for each monster within 3m"]],[7,["Charge  rate increased by 25%"]],[8,["+15% to Physical Armor"]],[9,["+100% Damage to secondary targets"]],[10,["20% chance to Stun target for 5 sec."]]]},{"n":"Twinferno Wand","id":"z_wand_m01_set","set":"Twinferno","c":1,"slots":1,"cap":2,"b":[[2,["12% Damage bonus when dual-wielding"]]]},{"n":"Aristocrat Belt","id":"pimp_01_belt_alt_set","set":"Aristocrat","c":8,"slots":8,"cap":9,"b":[[2,["+6% Cast Speed"]],[3,["2% Mana stolen"]],[4,["+8% to Electric Damage","+8% to Fire Damage","+8% to Ice Damage","+8% to Poison Damage"]]]}]};
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* Same rule as the affix block, so S4 is literally the treatment chosen there
+   applied here -- sign and percent travel with the number. */
+function mark(s) {
+  var out = '', last = 0, m, re = /[-+]?\d+(?:[.,]\d+)?%?/g;
+  while ((m = re.exec(s))) {
+    out += esc(s.slice(last, m.index)) + '<span class="n">' + esc(m[0]) + '</span>';
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last));
+}
+
+/* v.count swaps the heading for the ladder's own top rung; v.cap swaps the
+   dimming test from the record count to the slot capacity; v.both is the pair
+   the card ships, which needs a different word for each number -- "items" for
+   the records, "piece set" for the rung -- because calling both of them
+   "pieces" is what made `16 pieces (10 piece set)` read as a contradiction. */
+function ladder(g, v) {
+  var top = g.b.length ? g.b[g.b.length - 1][0] : 0;
+  var head = v.both
+    ? g.c + (g.c === 1 ? ' item' : ' items') + ' · ' + top + ' piece set'
+    : v.count
+      ? top + (top === 1 ? ' piece' : ' pieces')
+      : g.c + ' pieces (' + top + ' piece set)';
+  var reach = v.cap ? g.cap : g.c;
+  return '<p class="sname">' + (v.both ? 'Set: ' : '') + esc(g.set) +
+    '<span class="ct">' + esc(head) + '</span></p>' +
+    g.b.map(function (r) {
+      var over = r[0] > reach;
+      return r[1].map(function (f, i) {
+        return '<p class="rung' + (over ? ' over' : '') + '">' +
+          (i ? '<span class="rn"></span>' : '<span class="rn">' + r[0] + '</span>') +
+          '<span class="rt">' + mark(f) + '</span></p>';
+      }).join('');
+    }).join('');
+}
+
+function card(cls, v) {
+  return '<div class="card ' + cls + '">' + M.spec.map(function (g, i) {
+    return '<div>' + (i ? '<div class="rule"></div>' : '') +
+      '<p class="who">' + esc(g.n) + '<em>' + esc(g.id) + '</em></p>' +
+      '<p class="cnt">' + g.c + ' records · ' + g.slots + ' item types · ' +
+      g.cap + ' worn</p>' +
+      ladder(g, v) + '</div>';
+  }).join('') + '</div>';
+}
+
+var VARS = [
+  ['s1', 'S1 · Today', {}, 'the shipped ladder — sans, flat values, purple pill'],
+  ['s2', 'S2 · The heading', {count: 1},
+   'the heading quotes the top rung: 10 pieces, 2 pieces, 4 pieces'],
+  ['s3', 'S3 · The dimming', {cap: 1},
+   'a rung is dimmed against what a character can wear, not against the record count'],
+  ['s4', 'S4 · The card’s serif', {},
+   'bonus text takes --doc, as the affixes now do'],
+  ['s5', 'S5 · Values lifted', {},
+   'the C2 rule: numbers in --head at 600, words unchanged'],
+  ['s6', 'S6 · Quiet rung', {},
+   'the pill becomes a plain figure in the set purple'],
+  ['s7', 'S7 · All of it', {count: 1, cap: 1},
+   'the heading and the dimming, the serif, the lifted values, the quiet rung'],
+  ['s8', 'S8 · What the card ships', {both: 1, cap: 1},
+   'S7 with the heading the card ended up carrying — Set: prefix, and both counts kept']
+];
+
+document.getElementById('vars').innerHTML = VARS.map(function (v) {
+  return '<figure><figcaption><b>' + esc(v[1]) + '</b></figcaption>' +
+         '<p class="lede" style="margin:0 0 7px">' + esc(v[3]) + '</p>' +
+         card(v[0], v[2]) + '</figure>';
+}).join('');
+</script>
+</body>
+</html>

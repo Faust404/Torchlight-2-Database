@@ -1,0 +1,283 @@
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1">
+  <link rel="stylesheet" href="config.css">
+  <style>
+    body {
+      margin:     0 0 1.5em 0;
+      min-width:  fit-content;
+      background: #000;
+      overflow-y: scroll;
+    }
+
+    a, label {
+      white-space:     nowrap;
+      text-decoration: none;
+    }
+
+    .header {
+      position:   fixed;
+      box-sizing: border-box;
+      left:       0;
+      top:        0;
+      width:      100%;
+      background: #888e;
+      z-index:    1;
+    }
+    .header>* {
+      padding:    .5em;
+    }
+    @media (max-width:1080px) {
+      .header:has(.showFilters:not(:checked)) div {
+        display:  none;
+      }
+    }
+    @media not (max-width:1080px) {
+      label:has(.showFilters) {
+        display:  none;
+      }
+    }
+
+    nav {
+      background:   #ccce;
+      line-height:  1.5em;
+    }
+    nav>* {
+      margin-right: 1em;
+      padding:      0 .1em;
+      color:        initial;
+    }
+
+    nav~*>label:not(:last-child) {
+      margin-right: 2em;
+    }
+    nav~* input:not([type]) {
+      width:        10em;
+    }
+    nav~* input:checked,
+    nav~* input:not([type]):not(:placeholder-shown),
+    nav~* select:has(option:first-child:not(:checked)) {
+      outline:      4px solid yellow;
+    }
+
+    #combined:empty {
+      display:     none;
+    }
+    #combined, #list {
+      display:     flex;
+      flex-wrap:   wrap;
+      gap:         4px;
+      margin:      .5em;
+    }
+    #combined>div div>div, #list>div div>div {
+      margin-left: 1em;
+    }
+
+    .Normal, .Magical, .Rare, .Epic, .Legendary {
+      display:        flex;
+      flex-direction: column;
+      position:       relative;
+      max-width:      1000px;
+      white-space:    pre-wrap;
+      break-inside:   avoid;
+    }
+
+    .png {
+      position: absolute;
+      right:    26px;
+      top:      3px;
+      cursor:   pointer;
+    }
+    .link {
+      position: absolute;
+      right:    2px;
+      top:      3px;
+    }
+    .link:not(:empty)+.link {
+      display:  none;
+    }
+
+    .completionBonus {
+      display:               grid;
+      grid-template-columns: 1fr auto;
+      grid-auto-rows:        min-content;
+      padding:               1em 8px 0;
+      flex-grow:             1;
+      background:            #fff8;
+    }
+    .completionBonus>:nth-child(even) {
+      padding-left:          1em;
+      text-align:            right;
+    }
+    .completionBonus .multiline {
+      margin-bottom:         2px;
+      background:            #0001;
+    }
+
+    .loot {
+      display:               grid;
+      grid-template-columns: max-content 1fr max-content 1fr max-content;
+      grid-auto-rows:        min-content;
+      gap:                   0 .5em;
+      height:                10em;
+      background:            #0004;
+      overflow-y:            scroll;
+    }
+
+    .help {
+      display:     inline-block;
+      position:    relative;
+      margin-left: .5em;
+      top:         -2px;
+      width:       18px;
+      background:  #fff8;
+      font:        15px/18px "Noto Sans JP";
+      text-align:  center;
+      cursor:      help;
+    }
+    .help::after {
+      content:     "？";
+    }
+
+    .bookmark {
+      position: relative;
+      left:     -1px;
+      top:      -1px;
+      opacity:  .33;
+      cursor:   pointer;
+    }
+    .bookmark.ed {
+      opacity: 1;
+    }
+
+    .combine {
+      display:     flex;
+      align-items: stretch;
+      gap:         .25em;
+      position:    fixed;
+      right:       0;
+      bottom:      0;
+    }
+    .combine button {
+      height:      20px;
+    }
+    .combine :not(button) {
+      padding:     0 .2em;
+      background:  #888e;
+      font-size:   15px;
+    }
+    body:has(.selectCount) .combine span {
+      display:     none;
+    }
+    body:not(:has(.selectCount)) .combine button {
+      display:     none;
+    }
+    .selectCount {
+      display:     block;
+      background:  #ff08;
+    }
+    body:has(#highlight:checked)                  .selectable { box-shadow: 0 0 40px #ff0c inset; }
+    body:has(#highlight:checked) .completionBonus .selectable { box-shadow: 0 0 10px #ff0c inset; }
+
+    .canvas                       { align-self: start; }
+    .canvas .png,
+    .canvas .link,
+    .canvas .help,
+    .canvas .bookmark,
+    .canvas span:has(>.loot)      { display: none; }
+    .canvas span:has(>.loot)+span { padding-top: 1lh!important; }
+    .canvas:has(.selectCount) .completionBonus { grid-template-columns: 1fr; }
+    .canvas:has(.selectCount) .completionBonus>span:nth-child(even),
+    .canvas:has(.selectCount) .selectable:not(:has(.selectCount)),
+    .canvas:has(.selectCount) span:has(+hr),
+    .canvas:has(.selectCount) hr,
+    .canvas:not(:has(.selectCount)) .canvasCountOnly,
+    #list>:not(.canvas) .canvasOnly,
+    #list>:not(.canvas) .canvasCountOnly,
+    #list>:not(.canvas) :has(>.canvasOnly):not(:has(>:not(.canvasOnly))) {
+      display: none;
+    }
+
+    @media print {
+      .header, .png, .link, .bookmark, .combine, span:has(>.loot) {
+        display: none;
+      }
+
+      span:has(>.loot)+span {
+        padding-top: 1lh!important;
+      }
+    }
+  </style>
+  <script src="config.js"></script>
+  <script src="data/classification.js"></script>
+  <script src="data/mastery.js"></script>
+  <script src="link.js"></script>
+  <script src="function.js"></script>
+</head>
+
+<body>
+
+<div class="header">
+  <nav>
+    <a href="#">Home</a>
+    <a href="../support.html" target="_blank">Support</a>
+    <a>|</a>
+    <script>
+      var n = document.querySelector('nav');
+      menu.forEach(s => {
+        if (!s) return n.innerHTML += '<a>|</a>';
+
+        var a = document.createElement('a');
+        a.href = '#' + s.replace('/','').replace(/.*\.\.\..*/,'All');
+        a.innerText = s;
+        n.append(a);
+        n.append(' ');
+      });
+    </script>
+    <a>|</a>
+    <a href="#Bookmark">🔖</a>
+    <a href="#SaveBookmark" onclick="exportBookmark(); return false">Save🔖</a>
+    <label style="cursor:pointer">
+      <input type="file" style="display:none" onchange="importBookmark(this.files[0]); this.value = ''">
+      Load🔖
+    </label>
+    <select id="lang" onchange="localStorage.setItem('lang',this.value); load()">
+      <script> languages.forEach(_ => document.write(`<option>${_}</option>`)); </script>
+    </select>
+    <a href="#lang" onclick="location.hash = location.hash.slice(1).replace(/#.*/,''); return false">🔄</a>
+    <script> lang.value = localStorage.getItem('lang') || 'EN'; </script>
+    <label><input type="checkbox" class="showFilters"> filters</label>
+  </nav>
+
+  <script> document.write(filters); </script>
+</div>
+<div class="header" style="position:relative;visibility:hidden"></div>
+
+<div id="list"></div>
+<div id="combined"></div>
+<span class="combine">
+  <button onclick="confirm('Deselect?') && document.querySelectorAll('.selectCount').forEach(_ => _.remove())">Deselect</button>
+  <button onclick="combine()">Combine</button>
+  <span>Alt + click to select</span>
+  <label><input id="highlight" type="checkbox" style="margin:0"> highlight selectable</label>
+</span>
+
+<script>
+  var f = document.querySelectorAll('.header');
+  f[1].innerHTML = f[0].innerHTML.replaceAll('id=','data-id=');
+
+  var lastHash = location.hash;
+  onpopstate = e => {
+    if (e.state)
+      document.body.querySelectorAll('nav~* input, nav~* select').forEach((_,i) => _.checked = _.value = e.state[i]);
+    else if (lastHash.split('#').length > 3 && location.hash.split('#').length < 4)
+      reset.click();
+
+    lastHash = location.hash;
+    load();
+  };
+
+  load();
+</script>

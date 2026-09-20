@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css?family=Noto+Color+Emoji&text=🔖🔗🎨');
+
+@font-face {
+  font-family:   A028;
+  src:           url('https://cdn.jsdelivr.net/gh/greyscalepress/font-specimens@master/fonts/encore_des_fontes_manu/A028/A028-Med.ttf');
+  unicode-range: U+20
+}
+
+body {
+  font: 19px/22px A028, Arial, 'Noto Color Emoji';
+}
+
+/* Strength 190 & Dexterity 515 & Focus 818 & Vitality 157 - <600px */
+:is(.Normal, .Magical, .Rare, .Epic, .Legendary)                                        { max-width: 600px!important; }
+:is(.Normal, .Magical, .Rare, .Epic, .Legendary)>*                                      { background: #543!important; }
+:is(.Normal, .Magical, .Rare, .Epic, .Legendary)>:not(:nth-child(1)):not(:nth-child(2)) { background: #3218!important; color: #fffc; }
+:is(.Normal, .Magical, .Rare, .Epic, .Legendary)>:first-child                           { font-weight: bold; }
+:is(.Normal, .Magical, .Rare, .Epic, .Legendary)>:nth-child(2) a                        { color: #FF00FF; }
+
+.Normal,
+.Magical   { color: #cccccc; }
+.Rare      { color: #856FE9; }
+.Epic      { color: #FFA40E; }
+.Legendary { color: #FF3100; }
