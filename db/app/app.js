@@ -820,9 +820,11 @@
       // this pipeline, so calling it a TIDBI value would be the same
       // misattribution the base-value wording exists to prevent -- and a base
       // value is a raw pre-scale scalar that no one has rendered at all.
+      // Damage (`dv`) and armor (`da`) are derived separately -- an item can
+      // have one and not the other -- but they read as the same sentence.
       '<b>numbers</b> ' + (o.vb
         ? 'PAK .DAT base value' + (o.inh ? ' (inherited from BASEFILE)' : ' (own fields)')
-        : o.dv ? 'reconstructed from PAK game files'
+        : (o.dv || o.da) ? 'reconstructed from PAK game files'
         : 'TIDBI in-game value') +
       (o.ns ? '<span class="tag">name from ' + esc(o.ns) + '</span>' : '') +
       (o.ici ? '<span class="tag">icon inherited</span>' : '') +

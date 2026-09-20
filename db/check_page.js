@@ -658,22 +658,47 @@ async function go(hash) {
   // Reported against heavy_g_amulet_f_alt_b: fire armor should be 140-174, the
   // Focus requirement 79, and the required level 81. All three were invisible
   // before, because the DAT holds a single pre-scale scalar per type and has no
-  // LEVEL_REQUIRED at all. Armor and requirements still come from TIDBI: only
-  // weapon damage has a derivation.
+  // LEVEL_REQUIRED at all. Armor and damage now both derive from the game files
+  // -- the 140-174 here is the derived range, and TIDBI's rendered number for
+  // the same item agrees with it to the point. Requirements still come from
+  // TIDBI: the DAT has no field for them.
   const amu = (await deep('#item=heavy_g_amulet_f_alt_b')).getElementById('detail').textContent;
   ok('amulet: fire armor is the 140-174 range', /140-174Fire Armor/.test(amu), amu.slice(0, 300));
   ok('amulet: Focus requirement 79 is present', /Focus\s*79/.test(amu), amu.slice(0, 300));
   ok('amulet: player level required 81 is present',
      /Player Level\s*81/.test(amu), amu.slice(0, 300));
+  ok('a derived armor value is labelled as reconstructed, not as TIDBI',
+     /reconstructed from PAK game files/.test(amu), amu.slice(0, 600));
+
+  // ------------------------------------------------------- armor derivation
+  // The set jewellery that started this: TIDBI records these as a single number
+  // where the game files give the spread the game prints, so the derived range
+  // is the thing to show. Runemaster Signet and Runemaster Amulet are the pair
+  // reported by name; cloth_g_amulet_alt_set is the widest case in the corpus.
+  const sig = (await deep('#item=sturm_01_ring_alt_set')).getElementById('detail').textContent;
+  ok('Runemaster Signet: ice armor is the derived 4-6 range',
+     /4-6Ice Armor/.test(sig), sig.slice(0, 300));
+  const run = (await deep('#item=sturm_01_amulet_alt_set')).getElementById('detail').textContent;
+  ok('Runemaster Amulet: ice armor is the derived 7-8 range',
+     /7-8Ice Armor/.test(run), run.slice(0, 300));
+  const wid = (await deep('#item=cloth_g_amulet_alt_set')).getElementById('detail').textContent;
+  ok('the widest set-jewellery case renders all four types as ranges',
+     (wid.match(/55-68/g) || []).length === 4, wid.slice(0, 400));
+  // A base file whose weight and min-weight are equal has nothing to roll, so
+  // both ends collapse to one number. 1,300 derived items are flat for that
+  // reason -- every one of them chaining to a _UNIQUE base. A range there would
+  // be invented, so the flatness is the assertion.
+  const flt = (await deep('#item=caster_03_boots')).getElementById('detail').textContent;
+  ok('a single-weight base file still renders one number',
+     /20Physical Armor/.test(flt) && !/\d+-\d+Physical Armor/.test(flt), flt.slice(0, 400));
 
   // ------------------------------------------------------ base-value badge
-  // 19 items still fall back to a raw .DAT scalar -- 17 of them armor-only,
-  // since armor has no derivation. That has to be disclosed, not passed off as
-  // an in-game number. Only 4 of the 19 are still rendered, though: the other
-  // 15 are Unclassified (monster shields) and the site now hides that tier, so
-  // shield_dwarven is no longer reachable by deep link. Witch_Boots is a
-  // visible armor-only one. (ancientskeleton_axe used to be the example here;
-  // it is DAT-derived now, so it no longer carries the badge.)
+  // 4 items still fall back to a raw .DAT scalar, down from 19 now that armor
+  // derives: 2 are armor-only (the Witch_Boots pair, whose base file carries no
+  // weight and multiplier at all) and 2 are weapons the damage derivation
+  // cannot reach. That has to be disclosed, not passed off as an in-game
+  // number. The Unclassified monster shields the badge used to cover are still
+  // hidden from the site, so shield_dwarven remains unreachable by deep link.
   const bas = (await deep('#item=Witch_Boots')).getElementById('detail').textContent;
   ok('an item with only base values says so',
      /base values, not rendered/.test(bas) && /PAK \.DAT base value/.test(bas), bas.slice(0, 300));
