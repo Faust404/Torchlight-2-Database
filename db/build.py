@@ -281,10 +281,20 @@ DAMAGE_KEYS = ('DAMAGE_PHYSICAL', 'DAMAGE_FIRE', 'DAMAGE_ICE', 'DAMAGE_ELECTRIC'
 ARMOR_KEYS = ('ARMOR_PHYSICAL', 'ARMOR_FIRE', 'ARMOR_ICE', 'ARMOR_ELECTRIC',
               'ARMOR_POISON')
 
+# Armor's three inputs, all hashed fields the DATs never name: the weight and
+# min-weight a slot scales its ARMOR_* value by, and a rarity multiplier. None of
+# them sit on the item -- they are inherited from the base armour file
+# (BASEARMOR_AMULET.DAT and the rest of the family), so they have to ride the
+# same BASEFILE merge the named fields do, which is why they are in KEEP.
+ARMOR_WEIGHT = '0x1ED83664'
+ARMOR_MIN_WEIGHT = '0x1ED83772'
+ARMOR_MULT = '0xE720656C'
+
 STAT_FIELDS = DAMAGE_KEYS + ARMOR_KEYS + (
     'LEVEL', 'SPEED', 'SPEED_DMG_MOD', 'MINDAMAGE', 'MAXDAMAGE', 'RARITY_DMG_MOD')
 
 KEEP = set(STAT_FIELDS) | {
+    ARMOR_WEIGHT, ARMOR_MIN_WEIGHT, ARMOR_MULT,
     'NAME', 'DISPLAYNAME', 'DESCRIPTION', 'UNIDENTIFIED_NAME', 'UNITTYPE', 'TYPE',
     'ICON', 'MESHFILE', 'RESOURCEDIRECTORY', 'UNIT_GUID', 'BASEFILE', 'MINLEVEL',
     'MAXLEVEL', 'LEVEL_REQUIRED', 'RARITY', 'STRENGTH_REQUIRED', 'DEXTERITY_REQUIRED',
@@ -467,18 +477,22 @@ DMG_TYPES = ('physical', 'fire', 'ice', 'electric', 'poison')
 # 0x00000078 and 0x00000079, because dat_hash.FIELDS has no entry for them and
 # decode() hands back an unknown member's hash rather than guessing a name.
 GRAPH_WEAPON_DAMAGE = 'MEDIA/GRAPHS/STATS/BASE_WEAPON_DAMAGE.DAT'
-_curve = None
+# Armor by item level, the same shape. This is the graph the game scales player
+# armor with; it is the only one in the PAK (the other *_BYLEVEL graphs are the
+# monsters'), and its own NAME field calls it Armor_Player_byLevel_forSet.
+GRAPH_ARMOR = 'MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT'
+_graphs = {}
 
 
-def weapon_damage_curve():
-    """{level: base damage}, parsed once. Empty if the graph is unreadable, in
-    which case every item falls back to TIDBI and nothing renders a wrong
-    number -- the derivation is always optional, never required."""
-    global _curve
-    if _curve is None:
+def graph_points(path):
+    """{level: value} from one by-level graph DAT, parsed once per file. Empty if
+    the graph is unreadable, in which case every item falls back to TIDBI and
+    nothing renders a wrong number -- both derivations are always optional,
+    never required."""
+    if path not in _graphs:
         pts, lvl = {}, None
         try:
-            rows = DD.decode(DD.read_pak_entry(GRAPH_WEAPON_DAMAGE))[3]
+            rows = DD.decode(DD.read_pak_entry(path))[3]
         except Exception:
             rows = []
         for row in rows:
@@ -489,8 +503,16 @@ def weapon_damage_curve():
             elif row[1] == '0x00000079' and lvl is not None:
                 pts[lvl] = _num(row[3])
                 lvl = None
-        _curve = pts
-    return _curve
+        _graphs[path] = pts
+    return _graphs[path]
+
+
+def weapon_damage_curve():
+    return graph_points(GRAPH_WEAPON_DAMAGE)
+
+
+def armor_curve():
+    return graph_points(GRAPH_ARMOR)
 
 
 def derived_range(rec, curve):
@@ -526,6 +548,59 @@ def derived_range(rec, curve):
     lo, hi = nominal * mn / 100.0, nominal * mx / 100.0
     return {k: (int(lo * v / tot + 0.5), int(hi * v / tot + 0.5))
             for k, v in zip(DMG_TYPES, dat) if v}
+
+
+def armor_ends(rec, curve):
+    """The unrounded per-type (lo, hi) the armor formula produces, or None.
+
+        armor_x = ARMOR_x x weight x mult / 1e6 x curve(LEVEL)
+
+    Neither weight nor multiplier is stated on the item: both are inherited from
+    the base armour file (see ARMOR_WEIGHT), which is why the pair has to arrive
+    through the BASEFILE merge. Those base files come in three flavours, and the
+    weight pair is the whole difference between a flat number and a range:
+
+        BASEARMOR_AMULET.DAT          50 / 40   BASEARMOR_RING.DAT         34 / 26
+        BASEARMOR_AMULET_MAGIC.DAT     -        BASEARMOR_RING_MAGIC.DAT      -
+        BASEARMOR_AMULET_UNIQUE.DAT   45 / 45   BASEARMOR_RING_UNIQUE.DAT  30 / 30
+
+    Where weight equals min-weight there is nothing to roll and both ends land on
+    the same number, which is what most set jewellery shows.
+
+    Left unrounded so the TIDBI cross-check can see how near a .5 boundary each
+    end fell -- that distance is the whole explanation for the few hundred ends
+    the two sources disagree on by a point, so it has to stay visible rather
+    than be rounded away here. `derived_armor` is this plus the rounding.
+
+    Returns {'fire': (lo, hi), ...} or None when the item cannot be derived -- no
+    LEVEL, a level off the curve, or no weight and multiplier on the chain.
+    """
+    lvl = _num(rec.get('LEVEL'))
+    if not lvl or lvl not in curve:
+        return None
+    w = _num(rec.get(ARMOR_WEIGHT))
+    mu = _num(rec.get(ARMOR_MULT))
+    if not (w and mu):
+        return None
+    lo_w = _num(rec.get(ARMOR_MIN_WEIGHT)) or w
+    out = {}
+    for k, t in zip(ARMOR_KEYS, DMG_TYPES):
+        v = _num(rec.get(k))
+        if v:
+            out[t] = (v * lo_w * mu / 1e6 * curve[lvl],
+                      v * w * mu / 1e6 * curve[lvl])
+    return out or None
+
+
+def derived_armor(rec, curve):
+    """The rendered armor min/max per type, as ints -- armor_ends rounded.
+
+    The same int(x + .5) as derived_range, for the same reason: the game rounds
+    each type on its own, and Python's round() would take the halves to even.
+    """
+    ends = armor_ends(rec, curve)
+    return {t: (int(lo + 0.5), int(hi + 0.5)) for t, (lo, hi) in ends.items()} \
+        if ends else None
 
 
 def tidbi_pair(t, pre, key):
@@ -1050,7 +1125,9 @@ def build():
     print('  TIDBI %d rows, %d effect sets; alfgeir %d tags; %d icon files'
           % (len(tidbi), len(effects), len(alf), len(icon_files)))
     curve = weapon_damage_curve()
-    print('  BASE_WEAPON_DAMAGE curve: %d levels' % len(curve))
+    armor_c = armor_curve()
+    print('  BASE_WEAPON_DAMAGE curve: %d levels; armor curve: %d levels'
+          % (len(curve), len(armor_c)))
     set_names, set_thr = load_set_defs()
     set_bonus = load_set_bonuses()
     print('  %d set definitions, %d with bonus text'
@@ -1117,6 +1194,7 @@ def build():
     out, skipped_stat, templates, dropped = [], 0, [], []
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
+    arm_drift = []                 # derived armor vs TIDBI, for the check below
     for it in items:
         rec, t, a = it['rec'], it['tidbi'], it['alf']
         name = it['name']
@@ -1197,13 +1275,15 @@ def build():
         augs, affixes = split_effects(fx) if fx else ([], [])
         flat = flat_damage(affixes)
 
-        # A weapon's damage range is RECONSTRUCTED from the DAT (derived_range);
-        # where that is impossible it falls back to TIDBI's rendered min/max,
-        # and where TIDBI has nothing either, to the DAT's raw scalar -- those
-        # last are flagged vb so the page can say the number is a pre-scale base
-        # value rather than pass it off as rendered. Armor has no derivation and
-        # still comes from TIDBI. See the dps note below for why the derived
-        # value outranks TIDBI's where the two disagree.
+        # A weapon's damage range and an armour piece's armor are both
+        # RECONSTRUCTED from the DAT (derived_range, derived_armor) -- the files
+        # are the source and TIDBI is the cross-check. Where a derivation is
+        # impossible it falls back to TIDBI's rendered min/max, and where TIDBI
+        # has nothing either, to the DAT's raw scalar -- those last are flagged
+        # vb so the page can say the number is a pre-scale base value rather
+        # than pass it off as rendered. See the dps note below for why the
+        # derived value outranks TIDBI's where the two disagree, and the armor
+        # drift check at the end of the build for what the two cost each other.
         dmg, arm, base, dmg_avg = {}, {}, False, 0.0
         dv = derived_range(rec, curve)
         if dv:
@@ -1221,14 +1301,24 @@ def build():
                 v = _num(rec.get('DAMAGE_' + k.upper()))
                 if v:
                     dmg[k], base = fmt(v), True
-        for k in DMG_TYPES:
-            p = tidbi_pair(t, 'ARM', k.upper())
-            if p:
-                arm[k] = span(*p)
-                continue
-            v = _num(rec.get('ARMOR_' + k.upper()))
-            if v:
-                arm[k], base = fmt(v), True
+        da = derived_armor(rec, armor_c)
+        if da:
+            o['da'] = 1
+            ends_f = armor_ends(rec, armor_c)
+            for k, ends in da.items():
+                arm[k] = span(*ends)
+                p = tidbi_pair(t, 'ARM', k.upper())
+                if p and p != ends:
+                    arm_drift.append((name, o['t'], p, ends, ends_f[k]))
+        else:
+            for k in DMG_TYPES:
+                p = tidbi_pair(t, 'ARM', k.upper())
+                if p:
+                    arm[k] = span(*p)
+                    continue
+                v = _num(rec.get('ARMOR_' + k.upper()))
+                if v:
+                    arm[k], base = fmt(v), True
         if dmg:
             o['dmg'] = dmg
         if arm:
@@ -1377,6 +1467,51 @@ def build():
         'set item rarities drifted: %s' % dict(_uq)
     assert not [o for o in out if ('uq' in o) != (o['q'] == 'Set')], \
         'uq and the Set tier must travel together'
+
+    # Derived armor against TIDBI's rendered numbers -- the only independent
+    # check the derivation has, and the reason TIDBI is still read at all now
+    # that the game files answer the question. Per armor type, over the items
+    # the derivation reaches and TIDBI also prices:
+    #
+    #   3,674 pairs   agree to the point
+    #     200 pairs   one end off by exactly one
+    #     110 pairs   TIDBI's flat number against a real range (33 items)
+    #
+    # The 200 are an artefact of where the value falls, not of the formula: 193
+    # of those 400 ends land within a thousandth of a .5 boundary, where the
+    # game's own arithmetic and this float64 model part ways by one. That is
+    # also why the ends arrive here unrounded -- the distance to the boundary is
+    # the evidence, and it is what the third assertion reads.
+    #
+    # The 110 are set jewellery: the files hold the spread the game prints and
+    # TIDBI a single number, flat, on all 110. Two of the 33 (Formal Regent
+    # Signet, Highridge Talisman) are impossible under any weight x multiplier
+    # at their level, which is what settles that TIDBI's number is a capture of
+    # one roll rather than a different rounding of the same formula -- and so
+    # that the range is the right thing to print.
+    #
+    # Pinned as counts, because that is what makes this a drift alarm rather
+    # than a description: a new class of disagreement means the derivation or
+    # TIDBI moved, and the derivation is the one that has to be right.
+    _off = lambda d: max(abs(d[2][0] - d[3][0]), abs(d[2][1] - d[3][1]))
+    _drift = collections.Counter(_off(d) for d in arm_drift)
+    _far = [d for d in arm_drift if _off(d) > 1]
+    assert sum(_drift.values()) == 310 and _drift[1] == 200 and len(_far) == 110, \
+        'derived armor vs TIDBI drifted: %s' % dict(sorted(_drift.items()))
+    assert len({d[0] for d in _far}) == 33, \
+        'the far class changed size: %d items' % len({d[0] for d in _far})
+    assert not [d for d in _far
+                if d[2][0] != d[2][1] or d[1] not in ('Ring', 'Necklace')], \
+        'a far disagreement outside the flat set-jewellery class: %s' % _far[:5]
+    _near = sum(1 for d in arm_drift if _off(d) == 1
+                for i in (0, 1) if abs(d[4][i] % 1 - .5) < .001)
+    assert _near >= 190, \
+        'the one-point disagreements left the rounding boundary: %d' % _near
+    print('  armor: %d items derived, checked against TIDBI -- %d pairs agree, '
+          '%d one point off (%d of those ends on a .5 boundary), %d pairs of '
+          'set jewellery TIDBI records flat'
+          % (sum(1 for o in out if 'da' in o), 3984 - len(arm_drift),
+             len(arm_drift) - len(_far), _near, len(_far)))
     print('  SET RARITY: 210 Rare, 346 Unique (none unclassified)')
 
     # The set-bonus ladders the site prints. One entry per token an item names,
@@ -1437,7 +1572,7 @@ def build():
 
 def write_csv(items, path):
     cols = ['id', 'n', 't', 'c', 'q', 'lv', 'ml', 'lr', 'cls', 'sk', 'sp', 'dps',
-            'base', 'derived',
+            'base', 'arm_derived', 'dmg_derived',
             'str_req', 'dex_req', 'mag_req', 'def_req',
             'dmg_physical', 'dmg_fire', 'dmg_ice', 'dmg_electric',
             'dmg_poison', 'arm_physical', 'arm_fire', 'arm_ice', 'arm_electric',
@@ -1451,7 +1586,7 @@ def write_csv(items, path):
             w.writerow([o['id'], o['n'], o['t'], o['c'], o['q'], o.get('lv', ''),
                         o.get('ml', ''), o.get('lr', ''), o.get('cls', ''), o.get('sk', ''),
                         o.get('sp', ''), o.get('dps', ''), o.get('vb', ''),
-                        o.get('dv', ''),
+                        o.get('da', ''), o.get('dv', ''),
                         rq.get('str', ''), rq.get('dex', ''), rq.get('mag', ''),
                         rq.get('def', ''), d.get('physical', ''), d.get('fire', ''),
                         d.get('ice', ''), d.get('electric', ''), d.get('poison', ''),
@@ -1623,13 +1758,18 @@ def main():
     # With no class there is nothing to divide by, so it now shows no speed
     # rather than a fabricated one.
     assert gained == 81, 'expected 81 newly-priced weapons, got %d' % gained
-    # 19 items still fall back to a raw DAT scalar: 17 are armor only (armor has
-    # no derivation at all) and 2 are weapons the derivation cannot reach. This
-    # flag is the disclosure that keeps a pre-scale scalar from reading as a
-    # rendered value, so it has to be exactly the set that needs it -- not more,
-    # not less.
-    assert sum(1 for o in items if 'vb' in o) == 19, 'base-value count drifted'
-    assert sum(1 for o in items if 'vb' in o and 'dmg' not in o) == 17, 'vb split drifted'
+    # 4 items still fall back to a raw DAT scalar, down from 19 now that armor
+    # derives too: 2 are armor only (Witch_Boots and Witch_Boots2, whose chain
+    # carries no weight and multiplier at all) and 2 are weapons the damage
+    # derivation cannot reach (legendary2_shield05c, skeleton_greatsword_u03).
+    # This flag is the disclosure that keeps a pre-scale scalar from reading as
+    # a rendered value, so it has to be exactly the set that needs it -- not
+    # more, not less.
+    assert sum(1 for o in items if 'vb' in o) == 4, 'base-value count drifted'
+    assert sum(1 for o in items if 'vb' in o and 'dmg' not in o) == 2, 'vb split drifted'
+    assert {o['id'] for o in items if 'vb' in o} == {
+        'Witch_Boots', 'Witch_Boots2', 'legendary2_shield05c',
+        'skeleton_greatsword_u03'}, 'the base-value set changed'
     assert not [o for o in items if 'vb' in o and 'dv' in o], \
         'an item cannot be both derived and a base value'
     assert sum(1 for o in items if 'cls' in o) == 767, 'class-req count drifted'
