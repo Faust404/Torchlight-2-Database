@@ -1076,7 +1076,21 @@ tier-then-level, the same order the strip reads in. **Type is grouped** into the
 taxonomy above rather than listed flat, and each group header is itself a
 control — clicking it checks or clears every type beneath it, and it carries a
 tri-state marker so it is visible whether the group is fully, partly or not at
-all applied. There is no separate Category facet: since the header toggles the
+all applied. The four categories also carry the **fold glyph** the rail's own
+sections have: Armor, Weapons, Accessories and Misc each open with `−` and close
+to `+`, which hides the rows that follow them — a category's subgroups and their
+rows together. Only the glyph folds; the rest of the header is still the bulk
+toggle. A fold is a view state and not a filter: it never reaches the hash,
+changes no count, and is re-applied after the rail is rebuilt, because a rebuild
+renders every category open. A subgroup header carries no glyph — its one action
+is the bulk toggle — but it still emits the span, which is what keeps the
+indent ladder straight. That ladder had to be paid for: the fold glyph added 9px
+to each category header, so the rows beneath step in by the same 9px
+(`.f.s0` 23px, `.f.s1` 35px) and every existing relationship — 19px category,
+27px subgroup, rows below both — survives in the same order it had. The damage
+types below read as words (`Fire`, `Physical`) while the keys underneath stay
+lower-case, because the URL and the data are keyed on the lower-case token and
+only the display string is capitalised. There is no separate Category facet: since the header toggles the
 types it names, "category is Weapons" and "every weapon type is checked" are the
 same filter, and keeping both would only restore the empty grid that the
 grouping exists to remove. Results are 350px cards showing **every type the item
@@ -1256,7 +1270,11 @@ assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
 group's count equals the sum of its rows, that a group header checks the boxes
-it stands in for, and that a retired `#cat=` link still resolves), the set bonus
+it stands in for, that a retired `#cat=` link still resolves, that the four
+categories carry a fold glyph and a subgroup none, that folding takes a
+category's subgroups and rows and nothing else, survives the rail being
+rebuilt, and is not a filter, and that the damage rows read as words while the
+keys underneath still filter), the set bonus
 ladder in three shapes (a set that ships every piece it gates on, one that does
 not, one gated on more pieces than exist), and a set piece's rarity (the type
 line, the word that carries the colour, the card class for both rarities, and a
