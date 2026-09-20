@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 167 assertions.
+ * view, provenance and hash deep links -- 169 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -1040,6 +1040,30 @@ async function go(hash) {
        hdr('Weapons').querySelector('.tog').textContent === '−' &&
        [].every.call(rb.querySelectorAll('.f'), e => !e.hidden));
     await go('');
+  }
+
+  // The damage facet's values are the .DAT's own lowercase keys: they are what
+  // matches() compares and what the URL carries. The row prints a word, so it
+  // capitalises it, the same way the detail view's stat lines already do.
+  {
+    const rows = [].map.call(rb.querySelectorAll('input[data-f="dmg"]'), i => ({
+      label: i.closest('.f').querySelector('.lbl').textContent, value: i.value }));
+    ok('the damage rows read as words, not as the keys they filter on',
+       rows.length === 5 &&
+       rows.every(r => r.label === r.value.charAt(0).toUpperCase() + r.value.slice(1) &&
+                       r.value === r.value.toLowerCase()),
+       rows.map(r => r.label + '=' + r.value).join(' '));
+    // and the word must not follow the label into the URL: the key underneath is
+    // still what filters, so a link keeps working whatever the row calls it
+    const fire = rb.querySelector('input[data-f="dmg"][value="fire"]');
+    fire.checked = true;
+    fire.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('...and the key underneath is still what filters',
+       /(^|[#&])dmg=fire/.test(w.location.hash), w.location.hash);
+    await wait(30);
+    fire.checked = false;
+    fire.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await wait(30);
   }
 
   // a legacy #cat= link named a facet that no longer exists; it must still

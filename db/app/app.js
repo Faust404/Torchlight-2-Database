@@ -415,8 +415,14 @@
     FACETDEF.forEach(function (f) {
       if (f.k === 'tiers') return;   // renderTiers above owns this one
       var fv = facetValues(f.k);
+      // The damage facet's values are the .DAT's own lowercase keys -- `fire`,
+      // `electric` -- and they stay that way, because they are what the URL
+      // carries and what matches() compares. The row prints a word, not a key,
+      // so it capitalises: the same `cap` the detail view's stat lines use, so
+      // the rail and the tooltip spell a type the same way.
+      var label = function (v) { return f.k === 'dmg' ? cap(v) : v; };
       var body = f.k === 'types' ? typesBody()
-                                : fv.arr.map(function (p) { return checkRow(f.k, p[0], p[0]); }).join('');
+        : fv.arr.map(function (p) { return checkRow(f.k, p[0], label(p[0])); }).join('');
       if (!fv.arr.length) body = '<div class="f off"><span class="lbl">nothing matches</span></div>';
       h += section(f.k, f.title, body, fv.total);
     });
