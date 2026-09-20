@@ -444,6 +444,21 @@ button,input,select{font:inherit; color:inherit}
    says purple, and the lozenge was a third device competing with the magic-green
    affixes and the requirement chips. */
 .sname{margin:0 0 4px; color:var(--t-set); font-size:12.5px}
+/* The set name is the tooltip's one link: clicking it clears every filter and
+   lands on that set's own. A <button>, not an <a> -- it is an action on the
+   page, not a URL anyone should be able to middle-click, and the hash it writes
+   is a filter state the page owns. `font:inherit` is what strips the button
+   chrome back to the text it replaced; a button does not inherit font on its
+   own, so leaving it off would have set the name in the UA's 13.33px Arial. */
+.sname .setlink{
+  font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer;
+  text-decoration:underline;
+  text-decoration-color:color-mix(in srgb,var(--t-set) 40%,transparent);
+  text-underline-offset:2px;
+}
+.sname .setlink:hover{text-decoration-color:currentColor}
+.sname .setlink:focus-visible{outline:2px solid var(--gold); outline-offset:1px;
+  border-radius:2px}
 .sname .ct{color:color-mix(in srgb,var(--t-set) 46%,#8b837b); font-size:11.5px;
   margin-left:6px}
 .rung{display:flex; gap:7px; align-items:baseline; margin:0; padding:1.5px 0}

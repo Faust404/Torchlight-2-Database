@@ -1183,7 +1183,17 @@ it, and a header stating **two** numbers: how many pieces exist and how many a
 full set needs, `<set name> 16 pieces (10 piece set)`. The two differ on 47 of
 the 80 sets, in both directions — Mondon's Vestment ships 16 against a 10-piece
 ladder, Cornerstone ships 7 against a 9-piece one. This is the block the game and
-TIDBI both print and the item itself cannot answer. Rungs the set gates above what
+TIDBI both print and the item itself cannot answer. The set's name in that header
+is **the tooltip's one link**: clicking it drops every other filter — the search
+box, the facets, the tier strip, the sockets and the other set controls — and
+hands back the grid filtered to that set alone. It carries the record's own `set`
+field rather than the definition's name, because that is the string the set
+filter matches on; `build.py` writes both from the same `DISPLAYNAME`, so the
+button cannot name a set the filter would then refuse — checked against all 556
+pieces, which agree on every one. A `<button>` and not an `<a>`: it is an
+action on this page, and the hash it writes is a filter state the page owns. The
+clear it runs is the same `resetState()` `#reset` runs, extracted for exactly
+that reason — the two cannot drift apart. Rungs the set gates above what
 it ships are drawn dimmed and labelled (`9 pieces · set ships 7`) rather than on
 the assumption a reader knows the set is incomplete. The rungs reuse the
 `.or`/`.cond` divider, but not `.fx.locked` — that means something else (a stat
@@ -1265,7 +1275,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 169
+`db\check_page.js` goes further and drives the built page in a real DOM — 173
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
@@ -1282,7 +1292,8 @@ stale `#tier=Set` failing legibly), the tier strip (its pill order and counts,
 that the four counts are the data's own with the set pieces folded in and sum to
 the corpus, and that no pill names Set), the set controls (the toggle's 556, the
 select's 9, that the two spell themselves separately in the URL and narrow
-rather than union), and both halves of `MINLEVEL` — absent on the Aenigma,
+rather than union, and that the tooltip's set name clears everything else and
+lands on that set alone), and both halves of `MINLEVEL` — absent on the Aenigma,
 present and relabelled on a gem. It needs jsdom, which is not a project
 dependency:
 

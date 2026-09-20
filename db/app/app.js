@@ -695,7 +695,15 @@
     var st = o.setid && SETS[o.setid];
     if (!st) return '';
     var top = st.b.length ? st.b[st.b.length - 1][0] : 0;
-    return '<p class="sname">Set: ' + esc(st.n) + '<span class="ct">' +
+    // The name is the way to the set: clicking it drops every filter and lands
+    // on this set's own. It carries `o.set` rather than the definition's `st.n`
+    // because that is the field the filter matches on -- build.py writes both
+    // from the set file's DISPLAYNAME, so they are the same string, and the
+    // button is the one the filter would accept.
+    return '<p class="sname">Set: ' +
+      '<button type="button" class="setlink" data-set="' + esc(o.set) +
+      '" title="Show only this set">' + esc(o.set) + '</button>' +
+      '<span class="ct">' +
       st.c + (st.c === 1 ? ' item' : ' items') + ' · ' + top + ' piece set</span></p>' +
       st.b.map(function (r) {
         var over = r[0] > st.cap;
@@ -866,8 +874,12 @@
   }
 
   // ------------------------------------------------------------ hash routing
-  function readHash() {
-    var s = location.hash.replace(/^#/, '');
+
+  // Everything back to what the page opens on. Its own function because the set
+  // link in the detail view wants the same clear as #reset: it jumps to one
+  // set's filter, and arriving still narrowed by whatever happened to be on
+  // would answer a different question than the one that was asked.
+  function resetState() {
     S.types = new Set(); S.tiers = new Set(); S.dmg = new Set();
     S.set = ''; S.setOnly = false; S.sock = false; S.lvlMin = S.lvlMax = null; S.item = '';
     S.req = { str: null, dex: null, mag: null, def: null };
@@ -879,10 +891,15 @@
     // its pills carry their own state, and "nothing selected" would paint all
     // four dimmed above an unfiltered grid, which reads as a broken control
     // rather than as no filter. Populated here rather than in renderTiers so
-    // that the state exists before anything renders, and before the early
-    // return below, so #reset lands on the same four-on strip the page opens
-    // with. A hash that names the facet still overrides it, below.
+    // that the state exists before anything renders, and before readHash's
+    // early return, so #reset lands on the same four-on strip the page opens
+    // with. A hash that names the facet still overrides it.
     S.tiers = new Set(allVals().tiers);
+  }
+
+  function readHash() {
+    var s = location.hash.replace(/^#/, '');
+    resetState();
     if (!s || s === 'reset') return;
     s.split('&').forEach(function (kv) {
       var i = kv.indexOf('='), k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i)),
@@ -1091,7 +1108,23 @@
 
   document.getElementById('detail').addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('.back') : null;
-    if (b) { e.preventDefault(); S.item = ''; apply(); }
+    if (b) { e.preventDefault(); S.item = ''; apply(); return; }
+    // The set name is the other way out of the detail view, and a wider one: it
+    // clears everything -- the search box, the facets, the other set controls --
+    // and hands back the grid filtered to the set that was just named. The
+    // clear is the same one #reset does, so the two cannot drift.
+    var sl = e.target.closest ? e.target.closest('[data-set]') : null;
+    if (!sl) return;
+    e.preventDefault();
+    resetState();
+    S.set = sl.getAttribute('data-set');
+    showAll = false;
+    writeHash();
+    // On file:// writeHash assigns location.hash and the hashchange that follows
+    // is asynchronous -- and may not come at all, if the hash was already this.
+    // The repaint cannot wait for either, so force it the way #reset does.
+    lastSig = null;
+    onRoute();
   });
 
   document.getElementById('more').addEventListener('click', function (e) {

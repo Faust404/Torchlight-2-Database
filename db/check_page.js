@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 169 assertions.
+ * view, provenance and hash deep links -- 173 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -897,6 +897,34 @@ async function go(hash) {
      `${ssel().value} / ${sbtn().className} / ${cnt()}`);
   await go('');
   await wait(30);
+
+  // The set name in the tooltip is the second route to a set filter and the
+  // wider one: clicking it clears everything else first, because "show me this
+  // set" is not a question about whatever filters happened to be on. Same clear
+  // #reset performs -- the two share resetState(), so they cannot drift.
+  {
+    await go('#q=aenigma&dmg=fire&sock=1&item=Zeraphi_01_shoulders_alt_set');
+    const link = d.querySelector('#detail .sname .setlink');
+    ok('the tooltip names the set as a link to that set',
+       !!link && link.getAttribute('data-set') === 'Zeraphi Alchemy' &&
+       link.textContent === 'Zeraphi Alchemy', link && link.getAttribute('data-set'));
+    if (link) link.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('clicking it clears every other filter and lands on the set alone',
+       w.location.hash === '#set=Zeraphi%20Alchemy', w.location.hash);
+    ok('...and hands back the grid it filtered, with the item closed',
+       cards().length === 9 && !d.getElementById('app').classList.contains('item'),
+       `${cards().length} cards`);
+    // the controls have to agree with the state, or the page is lying about
+    // what it is showing: an emptied search box, an unchecked rail, and the
+    // select sitting on the set that was just named
+    ok('...and the search box, the rail and the set controls all say so',
+       d.getElementById('q').value === '' && ssel().value === 'Zeraphi Alchemy' &&
+       !sbtn().classList.contains('on') && !d.getElementById('sock').checked &&
+       [].every.call(d.querySelectorAll('#railbody input[type=checkbox]'), b => !b.checked),
+       `${ssel().value} / ${d.getElementById('q').value}`);
+    await go('');
+    await wait(30);
+  }
 
   // ------------------------------------------------------------ rail labels
   // The rail filter must use TL2's own stat names too. MAG/DEF are Torchlight
