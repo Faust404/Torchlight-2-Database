@@ -393,7 +393,14 @@ and items are built from it (§7). What remains:
    damage, armor and requirement fields are *pre-scale*, and TIDBI holds the
    rendered values. The build now reads TIDBI first and flags the 114 items where
    it has to fall back (§7).
-6. **Drop weights and the 64 unnamed field hashes** stay the real blockers —
+6. **The ember scaling multiplier.** Three of the four rare ember families carry
+   a fixed float per option in the files where the game shows a level-scaled
+   number (§7, *Rare embers*). The multiplier is per stat and lives in
+   `MEDIA\STATS\<Stat>.DAT` (plus `MEDIA\GRAPHS\STATS\`), whose reference section
+   the decoder does not read yet — the same "read the reference section" job as
+   the drop weights, and the one thing on the site that is transcribed rather
+   than derived.
+7. **Drop weights and the 64 unnamed field hashes** stay the real blockers —
    nothing about the above touches them.
 
 **Nothing here modifies game files.** All reads.
@@ -816,11 +823,12 @@ lines. They ship here too (178 of them), under their own names.
 ```
 db\
   build.py      the pipeline
+  ember_values.py  the 42 ember values the files cannot supply, with their source
   check_page.js optional DOM test of the built page (§7, Verifying)
   app\          the browser's source: index.html, app.css, app.js
   out\          generated
-    index.html  8.24 MB, self-contained — open it straight off disk
-    items.json  2.27 MB, 6,176 items
+    index.html  8.38 MB, self-contained — open it straight off disk
+    items.json  2.28 MB, 6,176 items
     items.csv   flat table for Excel/pandas
     sets.json   the 80 set bonus ladders, shared by the 556 set pieces
     icons.png   1,485x1,440 sprite of all 1,053 icons
@@ -976,6 +984,95 @@ own `UNITTYPE` for it reads `NORMAL AXE`, so the bare-type rule reads its raw `9
 as a one-hander's and makes it 0.72 s. Two rules, two answers, one item: it is
 left out of the db and the site rather than given a guess, and `build()` asserts
 the drop happened.
+
+### Rare embers: a two-roll pool no item declares
+
+32 socketables are typed `BLOOD`, `CHAOS`, `IRON` or `VOID EMBER` — four
+families of `RANK1..7` plus a `_BASE` template each — and they are the only gems
+whose two bonuses are not fixed. Their item DATs carry an **empty `AFFIXES`
+list** and the rank files declare `n_lists=0`: nothing on the item says what it
+grants. The game rolls one Armor/Trinket bonus and one Weapon bonus when the gem
+spawns, each **chosen from a set of possibilities**, which is why two Blood
+Ember Specks are not the same gem.
+
+The pool is not declared anywhere either. It is the set of affix DATs in
+`MEDIA\AFFIXES\GEMS\` **that name the family in their own applicability list**
+(`0xED6CBF91`) — and that same list splits the two columns, because the affixes
+naming `ARMOR` are the Armor/Trinket options and the ones naming `WEAPON` the
+weapon options. An affix is a candidate for a gem of level L when its
+`[0xF5C798D8, 0x95C798C9]` band contains L. The `0x2BB67F8F` slot list is
+deliberately *not* consulted: it names all three slots on both sides of every
+family, and the one file that differs (`GEM_UNIQUE_PERCENTLIFESTEAL`,
+ARMOR+TRINKET only) is a weapon affix — which is where the applicability list
+and the wiki's own table both put it.
+
+| family | Armor / Trinket options | Weapon options |
+|---|---|---|
+| Blood | Health, Health Regen | Lifesteal, Bleed |
+| Iron | Physical Armor, Melee bonus, Ranged bonus, Thorns | Damage Bonus, Degrade Armor |
+| Void | Mana, Mana Regen | Mana Steal |
+| Chaos | 9 families | 10 families, plus `GEM_UNIQUE_PERCENTLIFESTEAL` |
+
+**Chaos is derivable, and is derived.** Each of its families ships seven files,
+one per 14-level band — 1-13, 14-27, 28-41, 42-55, 56-69, 70-83, 84-999 —
+matching the seven rank levels, each holding that band's fixed value (Dodge 1→6,
+Silence 50→80). Two quirks fall out of the files rather than out of a rule:
+`GEM_CHAOSEMBER_WEAPON_ATTACKSPEED` is an unnumbered `1-999` file worth 3%, so
+every rank carries a *second* Attack Speed option beside its band's, and no
+84-999 attack-speed band file exists at all, so rank 7's weapon list holds the
+3% and nothing higher.
+
+**Blood, Iron and Void are not.** Each of their affixes is a single `1-999` file
+with one fixed float — Blood's Health 10, Iron's Armor 20, Void's Mana 20 —
+while the number the game prints grows with the gem's level. The per-level
+multiplier is not in the affix, not in the item DAT, and not in
+`MEDIA\STATS\<Stat>.DAT`, whose reference section this decoder does not read.
+It is **per stat**: Blood's Health and Health Regen share one factor (10 ×
+`0.4·ilvl + 1.6` reproduces both ladders exactly, 48 … 384), but Iron's Armor
+(20 at file, 5 shown at ilvl 8) and Iron's Ranged bonus (10 at file, 6 shown) do
+not. That is the one unsolved piece here. The 42 values are accordingly
+**transcribed** into `db\ember_values.py`, whose docstring carries the source
+and the reasoning.
+
+The source is the wiki's rare-gems table, and it is trustworthy on numbers for a
+checkable reason: its Normal-gems table covers the four varying families (Flame,
+Ice, Spark, Venom) and **all 56 of its values match TIDBI's own effect lines for
+the same socketable exactly**. Wording is not taken from it, because it is
+internally inconsistent — "Health Stolen on Hit" at ranks 1-3 and "Health stolen
+on hit" at 4-7, "+5 Physical Armor" at rank 1 and "+25 to Physical Armor" from
+rank 3, three spellings of "per second". Every string is normalised to the
+game's own tooltip text as TIDBI records it, which is what the site prints for
+every other item.
+
+Three places the wiki's rare-gems table disagrees with the files, **the files
+winning** as they do everywhere else here:
+
+1. its Armor/Trinket lists omit the Dodge option at all seven ranks;
+2. its weapon lists give one Attack Speed option per rank where the files have
+   two — so ranks 2-6 roll either the band's value or the flat 3%;
+3. its rank-7 Attack Speed of 6.5% has no file at all, the band files stopping
+   at 70-83.
+
+One affix the wiki does not list is excluded by construction rather than by
+name: `GEM_EYEOFGALLO_LIFESTEAL` (666) declares `BLOOD EMBER` + `WEAPON`, but it
+is The Eye of Gallo's own affix — that `UNIQUE SOCKETABLE` names it in its
+`AFFIXES` list — and Blood's weapon pool is transcribed, so the file cannot be
+picked up by accident.
+
+Two reading traps, both in `build.py`'s table rather than in a rule. Most
+families carry their value in the effect list's `0x0000BD6E` member, but three
+do not: knockback holds it under `0x0E46C025`, knockback resistance under
+`0xE343B7AF`, and Silence prints the **duration**, a string member of the list
+(`0xE03B279B`), not the 50-80 float beside it, which is an internal chance. And
+`ARMOR_PERCENTDAMAGE` prints a double negative — "Physical Damage Taken is
+reduced by -3%" — because the file's value is negative and the game's own line
+already says "reduced by"; TIDBI has the same string on the game's own items
+(`Quest_ManaVent_Acquire`), so it is the wording and not a flipped sign.
+
+The card prints the pair as two **"one of N"** lists rather than as stat lines,
+because the item does not have those stats — it has one of them, and which one
+is decided when the gem drops. The numbers in each list are the rank's own, so
+nothing on the card scales them.
 
 ### Type facet, and the rail's taxonomy
 
@@ -1275,7 +1372,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 173
+`db\check_page.js` goes further and drives the built page in a real DOM — 177
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
@@ -1293,9 +1390,12 @@ that the four counts are the data's own with the set pieces folded in and sum to
 the corpus, and that no pill names Set), the set controls (the toggle's 556, the
 select's 9, that the two spell themselves separately in the URL and narrow
 rather than union, and that the tooltip's set name clears everything else and
-lands on that set alone), and both halves of `MINLEVEL` — absent on the Aenigma,
-present and relabelled on a gem. It needs jsdom, which is not a project
-dependency:
+lands on that set alone), both halves of `MINLEVEL` — absent on the Aenigma,
+present and relabelled on a gem — and the ember pool (each slot label paired
+with its own option list, a rank's numbers against another rank's, the derived
+Chaos lists following the files where the wiki differs, and neither a `_BASE`
+template nor a fixed-bonus Flame Ember carrying a pool at all). It needs jsdom,
+which is not a project dependency:
 
 ```
 npm i jsdom          # anywhere on NODE_PATH

@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 173 assertions.
+ * view, provenance and hash deep links -- 177 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -398,6 +398,64 @@ async function go(hash) {
   ok('a socketable shows MINLEVEL as the item level needed to socket it',
      /Required Item Level to Socket:\s*28/.test(gemt) &&
      /Level 36/.test(gemc) && !/Min Level/.test(gemt), gemt.slice(0, 240));
+
+  // ----------------------------------------------------------- the ember pool
+  // The four rare ember families are the only socketables whose two bonuses are
+  // not fixed. Their item DATs carry an empty AFFIXES list, and the game rolls
+  // one Armor/Trinket bonus and one Weapon bonus when the gem spawns, off the
+  // affix pool in MEDIA/AFFIXES/GEMS/. build.py derives Chaos's pool from the
+  // PAK and reads the other three families from db/ember_values.py, and the
+  // card prints each slot as a "one of N" list of whole tooltip lines.
+  //
+  // Each list is read through the `ul.pool` that follows its own `p.poolh`,
+  // which is the pairing the card has to get right: a slot label whose options
+  // are some other slot's would still pass a page-wide text search.
+  const poolOf = doc => [].map.call(doc.querySelectorAll('#detail ul.pool'), u => {
+    const h = u.previousElementSibling;
+    return { head: h.firstChild.textContent, count: h.querySelector('.ct').textContent,
+             opts: [].map.call(u.querySelectorAll('li'), li => li.textContent) };
+  });
+  const show = p => p.map(s => `${s.head}: ${s.count} [${s.opts.join('; ')}]`).join('  ');
+  // Blood Ember Speck, rank 1: two options a side, and the transcribed numbers
+  // are the ones this rank rolls -- nothing on the card scales them.
+  const speck = poolOf(await deep('#item=tl2_bloodember_rank1'));
+  ok('a rare ember states both slots as their own "one of" list',
+     speck.length === 2 &&
+     speck[0].head === 'Armor / Trinket' && speck[0].count === 'one of 2' &&
+     speck[0].opts.join(' | ') === '7.2 Health recovery per second | +48 Health' &&
+     speck[1].head === 'Weapon' && speck[1].count === 'one of 2' &&
+     speck[1].opts.join(' | ') === '12 Health stolen on hit | 35 Physical Damage over 5 sec.',
+     show(speck));
+  // The same two rolls at rank 7 are worth eight times as much, so a pool that
+  // was built once and printed on every rank shows up here.
+  const giantBlood = poolOf(await deep('#item=tl2_bloodember_rank7'));
+  ok('the pool carries the rank\'s own numbers, not a shared base',
+     giantBlood[0].opts.indexOf('+384 Health') >= 0 &&
+     giantBlood[1].opts.indexOf('90 Health stolen on hit') >= 0 &&
+     giantBlood[0].opts.indexOf('+48 Health') < 0, show(giantBlood));
+  // Chaos is the derived family, and Giant Chaos Ember is the rank the wiki
+  // gets wrong twice: its armor list omits Dodge at every rank, and its weapon
+  // list stops at a 6.5% Attack Speed the files never ship -- the band files
+  // end at 70-83, so rank 7's fastest option is the flat 3%. The armor side
+  // also pins the one line the game prints with a sign the wiki drops.
+  const giantChaos = (await deep('#item=tl2_chaosember_rank7')).getElementById('detail');
+  const chaos = poolOf(giantChaos);
+  ok('a derived pool follows the files where the wiki differs',
+     chaos[0].count === 'one of 9' && chaos[1].count === 'one of 10' &&
+     chaos[0].opts.indexOf('+6% Dodge chance') >= 0 &&
+     chaos[1].opts.indexOf('+3% Attack Speed') >= 0 &&
+     chaos[0].opts.indexOf('Physical Damage Taken is reduced by -6%') >= 0 &&
+     !/6\.5%/.test(giantChaos.textContent), show(chaos));
+  // And the two socketables that look like these but are not: a BASE template,
+  // which no rank's level matches, and a normal ember, whose two bonuses are
+  // fixed and arrive as ordinary affix lines.
+  const base = poolOf(await deep('#item=tl2_bloodember_BASE'));
+  const flame = await deep('#item=tl2_flameember_rank1');
+  ok('only the 28 rare ranks carry a pool',
+     base.length === 0 && /Weapon: \+7 Fire Damage/.test(flame.getElementById('detail').textContent) &&
+     flame.querySelectorAll('#detail ul.pool').length === 0 &&
+     flame.querySelectorAll('#detail .aff').length === 2,
+     show(base) + ' | ' + flame.querySelector('#detail .body').textContent.slice(0, 120));
 
   // ---------------------------------------------------------------- set names
   // An item's SET field is a DAT token, and a token is not a name: SENTINAL is
