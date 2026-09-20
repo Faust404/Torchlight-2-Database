@@ -1083,7 +1083,14 @@ grouping exists to remove. Results are 350px cards showing **every type the item
 carries**, each as an element mark and its own value, in the detail view's order
 — a weapon leads with its `dps` figure, which is the one value with no element
 and so the one that carries a word. Never a summed total, which the game never
-shows, and the row wraps rather than dropping a type. Clicking one opens a full detail view
+shows, and the row wraps rather than dropping a type. Measured against the built
+page at the card's fixed 350px, the stat column is 270px and holds `dps` plus
+three damage types — the tightest of those 1,235 one-line cards
+(`legendary_greathammer03`) fills exactly 270px — so the 38 weapons carrying
+four or five types take a second line, inside a 98px card with nothing clipped.
+The pair is `stv-dps`, not `dps`: the detail view names its own headline `.dps`
+as a bare selector, and a card pair sharing that name silently inherited its
+15px gold figure and stood taller than the numbers beside it. Clicking one opens a full detail view
 with the leader-dot stat rows, affix lines and a provenance footer naming the
 `.DAT` path and whether the numbers are TIDBI's rendered values or a flagged
 DAT base value. Its **Item** block lists Item Level, attack speed, **Weapon
@@ -1244,7 +1251,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 158
+`db\check_page.js` goes further and drives the built page in a real DOM — 159
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
