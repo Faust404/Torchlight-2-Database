@@ -789,6 +789,26 @@
         : '');
   }
 
+  // ---- the ember pool ----
+  // A rare ember's two bonuses are rolled, not fixed: the gem carries no affix
+  // of its own and the game picks one option from each list when it spawns. So
+  // the block states a choice where every other block on the card states a
+  // fact, and it has to do that without dressing the options as stats the item
+  // has -- which is why the slot label carries the count, and why the options
+  // take a plain bullet in the body colour rather than the magic green an
+  // affix line gets. `a`/`w` are the two lists, already whole tooltip lines
+  // from build.py; the numbers in them are this rank's, so nothing scales here.
+  function poolHTML(ep) {
+    function group(label, list) {
+      if (!list || !list.length) return '';
+      return '<p class="poolh">' + esc(label) +
+        '<span class="ct">one of ' + list.length + '</span></p>' +
+        '<ul class="pool">' + list.map(function (s) {
+          return '<li>' + mark(s) + '</li>'; }).join('') + '</ul>';
+    }
+    return group('Armor / Trinket', ep.a) + group('Weapon', ep.w);
+  }
+
   function flav(o) {
     return o.ds ? '<p class="flav">' + esc(o.ds.replace(/\\n/g, ' ')) + '</p>' : '';
   }
@@ -839,6 +859,9 @@
 
     sec(statLines(o.dmg, 'Damage') + statLines(o.arm, 'Armor'));
     sec(o.fx && o.fx.length ? affLines(o) : '');
+    // The rolled pair, where a socketable's own affixes would sit: the rare
+    // embers have no `fx` at all, so this is the only stat block they have.
+    sec(o.ep ? poolHTML(o.ep) : '');
     // The augmented group last of the stats, so the weapon's own numbers are
     // read before the ones it could grow into.
     sec(o.aug && o.aug.length ? o.aug.map(augHTML).join('') : '');

@@ -492,6 +492,28 @@ button,input,select{font:inherit; color:inherit}
   color:#8d8579; border-left:2px solid var(--div)}
 .fx.locked li:before{content:"\2022"; position:absolute; left:7px; color:#6b645c}
 
+/* ---------------------------------------------------------- the ember pool
+   The four rare ember families roll both of their bonuses, so their card shows
+   a choice where every other card shows a fact. Three devices keep that
+   honest: the slot label names the column the game names it by, the "one of N"
+   caption states the roll in words, and the options take a plain bullet in the
+   body colour -- not the magic green an affix line gets, which on this card
+   means "this item has it". The bullet, indent and 2px rhythm are
+   `.fx.locked`'s, so the two list blocks on a socketable's card read as one
+   language; the locked block's dim grey is not borrowed, because these options
+   are not hidden behind anything. The numbers keep the tooltip's value
+   treatment (--val at 600, tabular) rather than the affix block's --head,
+   since they sit inside body-coloured lines. */
+.poolh{display:flex; align-items:baseline; gap:7px; margin:9px 0 2px;
+  color:var(--label); font-size:10px; letter-spacing:.13em; text-transform:uppercase}
+.poolh:first-child{margin-top:0}
+.poolh .ct{color:var(--faint); font-size:9.5px; letter-spacing:.04em;
+  text-transform:none}
+.pool{margin:0; padding:0; list-style:none}
+.pool li{position:relative; padding:2px 0 2px 16px; margin-left:1px; color:var(--body)}
+.pool li:before{content:"\2022"; position:absolute; left:7px; color:#6b645c}
+.pool .n{color:var(--val); font-weight:600; font-variant-numeric:tabular-nums}
+
 /* --------------------------------------------------------- requirements
    The one thing the block may never lose is the either/or: a player level OR
    all of the attributes, whichever the player reaches first -- not a
