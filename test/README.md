@@ -358,9 +358,10 @@ kill`.
    `BASEARMOR_*` templates with no `NAME`, leaving **6,177 real items**. The PAK
    is the truth about *structure* — which items exist, what they inherit, what
    set they belong to — and §7 has since made it the truth about weapon damage
-   too; armor and requirements are still TIDBI's, because the PAK stores those
-   pre-scale with no formula recovered. One of the 6,177 is then withheld as
-   unreconcilable, so **6,176** ship (§7).
+   **and armor** too, both recovered from the pre-scale fields TIDBI renders for
+   you. Stat and level requirements are still TIDBI's: the DAT has no field for
+   them at all. One of the 6,177 is then withheld as unreconcilable, so
+   **6,176** ship (§7).
 5. Names are English in `DISPLAYNAME`, Russian in `iTRANSLATION`.
 
 ---
@@ -448,26 +449,30 @@ DAT's own formula where that reaches, TIDBI's rendered value otherwise:
 | Damage | 1,273 | 1,370 | 1,273 | **97** | 0 |
 | `LEVEL_REQUIRED` | 5,473 | 844 | 810 | 34 | 4,663 |
 
-Weapon **damage is no longer read from TIDBI**. It is reconstructed from the DAT
-by the formula in *"The damage formula, recovered"* below, which reaches 1,367 of
-the 1,370 damaged items. Armor and requirements have no such formula and still
-come from TIDBI. The 97 items where only the DAT has damage are almost all
-monster, NPC and test weapons — skeletons, trolls, varkolyn, bandits — which a
-2014 viewer of *player* items never listed.
+Weapon **damage and armor are no longer read from TIDBI**. Both are reconstructed
+from the DAT by the formulas in *"The damage formula, recovered"* and *"The armor
+formula, recovered"* below, which together reach 3,981 of the 3,986 armored items
+and 1,367 of the 1,370 damaged ones. Only stat and level **requirements** still
+come from TIDBI, and there because the DAT has no field for them. The 97 items
+where only the DAT has damage are almost all monster, NPC and test weapons —
+skeletons, trolls, varkolyn, bandits — which a 2014 viewer of *player* items never
+listed.
 
 **Damage and armor are min-max ranges**, not scalars — `MIN_ARM_*`/`MAX_ARM_*` and
-`MIN_DMG_*`/`MAX_DMG_*`. They render the way the game writes them: `140-174` when
-the value varies, `100` when it does not. Of the 8,583 populated damage and armor
-type slots in `items.json`, 5,450 are a real range and 3,133 a single value.
-TIDBI never has a MIN without its MAX.
+`MIN_DMG_*`/`MAX_DMG_*`, which the derivation scales against each other. They
+render the way the game writes them: `140-174` when the value varies, `100` when
+it does not. Of the 8,583 populated damage and armor type slots in `items.json`,
+5,596 are a real range and 2,987 a single value. TIDBI never has a MIN without
+its MAX.
 
-The **19 items** that fall back to a raw DAT scalar — 17 showing armor, 2 showing
-damage, one of them both — are
+The **4 items** that fall back to a raw DAT scalar — 2 showing armor, 2 showing
+damage, none both — are
 flagged `vb` and shown as *"base values, not rendered"* in the detail view — a
-pre-scale number must not be passed off as an in-game one. A further **1,367** are
-flagged `dv` and labelled *"reconstructed from PAK game files"*: a derived number
-is not a TIDBI number either, and calling it one would be the same misattribution
-pointing the other way. The CSV carries both as the `base` and `derived` columns.
+pre-scale number must not be passed off as an in-game one. A further **3,981** are
+flagged `da` and **1,367** `dv`, and both are labelled *"reconstructed from PAK
+game files"*: a derived number is not a TIDBI number either, and calling it one
+would be the same misattribution pointing the other way. The CSV carries them as
+the `base`, `armor_derived` and `damage_derived` columns.
 
 **`LEVEL_REQUIRED` is a third field**, distinct from both `LEVEL` and `MINLEVEL`.
 TIDBI's own `iLEVEL` is the item's level and agrees with the DAT's `LEVEL` in all
@@ -710,6 +715,81 @@ rather than assumed, and it checks out: the wiki's Cerulean Nightmare
 both still show a poison line. The 2014 sources agree with each other because they
 are both old, not because they are both right.
 
+### The armor formula, recovered
+
+Armor turned out to have the same shape, with a different curve and one extra
+input:
+
+```
+armor_x = ARMOR_x x weight x mult / 1e6 x ARMOR_PLAYER_BYLEVEL_FORSET(LEVEL)
+```
+
+`weight`, `min-weight` and `mult` are **the three fields no item names**. They are
+not on the item at all — they come down the `BASEFILE` chain from the base armour
+file (`BASEARMOR_AMULET.DAT` and the rest of the family in
+`MEDIA/UNITS/ITEMS/TL2ARMOR/`), which is why they had to ride the same merge the
+named fields do. Their hashes are `0x1ED83664`, `0x1ED83772` and `0xE720656C`,
+none of which `dat_hash.FIELDS` names, so nothing here had read them before. The
+weight pair is the min and the max of the roll; `mult` is a rarity multiplier.
+
+**Those base files come in three flavours, and the weight pair is the whole
+difference between a number and a range:**
+
+| base file flavour | weight / min-weight | mult | renders |
+|---|---|---|---|
+| plain (`BASEARMOR_AMULET.DAT`, `_RING`, `_CHEST`, …) | 50 / 40, 34 / 26, 18 / 14 … | 100 | a range |
+| `_MAGIC` | — | 125 (135 for chest/boots/gloves/helm/pants/shoulders) | a range, wider |
+| `_UNIQUE` | 45 / 45, 30 / 30, 12 / 12 … | 160 (shoulders 100) | **one number** |
+
+Where weight equals min-weight there is nothing to roll and both ends collapse —
+which is what the flat armor on most set jewellery is, and why 1,305 items render
+every one of their armor types flat. A range there would be invented.
+
+`ARMOR_PLAYER_BYLEVEL_FORSET(LEVEL)` is a 105-point curve in
+`MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT` — `8` at level 1, `176` at
+49, `395` at 99, `423` at 105 — parsed by the same code as the weapon curve, with
+the same `0x78`/`0x79` member hashes. It is the **only** player armor-by-level
+graph in the PAK: the other `*_BYLEVEL` graphs are the monsters' own.
+
+The rounding is `int(x + .5)`, the same rule the damage formula uses and for the
+same reason. Cross-checked against TIDBI, over the 3,984 armor type pairs where
+both sources have a number:
+
+| | |
+|---|---|
+| agree to the point | **3,674** (92.2%) |
+| one end off by exactly one | 200 |
+| TIDBI's flat number against a real range | **110 pairs, 33 items** |
+
+The 200 are an artefact of *where the value falls*, not of the formula: **193 of
+those 400 ends land within a thousandth of a `.5` boundary**, where the game's own
+arithmetic and this float64 model part ways by one. That is why the ends stay
+unrounded all the way to the check — the distance to the boundary is the evidence,
+and `build.py` asserts it.
+
+**The 33 items are the interesting ones**, and they are all set rings and amulets:
+the files hold the spread the game prints, and TIDBI holds a single number. Two of
+them settle which source is right. The Formal Regent Signet and the Highridge
+Talisman are **impossible under any weight × multiplier at their level** — TIDBI's
+number cannot be a valid roll of the envelope the base file defines. And five
+siblings on the *identical* `_MAGIC` chain are recorded by TIDBI **as ranges**,
+which the derivation reproduces exactly: the Ritual Janissary Necklace at `26-32`
+fire / `40-50` electric, Grell's Personal Signet at `10-13` physical (Grell's
+chains through `sturm_01_ring_p.dat`, the same parent file as the Runemaster
+Signet, which TIDBI records flat). So TIDBI's flat numbers here are a capture of
+one roll, not a different rounding of the same formula — and the range is what
+ships. It is also what the user asked for: the Runemaster Amulet now reads `7-8`
+ice where it used to read one number.
+
+What it changed in the shipped data, in full: **the 33 set jewellery numbers
+became ranges**, 15 more items that were showing a pre-scale scalar gained a real
+rendered value (their spread rounds away at low level — Ghastly Boots at level 5
+renders `2` at both ends), and **nothing else moved**. 3,757 of the 3,966
+dual-sourced items are untouched, and no item anywhere lost a value. The one true
+off-by-one is the Ringed Aventail, which renders `4-5` against TIDBI's flat `4` —
+a one-wide range, and therefore exactly the case TIDBI's convention cannot
+represent.
+
 ### The rendered numbers were audited, not spot-checked
 
 Everything above is only as good as the two sources behind it, so every displayed
@@ -718,7 +798,7 @@ and the derived `dps` was checked both against the formula and against alfgeir:
 
 | Check | Scope | Result |
 |---|---|---|
-| our armor == TIDBI's `MIN`/`MAX` | 6,470 armor slots | 0 unexplained |
+| our derived armor == TIDBI's `MIN`/`MAX` | 3,984 armor type pairs | **310 differ**, and every one of them is explained: 200 one point off with 193 of those ends on a `.5` boundary, 110 the set-jewellery capture (§7, *The armor formula, recovered*). `build.py` pins all three counts and the class, so a fourth kind of disagreement fails the build |
 | our damage == alfgeir's | 461 weapons both cover | **70 differ** — the same one-handed-axe cluster as above, which is what you would expect: alfgeir and TIDBI are both 2014 and agree with each other rather than with the shipped build |
 | `int(mean ÷ speed + .5)` — does the rounding rule matter? | all 1,351 weapons | **yes: floor would change 618 of them.** Longfang is the worked case, on the wiki's own numbers: its tooltip damage lines are `85-170` / `28-56` / `28-56` at 0.72 s, so the mean is 211.5, 211.5 ÷ 0.72 = 293.75, and the tooltip's **294** is half-up where floor says 293. alfgeir's stated dps is this same form on all 461 weapons it carries. (We render **296** for this item — off by the same ~1% balance-curve drift as the Grimbone, so that tooltip settles the rule, not our magnitude.) TIDBI is not a counterexample: its `DPS_ALL` rounds each damage type *before* adding (§5), a quirk the game does not share |
 | our `dps` == alfgeir's, restricted to weapons neither side carries a flat affix for | 398 both cover | **331 agree (83.2%)**; the other 67 are the damage disagreements above propagating through, not a separate failure. alfgeir's dps omits flat affixes entirely, so any weapon carrying one is uncomparable without adjusting for it — 63 were dropped for that |
@@ -849,10 +929,13 @@ don't, walking `BASEFILE` gets **armor onto 1,995 of them but damage onto only
 and never break — hop histogram `{0:14, 1:265, 3:1}`, zero cycles, zero unresolved
 paths.
 
-The inheritance walk still runs on the DAT, because that is where the base
-relationships live; only the *displayed* numbers come over from TIDBI. The two
-extra items against the old 5,354 are ones TIDBI gives a rendered armor value
-that the DAT has no field for at all.
+The inheritance walk runs on the DAT, because that is where the base relationships
+live — and it is now what puts most of the *displayed* numbers there too, since
+`weight`, `min-weight` and `mult` are inherited the same way damage's
+`MINDAMAGE`/`MAXDAMAGE` are (§7). The two extra items against the old 5,354 are
+ones TIDBI gives a rendered armor value that the DAT has no field for at all, so
+neither source's formula can reach them; the `vb` pair the badge shows are the
+other way round.
 
 The builder asserts the resolved totals exactly, so a regression in the walk
 fails the build rather than silently emptying the corpus.
@@ -1362,7 +1445,12 @@ exact damage/armor totals, the dps and base-value counts, the Aenigma and Longfa
 rows against ground truth (theirs *and* alfgeir's — both dps figures are alfgeir's
 own), the `heavy_g_amulet_f_alt_b` row as a regression test for the three reported
 bugs, the stat-less weapon set, tier counts, and that every referenced icon has
-sprite coordinates. It also asserts that `TYPE_GROUPS` names every type the
+sprite coordinates. It also asserts the **derived armor against TIDBI**, which is
+the only independent check that derivation has: the exact count of one-point
+disagreements, that at least 190 of their ends still sit on a `.5` boundary, and
+that every larger disagreement is a flat set-jewellery number the files contradict
+(§7). A new class of disagreement fails the build. It also asserts that
+`TYPE_GROUPS` names every type the
 corpus emits — a type missing from the taxonomy would otherwise render in the
 wrong group, or vanish from the rail, without failing anything. It also asserts
 that every referenced set token has a name *and* a bonus ladder, that TIDBI's
@@ -1372,9 +1460,12 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 177
+`db\check_page.js` goes further and drives the built page in a real DOM — 182
 assertions covering filtering, multi-select, search, sort, the detail view,
-provenance, hash deep links, the three reported bugs, the base-value badge, the
+provenance, hash deep links, the three reported bugs, the armor derivation (the
+two set pieces reported by name, the widest set-jewellery case, the provenance
+line on a derived number, and the flatness a single-weight base file has to
+keep), the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
 group's count equals the sum of its rows, that a group header checks the boxes
 it stands in for, that a retired `#cat=` link still resolves, that the four

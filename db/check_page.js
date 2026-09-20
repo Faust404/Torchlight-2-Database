@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 177 assertions.
+ * view, provenance and hash deep links -- 182 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
