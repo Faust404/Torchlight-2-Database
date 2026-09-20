@@ -113,20 +113,6 @@ SET_SPEC = [
     'pimp_01_belt_alt_set',
 ]
 
-# How many pieces of a set a character can actually be wearing. The game's worn
-# slots are listed in MEDIA/INVENTORY/ -- HEAD, TORSO, SHOULDERS, GLOVES, PANTS,
-# BOOTS, BELT, NECKLACE, RING1, RING2, RIGHTHAND, LEFTHAND -- so a ring fills
-# two slots and a one-handed weapon fills two, everything else one. This is the
-# number the ladder's top rung is built to: 52 of the 80 sets stop at exactly
-# their capacity, and only Cornerstone goes past it.
-ONE_HANDED = {'Sword', 'Axe', 'Mace', 'Dagger', 'Claw', 'Wand', 'Pistol', 'Fist'}
-
-
-def capacity(types):
-    return sum(2 if (t == 'Ring' or t in ONE_HANDED) else 1 for t in types)
-
-
-
 def write(tpl_name, out_name, data, token):
     tpl = open(os.path.join(HERE, tpl_name), encoding='utf-8').read()
     html = tpl.replace(token, json.dumps(data, separators=(',', ':'),
@@ -149,15 +135,14 @@ def main():
     picked = [by[i] for i in WANT]
 
     # Each shown item's own set, and nothing else -- a mockup has no business
-    # carrying 80 ladders it never draws. `cap` rides along: the card dims a
-    # rung against what a character can wear, which is not the record count the
-    # set carries, and the template has no way to work it out from types.
+    # carrying 80 ladders it never draws. `cap` comes from sets.json now: the
+    # card dims a rung against what a character can wear, and one definition of
+    # that lives in the pipeline rather than one per tree.
     used = {}
     for o in picked:
         sid = o.get('setid')
         if sid and sid in sets:
-            types = set(x['t'] for x in items if x.get('setid') == sid)
-            used[sid] = dict(sets[sid], cap=capacity(types))
+            used[sid] = sets[sid]
 
     # The icons arrive as one 4.7 MB sheet addressed by coordinates. Cropping
     # the six tiles out into a 270x45 strip keeps the page a few KB and keeps
@@ -220,9 +205,9 @@ def main():
             sys.exit('set sheet: %s has an empty ladder' % sid)
         types = set(x['t'] for x in items if x.get('setid') == sid)
         sspec.append({'n': o['n'], 'id': o['id'], 'set': s['n'], 'c': s['c'],
-                      'slots': len(types), 'cap': capacity(types), 'b': s['b']})
+                      'slots': len(types), 'cap': s['cap'], 'b': s['b']})
         print('    %-22s %-14s records=%-3d slots=%-3d capacity=%-3d top rung=%d' %
-              (i, s['n'], s['c'], len(types), capacity(types), s['b'][-1][0]))
+              (i, s['n'], s['c'], len(types), s['cap'], s['b'][-1][0]))
     write('set.tpl.html', 'set.html', {'spec': sspec}, '/*__SETS__*/')
     print('  %d specimens' % len(sspec))
 

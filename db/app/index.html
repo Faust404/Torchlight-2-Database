@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Torchlight II Item Database</title>
 <style>
-:root{--sprite:url(data:image/png;base64,__SPRITE__)}
+:root{
+  /* --sprite is not here: at 6.2 MB of base64 it is too large to travel through
+     a custom property and is written into the rule that draws it. See the note
+     at the top of app.css. */
+  --esprite:url(data:image/png;base64,__ELEM__);
+  --ew:__EW__px;
+  --eh:__EH__px;
+}
 /*__CSS__*/
 </style>
 </head>

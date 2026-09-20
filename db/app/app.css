@@ -33,18 +33,52 @@
   --t-normal:#e6e6e6; --t-rare:#2182ff; --t-unique:#ef6100;
   --t-set:#a855f7; --t-legendary:#ff3100; --t-none:#8a8a8a;
 
+  /* The item card's own greys, lifted out of the rules below because it uses
+     four of them where the rest of the page needs one. They are a value ladder
+     rather than decoration: a card states labels, values, qualifiers and
+     asides, and the eye has to be able to sort them without reading them.
+     --body is the page's own text colour, named now that the card refers to it
+     by role. --magic is the game's magical-item green, #319C00 from the tier
+     colours above, lifted the same way --t-set is: 6.1:1 against the panel. */
+  --body:#c9c2b6; --val:#d8cfc0; --dim:#8b837b; --faint:#6f6862; --magic:#7cc24a;
+
+  /* Bitter, for the affix lines, the set ladder and the requirement chips. It is
+     embedded, not linked -- see app/fonts/README.md -- so the fallbacks are the
+     serifs the platform has rather than another webfont. */
+  --doc:Bitter,Georgia,"Times New Roman",serif;
+
   --rail:220px;
 }
 
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0; background:var(--bg); color:#c9c2b6;
+  margin:0; background:var(--bg); color:var(--body);
   font:13px/1.45 "Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   overflow:hidden;
 }
 a{color:inherit; text-decoration:none}
 button,input,select{font:inherit; color:inherit}
+
+/* ---------------------------------------------------------------- the sheet
+   The icon atlas, written straight into the rule that draws it rather than into
+   a custom property beside the other tokens in `:root`.
+
+   A data URI this long does not survive `var()`. The sheet is 4.46 MB and its
+   base64 is 6.2 MB; Chrome silently drops a custom property holding a data URI
+   over about 2 MB, and it drops the substitution rather than the declaration --
+   so every icon on the page disappears at once -- grid and card alike -- and
+   nothing in the console says why. Measured on this Chrome: 1,998,072 base64
+   characters resolve, 2,401,524 do not. The same 6.2 MB written directly into a
+   rule renders fine, which is why the two selectors below are grouped: the
+   base64 appears exactly once in the file, as it did as a variable.
+
+   The study in test/card_mockups/ never met this because it crops the sheet to
+   the items on the sheet -- 62 KB, comfortably under the line. */
+.card .art i, .tile i{
+  background-image:url(data:image/png;base64,__SPRITE__);
+  background-repeat:no-repeat; display:block;
+}
 
 /* ------------------------------------------------------------------ shell */
 #app{display:flex; flex-flow:row nowrap; height:100vh}
@@ -170,7 +204,6 @@ button,input,select{font:inherit; color:inherit}
 .card:hover{border-color:var(--label); background:#1c1a17}
 .card .art{flex:0 0 auto; width:46px; height:46px; display:flex;
   align-items:center; justify-content:center}
-.card .art i{background-image:var(--sprite); background-repeat:no-repeat; display:block}
 .card .ph{
   width:42px; height:42px; border:1px solid var(--div); border-radius:3px;
   display:flex; align-items:center; justify-content:center; color:#5c5650;
@@ -203,26 +236,53 @@ button,input,select{font:inherit; color:inherit}
   border-radius:3px; padding:5px 11px; cursor:pointer}
 #more button:hover{border-color:var(--gold); color:var(--gold)}
 
-/* ---------------------------------------------------------- detail (item) */
+/* ---------------------------------------------------------- detail (item)
+   The tooltip card, ported from test/card_mockups/mock.tpl.html where it was
+   settled against ten specimens. The rules below are that card's, and the
+   comments that argue them are the mockup's own -- kept here so the reasoning
+   travels with the thing it explains rather than living in a study folder.
+
+   Four names are deliberately not the card's:
+
+     .dwrap     the card's own width, and the app's back-link container, which
+                the card has no equivalent of
+     .dtype     where the card says .at. Four assertions and the tier-ink rules
+                below select it by name
+     .back      the app's route home
+     .prov .tag .task .cond .fx .locked
+                carried over verbatim; this block was lifted from the app in the
+                first place, so the port returns it unchanged
+
+   .block, .row, .or, .thr, .seth and .dmg are gone with the renderer that
+   emitted them. */
 #detail{flex:1 1 auto; overflow-y:auto; padding:16px 18px 60px; display:none}
 #app.item #grid-wrap{display:none}
 #app.item #detail{display:block}
 
-.dwrap{max-width:760px}
-.dtop{display:flex; gap:18px; align-items:flex-start; margin-bottom:14px}
-.dart{
-  flex:0 0 auto; background:#100f0e; border:1px solid var(--div); border-radius:4px;
-  display:flex; align-items:center; justify-content:center;
-  /* cell sized by equip slot, imitating the in-game inventory silhouette */
-}
-.dart.weapon{width:68px; height:130px}
-.dart.chest{width:68px; height:100px}
-.dart.head{width:68px; height:68px}
-.dart.waist{width:68px; height:36px}
-.dart.jewel{width:36px; height:36px}
-.dart i{background-image:var(--sprite); background-repeat:no-repeat; display:block}
+.dwrap{max-width:366px}
+.back{color:var(--label); font-size:12px; display:inline-block; margin-bottom:10px}
+.back:hover{color:var(--gold)}
 
-.dname{color:var(--head); font-size:21px; margin:0 0 4px}
+/* The card's own font-size, a shade under the app's 13px: the card carries a lot
+   of small print and reads too tight at the body size. */
+.c{background:var(--panel); border:1px solid var(--line); border-radius:4px;
+  font-size:12.5px; line-height:1.42; overflow:hidden}
+.c .ph{display:flex; align-items:center; justify-content:center; width:42px;
+  height:42px; border:1px solid var(--div); border-radius:3px; background:#100f0e;
+  color:#5c5650; font-size:15px; font-weight:600}
+
+/* The rarity tile: grimtools' one genuinely good idea, and the reason its cards
+   read as "an item" rather than "a row". Border and glow both take the item's
+   own colour, so the tier lands before a word is read. The icon inside is sized
+   by iconHTML(), which sets the tile's own width and height from the sheet. */
+.tile{position:relative; flex:0 0 auto; width:58px; height:58px;
+  border:1px solid currentColor; border-color:color-mix(in srgb,currentColor 48%,transparent);
+  border-radius:4px; display:flex; align-items:center; justify-content:center;
+  background:#100f0e; overflow:hidden}
+.tile:before{content:""; position:absolute; inset:0; opacity:.22;
+  background:radial-gradient(circle at 50% 58%,currentColor,transparent 70%)}
+.tile i,.tile .ph{position:relative}
+
 /* The type line reads "<tier> <type>" -- "Rare Pistol" -- with the tier word
    painted in its own tier colour, since that is the one word in the line
    carrying information the type does not. It used to read "Pistol Rare" with
@@ -233,7 +293,7 @@ button,input,select{font:inherit; color:inherit}
    `.nm`. So the tiers get a second, plainer class that colours whatever it is
    put on. The two lists cannot drift: app.js derives the `t-` name from the
    `q-` one, so a tier added to one is added to both. */
-.dtype{color:var(--muted); font-size:12.5px}
+.dtype{color:var(--muted); font-size:12px; margin:0}
 .dtype em{font-style:normal}
 .t-normal{color:var(--t-normal)}
 .t-rare{color:var(--t-rare)}
@@ -241,78 +301,155 @@ button,input,select{font:inherit; color:inherit}
 .t-set{color:var(--t-set)}
 .t-legendary{color:var(--t-legendary)}
 .t-unclassified{color:var(--t-none)}
-.back{color:var(--label); font-size:12px; display:inline-block; margin-bottom:10px}
-.back:hover{color:var(--gold)}
 
-.block{margin:14px 0 0; border-top:1px solid var(--line); padding-top:10px}
-.block h3{margin:0 0 7px; color:var(--label); font-size:10px; letter-spacing:.13em;
-  text-transform:uppercase; font-weight:600}
+/* ------------------------------------------------- the top-right corner
+   The item level, the socket count and the class gate. The gate is a hard
+   restriction on who may equip the item, so it lives here rather than among the
+   requirements below -- which is what makes "Player Level" affordable in full
+   down there, with no word "Required" on every line. The words are emitted once,
+   in the case they are written in; the chip is the slab serif, sentence case. */
+.corner{flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end;
+  gap:3px; margin-left:auto; text-align:right; padding-top:2px}
+.corner .pill{border:1px solid var(--div); border-radius:3px; padding:1px 6px;
+  color:var(--label); white-space:nowrap; font-family:var(--doc); font-size:11.5px}
 
-/* leader-dot row -- carries most of grimtools' visual identity */
-.row{display:flex; align-items:baseline; gap:6px; padding:2px 0}
-.row .k{color:var(--label)}
-.row .fill{flex:1 1 auto; border-bottom:1px dashed rgba(168,128,84,.12);
-  transform:translateY(-3px)}
-.row .v{color:#d8cfc0; font-variant-numeric:tabular-nums}
-.row .v.big{color:var(--gold); font-weight:600}
+/* the name block. No padding: the tile and the corner pills bleed to the card's
+   own edge, which is what makes the header read as a header rather than as the
+   first of the ruled sections -- the tile is the only thing on the card that
+   touches a border. */
+.ahead{display:flex; gap:12px; align-items:flex-start}
+.aid{min-width:0; flex:1 1 auto; padding-top:2px}
+.an{margin:0 0 2px; font-size:16px; font-weight:600; line-height:1.2}
 
-/* dividers that part two groups inside a tooltip: the "or" between an item's
-   requirement branches, the line marking an augmented weapon's unlockable stats
-   as conditional (both in renderDetail), and one per rung of a set's bonus
-   ladder. All three are the same object -- a word ruled off on both sides. */
-.or,.cond,.thr{display:flex; align-items:center; gap:8px; padding:3px 0; color:var(--label);
-  font-size:10px; letter-spacing:.14em; text-transform:uppercase}
-.or:before,.or:after,.cond:before,.cond:after,.thr:before,.thr:after{content:""; flex:1 1 auto;
-  border-top:1px solid var(--line)}
-.cond{color:var(--gold)}
-.cond:before,.cond:after{border-top-style:dashed; border-top-color:var(--div)}
+/* ---------------------------------------------------------------- body
+   What the weapon outputs, first, and in one place: the headline number, then
+   the two things that qualify it, then the damage it is made of. */
+.body{padding:12px 13px 13px}
+.dps{margin:0; color:var(--gold); font-weight:600; font-size:15px; line-height:1.35}
+.dps span{color:var(--gold); font-weight:400; font-size:12.5px; opacity:.82}
+.fspd{margin:2px 0 0; color:var(--dim)}
+.fspd b{color:var(--head); font-weight:600}
+.fspd em{font-style:normal; color:var(--faint)}
+.frng{margin:1px 0 0; color:var(--dim)}
+.frng b{color:var(--val); font-weight:600; font-variant-numeric:tabular-nums}
+.ln{margin:0; padding:1px 0; color:var(--body)}
+/* The element mark sits between the number and the word, which is the order the
+   game's own tooltip lays it out in (value widget, image widget, label -- see
+   EQUIPMENT_ROLLOVER.LAYOUT). It also keeps the numbers in a column.
 
-/* A ladder's rungs need more room above them than the two `or`/`cond` dividers
-   do: those part two groups and read fine tight, while a rung follows a bonus
-   line and would collide with it. */
-.thr{padding-top:7px}
+   --ew and --eh are the tile size, written into the shell by build.py from the
+   strip's own dimensions, so a re-cut strip cannot leave the offsets here and
+   the sprite disagreeing. The strip is five 15x16 tiles taken from
+   MEDIA/UI/HUD/INGAMETEXTURESHEETS4.PNG -- the shield-less variants the item
+   tooltip names, not the character sheet's. See db/app/fonts/README.md. */
+.em{display:inline-block; width:var(--ew); height:var(--eh); margin:0 5px;
+  background-image:var(--esprite); background-repeat:no-repeat; vertical-align:-3px}
+.ln b{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}
+/* C2 x F4, settled on affix.html: the words keep the game's magic green, the
+   value lifts to --head at 600, and the block takes the card's own serif. The
+   object the card already made two sections above -- every damage value is
+   --head against a --body label -- applied to the affix block. */
+.aff{margin:0; padding:1px 0; color:var(--magic); font-family:var(--doc)}
+.aff .n{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}
+.req{margin:0; padding:1px 0; color:var(--dim)}
+.req b{color:var(--val); font-weight:400; font-variant-numeric:tabular-nums}
+.sep{color:var(--faint)}
+.flav{margin:10px 0 0; color:#8d8579; font-style:italic; font-size:12px}
 
-/* The rungs a set gates above the number of pieces it ships: 15 of the 80 sets
-   declare one, Twinferno's 2-piece bonus sitting on a one-piece set being the
-   extreme. They are drawn, not dropped, because the game's own set file
-   declares them and a player comparing this page to the wiki should see the
-   same ladder -- but they are dimmed, since nothing a player does reaches them.
+.rule{height:1px; background:var(--line); margin:9px 0}
 
-   `.fx.locked` above is deliberately not reused. It means something else (a
-   stat the item has, gated behind a task the player can still complete) and it
-   is asserted on by name in check_page.js, so borrowing it would make those
-   assertions quietly match more than they were written to. */
-.thr.over{color:#6f6862}
-.fx.over li{color:#8d8579}
-.fx.over li:before{color:#6b645c}
+/* ------------------------------------------------------------- the ladder
+   The heading quotes both numbers, each in its own word. `sets.json`'s `c` is a
+   record count -- how many rows in items.json carry the setid -- and beside a
+   rung number it reads as a contradiction: Mondon's Vestment is 16 records
+   across 9 item types worn as 10 pieces. Both are worth having, so both are
+   kept, as "items" and as a "piece set".
 
-/* the set a ladder belongs to, once, above its rungs */
-.seth{margin:0 0 2px; color:var(--head)}
-.seth .ct{color:var(--muted); font-size:11.5px; margin-left:7px}
+   A rung is dimmed against what a character can wear, not against the record
+   count. Capacity is 2 for a ring, 2 for each one-handed weapon type, 1 for
+   everything else -- the worn slots MEDIA/INVENTORY/ declares -- and build.py
+   emits it as `cap`. 52 of the 80 sets top out at exactly it, and the record
+   count is always at least as large, so the old test could only ever be too
+   strict: it dimmed 15 rungs a character can reach, Twinferno's only one among
+   them.
 
-/* the task whose completion unlocks them -- the one thing the player must do */
+   The dimming must be the rung's own rule. `.fx.locked` is the obvious one to
+   borrow and the wrong one: it means "a stat the item has, behind a task you
+   can still finish", which is the opposite of a rung nothing reaches -- and
+   those assertions select on it by name, so borrowing it would quietly widen
+   what they match.
+
+   The rung figure is plain rather than a pill. The heading above it already
+   says purple, and the lozenge was a third device competing with the magic-green
+   affixes and the requirement chips. */
+.sname{margin:0 0 4px; color:var(--t-set); font-size:12.5px}
+.sname .ct{color:color-mix(in srgb,var(--t-set) 46%,#8b837b); font-size:11.5px;
+  margin-left:6px}
+.rung{display:flex; gap:7px; align-items:baseline; margin:0; padding:1.5px 0}
+.rung .rn{flex:0 0 auto; min-width:15px; height:16px; line-height:16px;
+  text-align:right; color:color-mix(in srgb,var(--t-set) 58%,#fff);
+  font-size:10px; font-variant-numeric:tabular-nums}
+.rung .rt{color:#bdb4a6; font-family:var(--doc)}
+.rung .rt .n{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}
+.rung.over .rn{color:color-mix(in srgb,var(--t-set) 24%,#8b837b)}
+.rung.over .rt{color:#8d8579}
+/* The lift out-specifies the muting, so an out-of-reach rung would keep the
+   brightest thing on it. Restated on the number; the weight stays. */
+.rung.over .rt .n{color:inherit}
+
+/* ------------------------------------------------------- the augmented group
+   The one part of a card that cannot be inferred from the stats around it: a
+   conditional bonus that reads as unconditional is worse than no bonus at all.
+   The task is a gold chip, the dashed rule states the condition in words, and
+   the gated stats sit behind a left rule so they cannot be mistaken for
+   something the weapon already has. The affixes above keep the tooltip's own
+   magic green; the locked stats pointedly do not, since green here means
+   "active". */
+.augtask{margin:0}
 .task{display:inline-block; padding:3px 9px; margin:1px 0 2px; color:var(--gold);
-  background:#241d12; border:1px solid var(--div); border-radius:3px}
-
+  background:#241d12; border:1px solid var(--div); border-radius:3px; font-size:12.5px}
+.cond{display:flex; align-items:center; gap:8px; margin:0; padding:3px 0;
+  color:var(--gold); font-size:10px; letter-spacing:.14em; text-transform:uppercase}
+.cond:before,.cond:after{content:""; flex:1 1 auto; border-top:1px dashed var(--div)}
 .fx{margin:0; padding:0; list-style:none}
-.fx li{padding:2px 0 2px 12px; position:relative; color:#bdb4a6}
-.fx li:before{content:"\2022"; position:absolute; left:2px; color:var(--label)}
+.fx.locked li{position:relative; padding:2px 0 2px 16px; margin-left:1px;
+  color:#8d8579; border-left:2px solid var(--div)}
+.fx.locked li:before{content:"\2022"; position:absolute; left:7px; color:#6b645c}
 
-/* the unlockable group, which is not yet active and so must not read like the
-   affixes above: dimmer, and ruled off to the left of the bullet */
-.fx.locked li{color:#8d8579; border-left:2px solid var(--div); margin-left:1px;
-  padding-left:16px}
-.fx.locked li:before{left:7px; color:#6b645c}
+/* --------------------------------------------------------- requirements
+   The one thing the block may never lose is the either/or: a player level OR
+   all of the attributes, whichever the player reaches first -- not a
+   conjunction. A reader who takes it for an "and" has been told something false
+   about the item. The chips make it structural: the level chip and the attribute
+   chips are two groups and the word between them is the branch, rather than a
+   rule drawn across the card. The chips borrow the corner's voice -- the slab
+   serif, sentence case, the same radius -- so the card has one chip language. */
+.rhead{margin:0 0 4px; color:var(--label); font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase}
+.rrow{display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:0}
+.rchip{border:1px solid var(--div); border-radius:3px; padding:1px 6px;
+  color:var(--dim); font-family:var(--doc); font-size:11.5px; white-space:nowrap}
+.rchip b{color:var(--val); font-weight:400; font-variant-numeric:tabular-nums}
+/* The "or" is the one thing on the card that must not be misread, so it is not
+   the faintest thing on it -- the note above is worth nothing if the word it
+   rests on is the hardest to see. */
+.ror{color:var(--dim); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  margin:0 2px}
 
-.dmg span{display:inline-block; margin-right:14px; white-space:nowrap}
-.dmg .k{color:var(--label); margin-right:4px}
+/* --------------------------------------------------------- the spawn band
+   Deliberately not chips. A requirement is something the player has to be or
+   do; this is a fact about where the item comes from, so it is stated in the
+   same plain voice as the provenance strip rather than given the boxed
+   treatment that would file it as a third gate. */
+.lvlr{margin:0; color:var(--dim); font-size:11.5px}
+.lvlr b{color:var(--val); font-weight:400; font-variant-numeric:tabular-nums}
 
-.prov{margin-top:18px; border-top:1px solid var(--line); padding-top:9px;
-  color:#6f6862; font-size:11px; font-family:ui-monospace,Consolas,monospace;
-  word-break:break-all; line-height:1.7}
+.prov{margin-top:16px; border-top:1px solid var(--line); padding-top:8px;
+  color:#6f6862; font-size:10.5px; font-family:ui-monospace,Consolas,monospace;
+  word-break:break-all; line-height:1.65}
 .prov b{color:#8b837b; font-weight:600}
 .tag{display:inline-block; padding:1px 5px; border:1px solid var(--div);
-  border-radius:3px; color:var(--label); font-size:10px; margin-left:6px}
+  border-radius:3px; color:var(--label); font-size:9.5px; margin-left:6px}
 
 /* --------------------------------------------------------------- empty/msg */
 .msg{padding:40px 6px; color:var(--label); text-align:center}

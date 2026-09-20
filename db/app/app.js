@@ -25,6 +25,10 @@
   // as `setid`, not the display name it shows. `c` is how many pieces of the set
   // this corpus ships, which is what a rung is measured against.
   var SETS = window.DB.sets || {};
+  // X-offsets into the five-tile strip of element marks the page inlines as
+  // --esprite, one per entry in DMGTYPES and in that order. Built by build.py
+  // from the PNG's own width, so the strip and these offsets cannot disagree.
+  var ELEM = window.DB.elem || {};
   // The rail's taxonomy, injected by build.py from TYPE_GROUPS -- the same list
   // that decides the CSV's category column. Each entry is {g: group,
   // s: subgroup or null, t: [types]}, already in render order.
@@ -113,15 +117,11 @@
     return '<span class="ph">' + esc((o.t || '?').charAt(0)) + '</span>';
   }
 
-  function slotClass(o) {
-    var t = o.t;
-    if (t === 'Ring' || t === 'Necklace' || t === 'Collar' || t === 'Tag') return 'jewel';
-    if (t === 'Belt') return 'waist';
-    if (t === 'Helmet' || t === 'Gloves' || t === 'Boots') return 'head';
-    if (t === 'Chest Armor' || t === 'Leggings' || t === 'Shoulder Armor' ||
-        t === 'Shield' || t === 'Armor') return 'chest';
-    return 'weapon';
-  }
+  // `slotClass()` used to live here, sizing the detail view's icon well by the
+  // equip slot it imitated. The card draws one tile size for every slot, so the
+  // taxonomy has no reader left and went with the well it served. The worn-slot
+  // rule it implied does not: `capacity()` in db/build.py states it, against
+  // MEDIA/INVENTORY/, and the set ladder dims by it.
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
@@ -453,18 +453,267 @@
   }
 
   // ------------------------------------------------------------ detail view
-  function row(k, v, big) {
-    return '<div class="row"><span class="k">' + esc(k) + '</span>' +
-      '<span class="fill"></span><span class="v' + (big ? ' big' : '') + '">' +
-      esc(v) + '</span></div>';
-  }
-  // Divider between the two branches of an either/or requirement. Parentheses
-  // would be more literal, but the rule is always "level, or all the stats", so
-  // a ruled "or" says the same thing and reads far better in this layout.
-  function orRow() { return '<div class="or">or</div>'; }
+  //
+  // The tooltip card, ported from test/card_mockups/mock.tpl.html, where it was
+  // settled against ten specimens. Four things are worth knowing before reading
+  // it, because each one is a deliberate departure from the row layout it
+  // replaced:
+  //
+  //   * A value leads and its label follows -- "169 <mark> Physical Damage" --
+  //     which is the order the game's own tooltip lays out (value widget, image
+  //     widget, label: see EQUIPMENT_ROLLOVER.LAYOUT under MEDIA/UI/PIECES/). It
+  //     also keeps the numbers in a column down the card.
+  //   * Sections are parted by a rule rather than by a heading, and a section
+  //     that renders nothing takes its rule with it -- see `sec` in tooltip().
+  //   * The requirement chips make the either/or structural: the level chip and
+  //     the attribute chips are two groups with the word between them, rather
+  //     than a rule drawn across the card.
+  //   * The tier word in the type line wears the `.t-*` classes, not the `.q-*`
+  //     ones -- those colour a descendant `.nm` and rule a card's left edge, and
+  //     a type line is neither.
+  //
+  // `esc`, `n`, `cap`, `ownTier`, `tierInk`, `speedBand` and `iconHTML` are the
+  // app's own and are reused rather than ported; the mockup carried twins of all
+  // six because it could not reach this file.
 
-  function block(title, body) {
-    return body ? '<div class="block"><h3>' + esc(title) + '</h3>' + body + '</div>' : '';
+  function tcls(o) { return tierInk(ownTier(o)); }
+
+  // The rarity tile: grimtools' one genuinely good idea, and the reason its
+  // cards read as "an item" rather than "a row". Border and glow both take the
+  // item's own colour, so the tier lands before a word is read.
+  function tile(o) {
+    return '<span class="tile ' + tcls(o) + '">' + iconHTML(o) + '</span>';
+  }
+
+  // "<rarity> <type>", and on a set piece the Set tag it really belongs to --
+  // "Unique Set Belt" -- because Set is a membership the DAT asserts rather than
+  // a rarity, and the game paints such an item in its real one.
+  function typeLine(o) {
+    return '<em class="' + tcls(o) + '">' + esc(ownTier(o)) + '</em> ' +
+      (o.uq ? esc(o.q) + ' ' : '') + esc(o.t) +
+      // The badge is the app's own, not the mockup's, and it is the honesty
+      // marker on the 19 items whose numbers are raw pre-scale .DAT scalars.
+      (o.vb ? '<span class="tag">base values, not rendered</span>' : '');
+  }
+
+  // The element mark that sits between a damage value and its word. Offsets come
+  // from the strip build.py inlines, one tile per entry in DMG_TYPES.
+  function elemMark(k) {
+    var p = ELEM[k];
+    if (p == null) return '';
+    return '<i class="em" style="background-position:-' + p + 'px 0"></i>';
+  }
+
+  // Damage and armor are the same line in two words, so they are one function:
+  // "169 <mark> Physical Damage", "140-174 <mark> Fire Armor".
+  function statLines(vals, word) {
+    if (!vals) return '';
+    return DMGTYPES.filter(function (k) { return vals[k]; }).map(function (k) {
+      return '<p class="ln"><b>' + esc(vals[k]) + '</b>' + elemMark(k) +
+        esc(cap(k)) + ' ' + word + '</p>';
+    }).join('');
+  }
+
+  // The value is what a reader scans for and it is already in the string, so
+  // lifting it is emphasis rather than a claim about the stat. Sign, decimal
+  // comma and percent travel with the number: splitting "+8" from "%" would
+  // print one value in two colours.
+  function mark(s) {
+    var out = '', last = 0, m, re = /[-+]?\d+(?:[.,]\d+)?%?/g;
+    while ((m = re.exec(s))) {
+      out += esc(s.slice(last, m.index)) + '<span class="n">' + esc(m[0]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    return out + esc(s.slice(last));
+  }
+
+  function affLines(o) {
+    return (o.fx || []).map(function (f) {
+      return '<p class="aff">' + mark(f) + '</p>';
+    }).join('');
+  }
+
+  // ---- the corner ----
+  // Item level, socket count and the class gate. The gate is a hard restriction
+  // on who may equip the item, so it lives here and is not repeated as a
+  // requirement below -- which is what makes "Player Level" affordable in full
+  // down there, without the word "Required" on every line.
+  function socketWord(k) { return k + (k === 1 ? ' Socket' : ' Sockets'); }
+  function corner(o) {
+    var rows = [];
+    if (n(o.lv)) rows.push('<span class="pill">Level ' + n(o.lv) + '</span>');
+    if (n(o.sk)) rows.push('<span class="pill">' + socketWord(n(o.sk)) + '</span>');
+    if (o.cls) rows.push('<span class="pill">' + esc(o.cls) + ' Only</span>');
+    return rows.length ? '<div class="corner">' + rows.join('') + '</div>' : '';
+  }
+
+  // ---- the ladder ----
+  // The heading states both numbers, in the two different words they need.
+  // `st.c` counts the records that exist -- Mondon's 16, being two item levels of
+  // seven slots plus a necklace and a ring -- and the top rung counts the pieces
+  // a character wears, which is 10 because a ring fills two slots. Calling both
+  // of them "pieces" is what made the old heading read as a contradiction:
+  // `16 pieces (10 piece set)`. Cornerstone is the case for keeping both, since
+  // it reads `7 items · 9 piece set`, which is the whole anomaly.
+  //
+  // A rung is dimmed against `st.cap` -- what a character can wear, computed in
+  // build.py -- and not against `st.c`. The record count is always the larger of
+  // the two, so the old test could only ever be too strict: it dimmed 15 rungs a
+  // player can reach, Twinferno's only one among them.
+  function ladder(o) {
+    var st = o.setid && SETS[o.setid];
+    if (!st) return '';
+    var top = st.b.length ? st.b[st.b.length - 1][0] : 0;
+    return '<p class="sname">Set: ' + esc(st.n) + '<span class="ct">' +
+      st.c + (st.c === 1 ? ' item' : ' items') + ' · ' + top + ' piece set</span></p>' +
+      st.b.map(function (r) {
+        var over = r[0] > st.cap;
+        // A rung carrying several bonuses repeats the row, and only the first
+        // of them states the piece count -- the rest are visually its
+        // continuation, which is why the blank `.rn` must stay in the markup.
+        return r[1].map(function (f, i) {
+          return '<p class="rung' + (over ? ' over' : '') + '">' +
+            (i ? '<span class="rn"></span>' : '<span class="rn">' + r[0] + '</span>') +
+            '<span class="rt">' + mark(f) + '</span></p>';
+        }).join('');
+      }).join('');
+  }
+
+  // ---- requirements ----
+  // A socketable's MINLEVEL is read as a gate on the host item rather than on the
+  // player, and that phrasing does not survive being shortened, so it is emitted
+  // whole on its own line rather than bent to fit a chip it does not have. It is
+  // also why socketables show no spawn band below: it is the same field, and the
+  // card must not print one number twice under two labels.
+  function reqSocket(o) {
+    return n(o.ml) && o.t === 'Socketable'
+      ? 'Required Item Level to Socket: <b>' + n(o.ml) + '</b>' : '';
+  }
+  // The chips make the either/or structural. Requirements are alternatives, not
+  // a conjunction: the game grants equip once you meet the player level OR all
+  // of the stats, whichever you reach first. A reader who takes it for an "and"
+  // has been told something false about the item.
+  function requirements(o) {
+    var req = o.rq || {}, rows = [], socket = reqSocket(o);
+    if (socket) rows.push('<p class="req">' + socket + '</p>');
+    var level = n(o.lr)
+      ? '<span class="rchip">Player Level <b>' + n(o.lr) + '</b></span>' : '';
+    var stats = ['str', 'dex', 'mag', 'def'].filter(function (k) { return req[k]; })
+      .map(function (k) {
+        return '<span class="rchip">' + REQLABEL[k] + ' <b>' + esc(req[k]) + '</b></span>';
+      }).join('');
+    var parts = level + (level && stats ? '<span class="ror">or</span>' : '') + stats;
+    if (parts) rows.push('<p class="rrow">' + parts + '</p>');
+    return (rows.length ? '<p class="rhead">Requirements</p>' : '') + rows.join('');
+  }
+
+  // ---- the spawn band ----
+  // MINLEVEL and MAXLEVEL bracket the item's own level -- the band it drops in,
+  // not a socketing ladder. ml <= lv <= xl holds on 1,862 of the 1,955 items
+  // carrying all three, and the Blood Ember ranks settle it: both fields step by
+  // 14 per rank, exactly as the gem's own level does (rank 3 is lv 36, ml 28,
+  // xl 46), and a maximum level for socketing something is not a thing that can
+  // exist.
+  //
+  // It is stated in plain text rather than in chips because it is a fact about
+  // where the item comes from, not a gate on the reader -- and it sits below the
+  // requirements so the two level numbers never read as one block.
+  //
+  // The numbers print as the data has them, sentinels included: 999 says "no
+  // ceiling" to anyone who has played the game, and rewriting it was
+  // editorialising a field the reader can see for themselves. 999 is only one of
+  // them -- 999999 and 9999999 both appear -- and a MINLEVEL of 777 marks
+  // monster-only gear, which never drops for a player.
+  function lvlRange(o) {
+    if (o.t === 'Socketable') return '';
+    var lo = n(o.ml), hi = n(o.xl), bits = [];
+    if (lo) bits.push('<span class="k">Min Level</span> <b>' + lo + '</b>');
+    if (hi) bits.push('<span class="k">Max Level</span> <b>' + hi + '</b>');
+    return bits.length
+      ? '<p class="lvlr">' + bits.join('<span class="sep"> · </span>') + '</p>' : '';
+  }
+
+  // ---- the augmented group ----
+  // The one part of a card that cannot be inferred from the stats around it: a
+  // conditional bonus that reads as unconditional is worse than no bonus at all.
+  // Three devices, all of them the app's own -- the task as a gold chip, a dashed
+  // rule stating the condition in words, and the gated stats set behind a left
+  // rule so they cannot be mistaken for something the weapon already has. The
+  // affixes keep the tooltip's magic green; the locked stats pointedly do not,
+  // since green here means "active".
+  function augHTML(a) {
+    return (a.task ? '<p class="augtask"><span class="task">' + esc(a.task) + '</span></p>' : '') +
+      (a.fx.length
+        ? '<p class="cond">locked until the task above is complete</p>' +
+          '<ul class="fx locked">' + a.fx.map(function (f) {
+            return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>'
+        : '');
+  }
+
+  function flav(o) {
+    return o.ds ? '<p class="flav">' + esc(o.ds.replace(/\\n/g, ' ')) + '</p>' : '';
+  }
+
+  function prov(o) {
+    return '<div class="prov"><b>file</b> ' + esc(o.p) + '<br>' +
+      (o.g ? '<b>guid</b> ' + esc(o.g) + '<br>' : '') +
+      // Three sources, not two. A derived number is computed from the PAK by
+      // this pipeline, so calling it a TIDBI value would be the same
+      // misattribution the base-value wording exists to prevent -- and a base
+      // value is a raw pre-scale scalar that no one has rendered at all.
+      '<b>numbers</b> ' + (o.vb
+        ? 'PAK .DAT base value' + (o.inh ? ' (inherited from BASEFILE)' : ' (own fields)')
+        : o.dv ? 'reconstructed from PAK game files'
+        : 'TIDBI in-game value') +
+      (o.ns ? '<span class="tag">name from ' + esc(o.ns) + '</span>' : '') +
+      (o.ici ? '<span class="tag">icon inherited</span>' : '') +
+      '<br><b>id</b> ' + esc(o.id) + '</div>';
+  }
+
+  function tooltip(o) {
+    var h = '<div class="ahead">' + tile(o) + '<div class="aid">' +
+      '<h3 class="an ' + tcls(o) + '">' + esc(o.n) + '</h3>' +
+      '<p class="dtype">' + typeLine(o) + '</p></div>' + corner(o) + '</div>';
+
+    // Groups are parted by a rule and the flavour text is not a group, so it
+    // sits under whatever came last without one. `sec` is what keeps the rules
+    // honest: a group that renders nothing takes its rule with it rather than
+    // leaving a stray line on the card.
+    var body = '', any = false;
+    function sec(html) {
+      if (!html) return;
+      if (any) body += '<div class="rule"></div>';
+      body += html; any = true;
+    }
+
+    // Weapons lead with their output: the headline number, the two things that
+    // qualify it, then the damage it is made of.
+    var lead = '';
+    if (o.dps) lead += '<p class="dps">' + esc(o.dps) +
+      ' <span>Damage per Second</span></p>';
+    if (o.sp && speedBand(+o.sp)) {
+      lead += '<p class="fspd"><b>' + speedBand(+o.sp) + '</b> attack speed <em>(' +
+        esc(o.sp) + ' seconds)</em></p>';
+    }
+    if (n(o.rng)) lead += '<p class="frng">Weapon Range <b>' + n(o.rng) + '</b></p>';
+    if (lead) { body += lead; any = true; }
+
+    sec(statLines(o.dmg, 'Damage') + statLines(o.arm, 'Armor'));
+    sec(o.fx && o.fx.length ? affLines(o) : '');
+    // The augmented group last of the stats, so the weapon's own numbers are
+    // read before the ones it could grow into.
+    sec(o.aug && o.aug.length ? o.aug.map(augHTML).join('') : '');
+    // The whole set's ladder, on every piece of it -- a set item's most useful
+    // fact is not on the item, and the game and TIDBI both print it this way.
+    // Keyed on setid, not on `set`: 556 items carry a set and every one is in
+    // SETS, but the two are different strings (a token against a display name)
+    // and only the token is a key here.
+    sec(ladder(o));
+    sec(requirements(o));
+    sec(lvlRange(o));
+
+    h += '<div class="body">' + body + flav(o) + '</div>' + prov(o);
+    return '<div class="c">' + h + '</div>';
   }
 
   function renderDetail(id) {
@@ -475,178 +724,13 @@
       d.innerHTML = '<div class="msg">No item called <b>' + esc(id) + '</b>.</div>';
       return;
     }
-    var c = o.ic && ICONS[o.ic];
-    var art = c
-      ? '<i style="width:' + c[2] + 'px;height:' + c[3] + 'px;background-position:-' +
-        c[0] + 'px -' + c[1] + 'px"></i>'
-      : '<span class="ph">' + esc(o.t.charAt(0)) + '</span>';
-
-    // The item's own rarity, which on a set piece is not the tier the facet
-    // files it under. Used for the name, the type line and the card.
-    var ink = ownTier(o);
-    var h = '<div class="dwrap"><a class="back" href="#">&larr; back to results</a>' +
-      '<div class="dtop"><div class="dart ' + slotClass(o) + '">' + art + '</div>' +
-      // The tier class is on the span rather than the h2 so it does not have to
-      // out-specify `.dname`'s own colour -- it is a different element, and
-      // `.t-*` already means "colour the element this is on".
-      '<div><h2 class="dname"><span class="' + tierInk(ink) + '">' + esc(o.n) +
-      '</span></h2>' +
-      // "<rarity> <type>", the rarity word in its own colour. Reversed from the
-      // old "Pistol Rare" at the user's request: the tier is the word that
-      // changes what the item is worth, so it leads. On a set piece the rarity
-      // leads and the Set tag follows it -- "Unique Set Belt" -- because the
-      // game prints both and only the first says what the item is worth.
-      '<div class="dtype"><em class="' + tierInk(ink) + '">' + esc(ink) + '</em> ' +
-      (o.uq ? esc(o.q) + ' ' : '') + esc(o.t) +
-      (o.vb ? '<span class="tag">base values, not rendered</span>' : '') +
-      '</div></div></div>';
-
-    // No Total row on either block. The game shows no such number, and the
-    // user asked for it gone -- a sum of five elemental values is a stat this
-    // database invented. dps is different: the game does state it, for weapons.
-    if (o.dmg) {
-      h += block('Damage', DMGTYPES.filter(function (k) { return o.dmg[k]; })
-        .map(function (k) { return row(cap(k), o.dmg[k]); }).join('') +
-        (o.dps ? row('Damage per Second', o.dps, true) : ''));
-    }
-    if (o.arm) {
-      h += block('Armor', DMGTYPES.filter(function (k) { return o.arm[k]; })
-        .map(function (k) { return row(cap(k), o.arm[k]); }).join(''));
-    }
-    // TL2 renamed Torchlight 1's Magic and Defense to Focus and Vitality; the
-    // .DAT field names kept the old words, so the labels are translated here
-    // rather than in the build.
-    // Requirements are alternatives, not a conjunction: the game lets you equip
-    // an item once you meet the player level OR all of the stat requirements,
-    // whichever you reach first. That is why a class item lists both -- the
-    // Battlemage Helm is "Level 65 or (87 Focus and 101 Vitality)". Printing
-    // them as one flat list would state the opposite of how the game works.
-    var req = o.rq || {};
-    var statRows = ['str', 'dex', 'mag', 'def'].filter(function (k) { return req[k]; })
-      .map(function (k) { return row(REQLABEL[k], req[k]); }).join('');
-    var reqBody = n(o.lr) ? row('Player Level Required', n(o.lr)) : '';
-    if (n(o.lr) && statRows) reqBody += orRow();
-    reqBody += statRows;
-    // The class gate is *not* an alternative to those -- it is a hard
-    // restriction on top of whichever branch you satisfy.
-    if (o.cls) reqBody += row('Class', o.cls + ' only');
-    h += block('Requirements', reqBody);
-
-    // "Item Level", not bare "Level": it is a different thing from the player
-    // level above and the old label read as either one.
-    //
-    // Two fields are built but deliberately not rendered here:
-    //
-    //   xl  (MAXLEVEL)     the level the item stops scaling at -- a property of
-    //                      the drop rather than of the item.
-    //   skm (MAX_SOCKETS)  NOT this item's cap. It is the ceiling across the
-    //                      item's variants: legendary2_sword05 (Cerulean
-    //                      Nightmare) declares sk=2/skm=4, and the 4 belongs to
-    //                      its c variant, the Netherrealm Sword. Rendering it
-    //                      read as "you can socket this to 4", which you cannot.
-    //                      On 1,857 of the 2,168 records carrying one it exceeds
-    //                      the socket count shown right beside it.
-    //
-    // Both stay in items.json. Neither was ever a CSV column.
-    //
-    // rng (RANGE) is here rather than in the type line above, where it used to
-    // render as e.g. "Sword · Rare · 0.6 range" and read as a damage range. It
-    // is not: it is the weapon's attack reach in world units, the distance at
-    // which the attack connects. Read off the weapon base templates
-    // (BASE_SWORD.DAT, BASE_BOW.DAT) beside MINDAMAGE/MAXDAMAGE, which is why it
-    // is near-constant per type -- melee 0.5-1.8, ranged 5-12 -- and why per
-    // item it says less than the number suggests. The exceptions are the whole
-    // point of showing it: axe_u05x "The Axe of Throwing" is 9 where all 92
-    // other axes are 0.6. All 1,372 records carrying it are weapons; no other
-    // record in the corpus has the field.
-    // MINLEVEL is two unrelated fields wearing one name. On a socketable it is
-    // a real gate and a clean one: the seven ranks of every gem family carry
-    // exactly 1, 14, 28, 42, 56, 70, 84 -- a step of 14 -- against the gem's
-    // own levels of 8, 22, 36 ... a fixed 8 higher, and the same seven numbers
-    // across all eight ember families. Nothing else in the record explains a
-    // second level field on a gem, and a gem's only level-shaped requirement is
-    // the item it goes into. On everything you *wear* it is none of that: it is
-    // a stray scalar that is neither `lv` nor the `lr` shown above (it equals
-    // lv on 64 of 2,245, and is 1 on 258 where lr is the real gate), so it is
-    // shown on socketables only.
-    h += block('Item', (n(o.lv) ? row('Item Level', n(o.lv)) : '') +
-      (n(o.ml) && o.t === 'Socketable'
-        ? row('Required Item Level to Socket', n(o.ml)) : '') +
-      (o.sp && speedBand(+o.sp)
-        ? row('Attack Speed', speedBand(+o.sp) + ' (' + o.sp + ' seconds)') : '') +
-      (n(o.rng) ? row('Weapon Range', n(o.rng)) : '') +
-      (n(o.sk) ? row('Sockets', n(o.sk)) : '') +
-      (o.set ? row('Set', o.set) : ''));
-    // Augmented weapons come *before* the affixes, which is the order the
-    // game's own tooltip uses -- it draws the unlockable group first, then the
-    // rule, then the ordinary affixes. The group is only worth showing because
-    // it is plainly conditional: the task is the headline, the divider between
-    // the task and the stats states the condition in words, and the stats
-    // themselves are set apart so they cannot be read as already on the weapon.
-    // (74 items; split_effects() in build.py is what separates the two groups.)
-    if (o.aug && o.aug.length) {
-      h += block('Augmented Weapon', o.aug.map(function (a) {
-        return (a.task ? '<div class="task">' + esc(a.task) + '</div>' : '') +
-          (a.fx.length
-            ? '<div class="cond">locked until the task above is complete</div>' +
-              '<ul class="fx locked">' + a.fx.map(function (f) {
-                return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>'
-            : '');
-      }).join(''));
-    }
-    if (o.fx && o.fx.length) {
-      h += block('Affixes', '<ul class="fx">' + o.fx.map(function (f) {
-        return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>');
-    }
-    // The whole set's ladder, on every piece of it -- this is a set item's most
-    // useful fact and it is not on the item. Matches how the game and TIDBI both
-    // print it: the piece's own stats, then the set it belongs to.
-    //
-    // Keyed on setid, not on `set`: 556 items carry a set and every one of them
-    // is in SETS, but the two are different strings (a token against a display
-    // name) and only the token is a key here. The guard is for the case that
-    // should not arise -- an item whose set has no ladder -- where the honest
-    // render is no block at all rather than an empty one.
-    var st = o.setid && SETS[o.setid];
-    if (st) {
-      // Two numbers, because they answer different questions and on 47 of the
-      // 80 sets they differ: how many pieces exist (what you can collect) and
-      // how many the last rung needs (what you must wear). A set can be short
-      // of its top rung -- 15 of them are -- and can equally have pieces to
-      // spare, as the four 16-piece sets do, topping out at 10.
-      var ship = st.c, top = st.b.length ? st.b[st.b.length - 1][0] : 0;
-      h += block('Set Bonuses',
-        '<div class="seth">' + esc(st.n) + '<span class="ct">' + ship +
-        ' pieces (' + top + ' piece set)</span></div>' +
-        st.b.map(function (r) {
-          // a rung gated above what the set ships, so nothing in the game
-          // reaches it -- said in the label rather than left to be inferred
-          // from a colour, and never quietly dropped
-          var over = r[0] > ship;
-          return '<div class="thr' + (over ? ' over' : '') + '">' + r[0] + ' pieces' +
-            (over ? ' · set ships ' + ship : '') + '</div>' +
-            '<ul class="fx' + (over ? ' over' : '') + '">' +
-            r[1].map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') +
-            '</ul>';
-        }).join(''));
-    }
-    if (o.ds) h += block('Description', esc(o.ds.replace(/\\n/g, ' ')));
-
-    h += '<div class="prov"><b>file</b> ' + esc(o.p) + '<br>' +
-      (o.g ? '<b>guid</b> ' + esc(o.g) + '<br>' : '') +
-      // Three sources, not two. A derived number is computed from the PAK by
-      // this pipeline, so calling it a TIDBI value would be the same
-      // misattribution the vb wording exists to prevent -- and a base value is
-      // a raw pre-scale scalar that no one has rendered at all.
-      '<b>numbers</b> ' + (o.vb
-        ? 'PAK .DAT base value' + (o.inh ? ' (inherited from BASEFILE)' : ' (own fields)')
-        : o.dv ? 'reconstructed from PAK game files'
-        : 'TIDBI in-game value') +
-      (o.ns ? '<span class="tag">name from ' + esc(o.ns) + '</span>' : '') +
-      (o.ici ? '<span class="tag">icon inherited</span>' : '') +
-      '<br><b>id</b> ' + esc(o.id) + '</div></div>';
-
-    d.innerHTML = h;
+    // Everything the detail says about an item is the card's, and the card is
+    // built in one string by tooltip() above. What is left here is the route:
+    // find the record, say so when there is none, and keep the back link and
+    // the width the card was settled at.
+    d.innerHTML = '<div class="dwrap">' +
+      '<a class="back" href="#">&larr; back to results</a>' +
+      tooltip(o) + '</div>';
     d.scrollTop = 0;
   }
 

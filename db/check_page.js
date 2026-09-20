@@ -1,9 +1,15 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 102 assertions.
+ * view, provenance and hash deep links -- 109 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
- *   node db/check_page.js
+ *   node --max-old-space-size=6144 db/check_page.js
+ *
+ * The heap flag is not optional. Twenty of these assertions build a fresh
+ * JSDOM over the whole built page, and that page is 8.36 MB -- mostly a 6.2 MB
+ * base64 icon sheet sitting in a <style> text node -- so the suite holds several
+ * gigabytes of live DOMs and node's default old-space (about 4 GB) runs out
+ * partway through. 5,120 MB completes; 4,096 MB does not.
  *
  * jsdom fires a spurious second hashchange (with an empty hash) whenever code
  * assigns location.hash. That reproduces on a page with a single listener and
@@ -131,50 +137,71 @@ async function go(hash) {
   const aen = [].filter.call(cards(), c => c.querySelector('.nm').textContent === 'Aenigma')[0];
   aen.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   // synchronous -- apply() runs inside the delegated handler
-  ok('clicking opens the detail', /Physical\s*169/.test(det()));
+  // The card leads with the number, then the element mark, then the word -- the
+  // order the game's own tooltip lays out (value widget, image widget, label).
+  // The mark is an <i> with no text in it, so what the DOM reads is the number
+  // and the word run together: "169Physical Damage".
+  ok('clicking opens the detail', /169Physical Damage/.test(det()), det().slice(0, 120));
   ok('the item route keeps the active filters',
      /tier=Legendary/.test(w.location.hash) && /item=legendary_axe01/.test(w.location.hash),
      w.location.hash);
   // 169/72 are now reconstructed from the DAT rather than read out of TIDBI,
   // and they land on the same numbers -- the DAT's raw 70/30 are pre-scale and
   // were what this page used to show. See derived_range() in build.py.
-  ok('detail shows physical 169 + electric 72', /Physical\s*169/.test(det()) && /Electric\s*72/.test(det()));
+  ok('detail shows physical 169 + electric 72',
+     /169Physical Damage/.test(det()) && /72Electric Damage/.test(det()));
   ok('no invented Total row survives', !/Total/.test(det()));
   ok('detail shows Strength 163 / Dexterity 68 (not STR 120 / DEX 50)',
      /Strength\s*163/.test(det()) && /Dexterity\s*68/.test(det()) && !/STR/.test(det()));
-  ok('detail shows sockets 2', /Sockets\s*2/.test(det()));
-  // "Item Level" / "Player Level Required", not bare "Level" / "Level required"
-  // -- the two are different things and the old labels read as either one.
+  ok('detail shows sockets 2', /2 Sockets/.test(det()));
+  // The card states the item level once, in the corner, as "Level 54" -- and
+  // what makes the short word affordable there is that the class gate is also in
+  // the corner and the requirement below says "Player Level" in full. The two
+  // are different things and the old labels ("Item Level" / "Level required")
+  // read as either one.
   //
-  // The Aenigma's MINLEVEL used to render between them as "Min level 45". It is
-  // a third number that is neither of the other two -- on 258 items it is 1
-  // while `lr` is the real gate -- so it is gone from everything you wear. It
-  // survives on socketables, where it is a different field entirely (below).
-  ok('detail shows item level 54 / player level required 61, and no min level',
-     /Item Level\s*54/.test(det()) && /Player Level Required\s*61/.test(det()) &&
-     !/Min level/.test(det()), det().slice(0, 200));
-  // The old label was exactly "Level required" with a lowercase r, so the new
-  // capital-R wording cannot satisfy this by accident. (A bare "Level" needs no
-  // separate check: the positive assertion above only passes because it now
-  // reads "Item Level".)
+  // This used to be a *negative* assertion on "Min level", and it passed on
+  // letter case alone: the card prints "Min Level", so `!/Min level/` was true
+  // whatever the band did. Aenigma has ml=45, so the band renders -- the old
+  // wording would have gone green over a row it was written to exclude. It now
+  // asserts where the band is and, more to the point, where it is not.
+  {
+    const corner = d.querySelector('#detail .corner').textContent;
+    const rrow = d.querySelector('#detail .rrow').textContent;
+    const lvlr = d.querySelector('#detail .lvlr').textContent;
+    ok('detail shows the item level in the corner, and no other level beside it',
+       /Level 54/.test(corner) && !/Item Level/.test(corner), corner);
+    ok('detail shows the player level among the requirements', /Player Level 61/.test(rrow), rrow);
+    // ml <= lv <= xl brackets the band an item drops in. It is not a gate, so it
+    // is stated in plain text below the requirements rather than boxed into a
+    // third chip -- and it must not appear among them.
+    ok('the spawn band is the only other level, and it is MINLEVEL',
+       /Min Level 45/.test(lvlr) && !/Min Level/.test(rrow) && !/Max Level/.test(rrow), lvlr);
+  }
   ok('the old "Level required" wording is gone', !/Level required/.test(det()));
-  // Aenigma carries neither xl nor skm, so asserting the Max level / Max sockets
+  // `Level required` was the old label; `Player Level` is the new one, and the
+  // negative above cannot catch a regression that reintroduces the old *shape*
+  // -- the item level printed a second time beside the corner. Counting the
+  // occurrences states the property directly: 54 is on the card once.
+  ok('the item level is stated once, in the corner',
+     det().split('Level 54').length - 1 === 1, det().slice(0, 200));
+  // Aenigma carries neither xl nor skm, so asserting the Max Level / Max Sockets
   // rows are absent *here* would pass even with both still rendered. Those two
   // are checked below, against a record that actually has the fields.
   ok('the dropped fields are still built, just not shown here',
-     !/Max level/.test(det()) && !/Max sockets/.test(det()) &&
+     !/Max Level/.test(det()) && !/Max Sockets/i.test(det()) &&
      w.DB.items.some(o => o.xl) && w.DB.items.some(o => o.skm));
   // rng (RANGE) is the weapon's attack reach, not a damage range -- it used to
   // render in the type line as "Axe · Legendary · 0.6 range", which read as one.
-  // It lives in the Item block now. Aenigma is an Axe, and 93 of the 101 Axes
-  // are 0.6.
+  // It sits with the weapon's other two output numbers now, under the damage per
+  // second. Aenigma is an Axe, and 93 of the 101 Axes are 0.6.
   //
   // The negative half reads `.dtype` rather than the whole detail, because a
   // damage range is *supposed* to be down there -- only the type line must be
   // free of the word.
   {
     const dtyp = d.querySelector('#detail .dtype').textContent;
-    ok('weapon range moved out of the type line into the Item block',
+    ok('weapon range moved out of the type line into the card body',
        /Weapon Range\s*0\.6/.test(det()) && !/range/i.test(dtyp), dtyp);
   }
   // The type line reads "<tier> <type>" -- "Legendary Axe" -- the tier word
@@ -205,10 +232,13 @@ async function go(hash) {
        cardSub && w.getComputedStyle(cardSub).textTransform);
   }
   // dps 430 is alfgeir's own figure for Aenigma, and the speed string is the
-  // shape the user quoted from the game.
-  ok('detail shows damage per second 430', /Damage per Second\s*430/.test(det()));
+  // shape the user quoted from the game. Both lead with their number now, like
+  // every other stat on the card: "430 Damage per Second", "Very Fast attack
+  // speed (0.56 seconds)". The band word moves to the front because it is the
+  // reading of the number, and the seconds are the number it is read from.
+  ok('detail shows damage per second 430', /430 Damage per Second/.test(det()));
   ok('detail words the attack speed as the game does',
-     /Attack Speed\s*Very Fast \(0\.56 seconds\)/.test(det()), det().slice(0, 400));
+     /Very Fast attack speed \(0\.56 seconds\)/.test(det()), det().slice(0, 400));
   ok('detail shows all three affix lines',
      /\+8% Critical Hit Chance/.test(det()) && /60% bonus to Critical Damage/.test(det()) &&
      /10% chance to Stun target for 5 sec\./.test(det()));
@@ -287,21 +317,29 @@ async function go(hash) {
   // The skm one is the interesting case: the DAT says MAX_SOCKETS 4, but that 4
   // is the socket count of the family's c variant, the Netherrealm Sword. This
   // sword spawns with 2 and cannot reach 4, so the row was actively misleading.
+  // xl is the opposite -- 999 is MAXLEVEL, it is where the item stops dropping,
+  // and the card states it in the spawn band. So the two fields part company
+  // here, and this asserts both directions on one record.
   const d5 = await deep('#item=legendary2_sword05');
   const d5t = d5.getElementById('detail').textContent;
   ok('Cerulean Nightmare: a max-sockets field exists but is not rendered',
-     /Sockets\s*2/.test(d5t) && !/Max sockets/.test(d5t) &&
-     !/Max level/.test(d5t) && /Item Level\s*105/.test(d5t), d5t.slice(0, 160));
+     /2 Sockets/.test(d5t) && !/Max Sockets/i.test(d5t) && /Level 105/.test(d5t),
+     d5t.slice(0, 160));
+  ok('...while MAXLEVEL, which is a real drop-band fact, is stated',
+     /Min Level 99/.test(d5t) && /Max Level 999/.test(d5t), d5t.slice(0, 240));
   // The Axe of Throwing is why Weapon Range is worth a row at all. 93 of the
   // 101 Axes are 0.6 and it is 9, because the thing is thrown -- so a per-type
   // constant is not quite a constant, and the one item where it moves is the
   // one item where it means something. Its damage is a flat 228, so there is no
   // damage range anywhere on the page to confuse the row with.
   const thr = await deep('#item=axe_u05x');
-  const tht = thr.getElementById('detail').textContent;
+  const frng = thr.querySelector('#detail .frng').textContent;
+  // Read off the row rather than the card: the range is the last thing in the
+  // card's lead, and the damage line below it starts with a number, so on the
+  // flattened text "Weapon Range 9" runs straight into "228Physical Damage".
   ok('The Axe of Throwing reads Weapon Range 9 against the Axe type\'s 0.6',
-     /Weapon Range\s*9(?!\d)/.test(tht) &&
-     !/range/i.test(thr.querySelector('#detail .dtype').textContent), tht.slice(0, 200));
+     /^Weapon Range 9$/.test(frng) &&
+     !/range/i.test(thr.querySelector('#detail .dtype').textContent), frng);
 
   // The other half of MINLEVEL, which the Aenigma assertion above turns off.
   // On a socketable it is a real gate and a clean one: the seven ranks of every
@@ -312,9 +350,14 @@ async function go(hash) {
   // item it goes into. Blood Ember Shard is rank 3, so 28 against its own 36.
   const gem = await deep('#item=tl2_bloodember_rank3');
   const gemt = gem.getElementById('detail').textContent;
+  // The card prints it whole, with the colon, because "Required Item Level to
+  // Socket" is a sentence rather than a label and does not shorten into one.
+  // It is also why a socketable shows no spawn band below: ml is the same field,
+  // and the card must not print one number twice under two labels.
+  const gemc = gem.querySelector('#detail .corner').textContent;
   ok('a socketable shows MINLEVEL as the item level needed to socket it',
-     /Required Item Level to Socket\s*28/.test(gemt) &&
-     /Item Level\s*36/.test(gemt) && !/Min level/.test(gemt), gemt.slice(0, 240));
+     /Required Item Level to Socket:\s*28/.test(gemt) &&
+     /Level 36/.test(gemc) && !/Min Level/.test(gemt), gemt.slice(0, 240));
 
   // ---------------------------------------------------------------- set names
   // An item's SET field is a DAT token, and a token is not a name: SENTINAL is
@@ -334,8 +377,8 @@ async function go(hash) {
        opts.indexOf('Sentinel (9)') >= 0 && opts.indexOf('Cornerstone (7)') >= 0 &&
        !opts.some(t => /^[A-Z0-9_]+ \(\d+\)$/.test(t)), opts.slice(1, 6).join(' | '));
     ok('a set item names its set the way the game does',
-       /Set\s*Zeraphi Alchemy/.test(zs.getElementById('detail').textContent),
-       zs.querySelector('#detail .row:last-child').textContent);
+       /Set:\s*Zeraphi Alchemy/.test(zs.getElementById('detail').textContent),
+       zs.querySelector('#detail .sname').textContent);
   }
   const zf = await deep('#set=Zeraphi%20Alchemy');
   ok('a set filter by display name returns the set',
@@ -353,69 +396,103 @@ async function go(hash) {
   // Cornerstone is 7 pieces with a 2-9 ladder: the top two rungs can never be
   // reached, and 15 of the 80 sets are like this. Twinferno is the extreme --
   // one piece, gated on two.
-  const sblock = (doc, title) => [].slice
-    .call(doc.querySelectorAll('#detail .block'))
-    .filter(b => b.querySelector('h3') &&
-                 b.querySelector('h3').textContent === title)[0] || null;
+  // The card parts its sections with a rule rather than a heading, so there is
+  // no "Set Bonuses" block to look up any more: the ladder is the set name and
+  // the rungs beneath it. `.sname` is that heading; `rungNums` reads the figure
+  // each rung states. A rung carrying several bonuses repeats the row and only
+  // the first states the count, so the blank `.rn` spans are the continuation
+  // rows and are filtered out here -- the rung count is the non-empty ones.
+  const sname = doc => doc.querySelector('#detail .sname');
+  const rungNums = doc => [].filter
+    .call(doc.querySelectorAll('#detail .rung .rn'), e => e.textContent.trim())
+    .map(e => e.textContent);
 
   {
-    const sb = sblock(zs, 'Set Bonuses');
-    const rungs = sb ? [].map.call(sb.querySelectorAll('.thr'), t => t.textContent) : [];
+    const sb = sname(zs), rungs = rungNums(zs);
     ok('a set piece carries the whole set\'s ladder, not just its own rungs',
-       !!sb && rungs.length === 5 &&
-       rungs.join(' | ') === '2 pieces | 3 pieces | 4 pieces | 5 pieces | 6 pieces' &&
-       /\+35% to Electric Damage/.test(sb.textContent),
+       !!sb && rungs.join(',') === '2,3,4,5,6' &&
+       /\+35% to Electric Damage/.test(zs.getElementById('detail').textContent),
        rungs.join(' | '));
     ok('a set that ships every piece it gates on marks no rung unreachable',
-       !!sb && sb.querySelectorAll('.thr.over').length === 0 &&
-       sb.querySelectorAll('.thr').length === sb.querySelectorAll('.fx').length,
-       sb ? sb.querySelectorAll('.thr.over').length + ' marked' : 'no block');
+       !!sb && zs.querySelectorAll('#detail .rung.over').length === 0,
+       zs.querySelectorAll('#detail .rung.over').length + ' marked');
     // Two numbers, because they answer different questions and on 47 of the 80
     // sets they differ. Zeraphi is the "pieces to spare" shape -- 9 exist, the
     // ladder tops out at 6, so three are spare once the set is complete.
-    ok('the ladder header counts the pieces shipped and the pieces a full set needs',
-       !!sb && /Zeraphi Alchemy\s*9 pieces \(6 piece set\)/.test(sb.textContent),
-       sb && sb.querySelector('.seth').textContent);
+    //
+    // `c` is a record count and the figure beside it is a rung number, which is
+    // why the two words differ. They used to read "9 pieces (6 piece set)", and
+    // on Mondon's the record count is not a piece count at all.
+    ok('the ladder header counts the records shipped and the pieces a full set needs',
+       !!sb && /Zeraphi Alchemy\s*9 items · 6 piece set/.test(sb.textContent),
+       sb && sb.textContent);
   }
   const arch = await deep('#item=engineer_05_amulet_alt_set');
   {
-    const sb = sblock(arch, 'Set Bonuses');
-    const over = sb ? [].map.call(sb.querySelectorAll('.thr.over'), t => t.textContent) : [];
-    ok('a rung above what the set ships is drawn, and says why it cannot be reached',
-       over.length === 2 &&
-       over[0] === '8 pieces · set ships 7' && over[1] === '9 pieces · set ships 7',
-       over.join(' | '));
+    const sb = sname(arch);
+    const over = [].map.call(arch.querySelectorAll('#detail .rung.over .rn'), e => e.textContent);
+    // 7 records exist for Cornerstone and the ladder gates a rung on 9, so two
+    // of its rungs are unreachable -- and it is the only set of the 80 where
+    // that happens at all. They are drawn rather than dropped, because the
+    // game's own set file declares them, but they are dimmed: nothing a player
+    // does reaches them.
+    //
+    // "set ships 7" used to be printed beside each one. It is gone: the heading
+    // above the ladder already reads "7 items · 9 piece set", which is the same
+    // contradiction in one line rather than repeated per rung.
+    ok('a rung above what the set ships is drawn, and dimmed rather than captioned',
+       over.length === 2 && over.join(',') === '8,9', over.join(' | '));
     ok('...and states the full-set size even where it is unreachable',
-       !!sb && /Cornerstone\s*7 pieces \(9 piece set\)/.test(sb.textContent),
-       sb && sb.querySelector('.seth').textContent);
+       !!sb && /Cornerstone\s*7 items · 9 piece set/.test(sb.textContent),
+       sb && sb.textContent);
     // The dimming must be the rung's own rule. `.fx.locked` is the obvious one
     // to borrow and the wrong one: it means "a stat the item has, behind a task
     // you can still finish", which is the opposite of a rung nothing reaches --
-    // and the augmented-weapon assertions above select on it by name, so reusing
+    // and the augmented-weapon assertions below select on it by name, so reusing
     // it would quietly widen what those match. Read as CSS text because jsdom
     // does not substitute var(), which leaves computed colours useless here.
     const css = [].map.call(arch.querySelectorAll('style'), s => s.textContent).join('\n');
-    const overList = sb && sb.querySelector('.fx.over');
+    const overList = arch.querySelector('#detail .rung.over');
     ok('an unreachable rung is dimmed by its own rule, not by `.fx.locked`',
        !!overList && !overList.classList.contains('locked') &&
-       /\.thr\.over\{[^}]*color:/.test(css) && /\.fx\.over li\{[^}]*color:/.test(css),
+       /\.rung\.over \.rt\{[^}]*color:/.test(css) &&
+       /\.rung\.over \.rn\{[^}]*color:/.test(css) &&
+       !/\.fx\.over li\{/.test(css),
        overList && overList.className);
   }
   const twin = await deep('#item=z_wand_m01_set');
   {
-    const sb = sblock(twin, 'Set Bonuses');
-    ok('a set one piece short of its own first rung still shows the rung',
-       !!sb && sb.querySelectorAll('.thr.over').length === 1 &&
-       /2 pieces · set ships 1/.test(sb.textContent) &&
-       /12% Damage bonus when dual-wielding/.test(sb.textContent),
-       sb && sb.textContent.slice(0, 120));
+    const sb = sname(twin);
+    // This is the assertion that inverts, and it is the clearest single piece of
+    // evidence that the port is right.
+    //
+    // Twinferno ships one record and gates its only rung on two. The rung used
+    // to be dimmed, because the dimming rule compared the rung against the
+    // *record count* -- one -- and 2 > 1. But a wand fills both hands and a
+    // character can wear two of them, so the set is completable by anyone who
+    // finds a second one. The old rule dimmed the only rung this set has, which
+    // is the most wrong it is possible to be about a one-rung ladder.
+    //
+    // It compares against `cap` now: 2 for a ring or a one-handed weapon, 1 for
+    // everything else. Twinferno's rung is 2 against a capacity of 2, so the
+    // count of dimmed rungs must be 0 where this test used to require 1.
+    const twt = twin.getElementById('detail').textContent;
+    ok('Twinferno\'s only rung is not dimmed: a wand fills two hands, and two of it is a set',
+       !!sb && twin.querySelectorAll('#detail .rung.over').length === 0 &&
+       /Twinferno\s*1 item · 2 piece set/.test(sb.textContent) &&
+       /12% Damage bonus when dual-wielding/.test(twt),
+       twin.querySelectorAll('#detail .rung.over').length + ' marked  //  ' +
+       (sb ? sb.textContent : 'no heading'));
     // The ladder must not read as affixes the item already has -- the same
-    // distinction the augmented-weapon block exists to draw. Its own block, and
-    // nothing from it in the Affixes block beside it.
-    const aff = sblock(twin, 'Affixes');
-    ok('the ladder is its own block, not extra affixes on the piece',
-       !!sb && (!aff || !/dual-wielding/.test(aff.textContent)),
-       aff ? aff.textContent.slice(0, 120) : '(no affix block)');
+    // distinction the augmented-weapon block exists to draw. The card parts its
+    // sections with a rule rather than a heading, so there is no block to
+    // compare against; the rungs are their own section and nothing from them
+    // may appear in a `.aff` paragraph.
+    const aff = [].filter.call(twin.querySelectorAll('#detail .aff'),
+                               a => /dual-wielding/.test(a.textContent));
+    ok('the ladder is its own section, not extra affixes on the piece',
+       !!sb && aff.length === 0,
+       aff.length ? aff[0].textContent : '(clean)');
   }
 
   // ----------------------------------------------------- a set piece's rarity
@@ -438,10 +515,15 @@ async function go(hash) {
     ok('...and the rarity word carries the colour, not the Set tag',
        !!em && em.textContent === 'Unique' && em.className === 't-unique',
        em && em.className + ' -> ' + em.textContent);
-    const sb = sblock(mon, 'Set Bonuses');
-    ok('Mondon\'s Vestment reads "16 pieces (10 piece set)"',
-       !!sb && /Mondon’s Vestment\s*16 pieces \(10 piece set\)/.test(sb.textContent),
-       sb && sb.querySelector('.seth').textContent);
+    const sb = sname(mon);
+    // The set the user asked about by name. 16 records, and 10 pieces because a
+    // ring fills two of the nine slots -- the same axis the dimming rule reads.
+    ok('Mondon\'s Vestment reads "16 items · 10 piece set"',
+       !!sb && /Mondon’s Vestment\s*16 items · 10 piece set/.test(sb.textContent),
+       sb && sb.textContent);
+    ok('...and not one of its rungs is dimmed, because all ten can be worn',
+       mon.querySelectorAll('#detail .rung.over').length === 0,
+       mon.querySelectorAll('#detail .rung.over').length + ' marked');
   }
   const mset = await deep('#set=Mondon%E2%80%99s%20Vestment');
   {
@@ -472,10 +554,10 @@ async function go(hash) {
   // LEVEL_REQUIRED at all. Armor and requirements still come from TIDBI: only
   // weapon damage has a derivation.
   const amu = (await deep('#item=heavy_g_amulet_f_alt_b')).getElementById('detail').textContent;
-  ok('amulet: fire armor is the 140-174 range', /Fire\s*140-174/.test(amu), amu.slice(0, 300));
+  ok('amulet: fire armor is the 140-174 range', /140-174Fire Armor/.test(amu), amu.slice(0, 300));
   ok('amulet: Focus requirement 79 is present', /Focus\s*79/.test(amu), amu.slice(0, 300));
   ok('amulet: player level required 81 is present',
-     /Player Level Required\s*81/.test(amu), amu.slice(0, 300));
+     /Player Level\s*81/.test(amu), amu.slice(0, 300));
 
   // ------------------------------------------------------ base-value badge
   // 19 items still fall back to a raw .DAT scalar -- 17 of them armor-only,
@@ -493,14 +575,27 @@ async function go(hash) {
   // A class item carries both a player level and stat requirements, and the
   // game grants equip if you meet either branch -- so the detail must show the
   // "or". A flat list would state the opposite of how equipping works.
-  const bmh = (await deep('#item=caster_04_helmet_alt_c')).getElementById('detail').textContent;
+  const bdoc = await deep('#item=caster_04_helmet_alt_c');
+  const bmh = bdoc.getElementById('detail').textContent;
   ok('class item: level 65 / Focus 87 / Vitality 101',
-     /Player Level Required\s*65/.test(bmh) && /Focus\s*87/.test(bmh) &&
+     /Player Level\s*65/.test(bmh) && /Focus\s*87/.test(bmh) &&
      /Vitality\s*101/.test(bmh), bmh.slice(0, 400));
+  // The chips run together in the DOM -- "Player Level 65orFocus 87" -- because
+  // the space around the "or" is CSS margin, not text. `\s*` on both sides.
   ok('class item: the two branches are joined by "or"',
-     /Player Level Required\s*65\s*or\s*Focus\s*87/.test(bmh), bmh.slice(0, 400));
-  ok('class item: the Embermage gate is shown as a restriction, not an option',
-     /Class\s*Embermage only/.test(bmh), bmh.slice(0, 400));
+     /Player Level 65\s*or\s*Focus 87/.test(bmh), bmh.slice(0, 400));
+  // The class gate is not a branch of the requirement: it is a hard restriction
+  // on who may equip the item at all, so it is a corner pill rather than a third
+  // chip beside the "or". Putting it in the row would say a non-Embermage could
+  // equip this by meeting the stats. Read off the two elements rather than the
+  // card's text, because "REQUIREMENTS" is uppercased by CSS -- splitting the
+  // string on it would silently find nothing and pass on an empty remainder.
+  {
+    const pill = bdoc.querySelector('#detail .corner').textContent;
+    const row = bdoc.querySelector('#detail .rrow').textContent;
+    ok('class item: the Embermage gate is a corner restriction, not a requirement branch',
+       /Embermage Only/.test(pill) && !/Embermage/.test(row), pill + '  //  ' + row);
+  }
 
   // ------------------------------------------- augmented weapons (unlockable)
   // 74 uniques carry a kill-count task that unlocks 1-3 further stats. The
@@ -511,7 +606,10 @@ async function go(hash) {
   const gwd = gw.getElementById('detail');
   const txt = sel => { const e = gwd.querySelector(sel); return e ? e.textContent : ''; };
   const list = sel => [].map.call(gwd.querySelectorAll(sel), l => l.textContent);
-  const locked = list('.fx.locked li'), plain = list('.fx:not(.locked) li');
+  // The plain affixes are `.aff` paragraphs now: the card dropped the list the
+  // `.fx:not(.locked) li` selector reached, and the locked group is the only
+  // `<ul>` left on it. The locked side keeps its selector unchanged.
+  const locked = list('.fx.locked li'), plain = list('.aff');
   ok('augmented weapon: the task is shown',
      /Kill 50 Ezrohir to Upgrade/.test(txt('.task')), txt('.task'));
   ok('augmented weapon: the condition is spelled out, not implied',
@@ -528,7 +626,7 @@ async function go(hash) {
   const rk = await deep('#item=ratkiller');
   const rkd = rk.getElementById('detail');
   const rkl = [].map.call(rkd.querySelectorAll('.fx.locked li'), l => l.textContent);
-  const rkp = [].map.call(rkd.querySelectorAll('.fx:not(.locked) li'), l => l.textContent);
+  const rkp = [].map.call(rkd.querySelectorAll('.aff'), l => l.textContent);
   ok('augmented weapon: the inverted-divider item splits the same way',
      rkl.length === 1 && /\+2 Physical Damage/.test(rkl[0]) &&
      rkp.length === 1 && /90% Interrupt chance/.test(rkp[0]),
@@ -652,6 +750,24 @@ async function go(hash) {
   await go('');
   const noIcon = [].filter.call(d.querySelectorAll('#grid .art'), a => !a.querySelector('i')).length;
   ok('every rendered card got a sprite icon', noIcon === 0, `${noIcon} placeholders`);
+  // The assertion above cannot see whether anything was *painted*. The sheet is
+  // 4.46 MB, its base64 is 6.2 MB, and Chrome silently drops a custom property
+  // holding a data URI over about 2 MB -- dropping the substitution, not the
+  // declaration, so every icon on the page vanishes at once with nothing in the
+  // console. The icons were missing on the whole site for exactly this reason.
+  //
+  // jsdom does not substitute var() either, so no computed style can tell the
+  // two apart here. What can be asserted is the shape of the declaration: the
+  // sheet is written into the rule that draws it, and no rule reaches it
+  // through a variable. Both the grid card and the detail tile are covered by
+  // the one grouped selector, so the base64 still appears once in the file.
+  {
+    const css = [].map.call(d.querySelectorAll('style'), s => s.textContent).join('\n');
+    ok('the icon sheet is written into the rule, not carried through var()',
+       /\.card \.art i, \.tile i\{[^}]*background-image:url\(data:image\/png;base64,[A-Za-z0-9+/]{1000}/
+         .test(css) && !/var\(--sprite\)/.test(css),
+       'a 6.2 MB data URI does not survive a custom property');
+  }
 
   ok('no uncaught errors in the page', errors.length === 0, errors.join(' | '));
 

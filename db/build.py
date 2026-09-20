@@ -390,6 +390,25 @@ DROP_ITEMS = ('polearm_vanq01',)
 # them. This hides them from the site only; nothing is lost from the data.
 SITE_HIDDEN_TIERS = ('Unclassified',)
 
+# How many pieces of a set a character can be wearing at once. The game's worn
+# slots are listed in MEDIA/INVENTORY/ -- HEAD TORSO SHOULDERS GLOVES PANTS
+# BOOTS BELT NECKLACE RING1 RING2 RIGHTHAND LEFTHAND -- so a ring fills two and
+# a one-handed weapon fills two, everything else one. It is the number a ladder's
+# top rung is built to: 52 of the 80 sets stop at exactly their capacity, and
+# only Cornerstone's seven single-slot items go past it.
+#
+# This is not a set's record count, and the difference is the whole reason the
+# ladder has a dimmed state worth drawing. Mondon's Vestment is 16 records across
+# 9 item types worn as 10 pieces, so all three numbers differ; Twinferno is one
+# wand with a 2-piece ladder, legible only once the second piece is understood to
+# be the other hand.
+ONE_HANDED = {'Sword', 'Axe', 'Mace', 'Dagger', 'Claw', 'Wand', 'Pistol', 'Fist'}
+
+
+def capacity(types):
+    return sum(2 if (t == 'Ring' or t in ONE_HANDED) else 1 for t in types)
+
+
 # UNITTYPE tokens the corpus never agreed a display name for, so classify_type()
 # hands these items to the old chain and their folder decides. All four are
 # NOSPAWN monster attack props -- DISPLAYNAME "NOSPAWN_monster_tell Erich" or
@@ -1215,8 +1234,9 @@ def build():
         _tid = {c for c, _ in rungs}
         assert _dat == _tid, \
             'SET %s: DAT thresholds %s but TIDBI %s' % (tok, sorted(_dat), sorted(_tid))
-        sets[tok] = {'n': set_names[tok], 'c': sum(1 for o in out if o.get('setid') == tok),
-                     'b': rungs}
+        _mine = [o for o in out if o.get('setid') == tok]
+        sets[tok] = {'n': set_names[tok], 'c': len(_mine),
+                     'cap': capacity({o['t'] for o in _mine}), 'b': rungs}
     # Every rung must be a real threshold. A 1-piece "bonus" is what the game
     # prints for an ordinary affix, so a ladder claiming one would be mislabelled
     # rather than merely short.
@@ -1234,6 +1254,15 @@ def build():
         'sets with an unreachable top rung drifted: %d' % len(_short)
     print('  SET BONUS: %d ladders, %d rungs, %d sets gate a rung they cannot reach'
           % (len(sets), sum(len(s['b']) for s in sets.values()), len(_short)))
+    # And the other reading of the same question: `_short` counts the corpus, this
+    # counts what a character can wear. The site dims a rung on _over, not on
+    # _short, because a set may ship one record of a piece that fills two slots.
+    # Only Cornerstone goes past its capacity -- 7 single-slot records, a 9-rung
+    # ladder -- and it is the whole reason the dimmed state is drawn at all.
+    _over = {t: (s['cap'], s['b'][-1][0]) for t, s in sets.items()
+             if s['b'][-1][0] > s['cap']}
+    assert len(_over) == 1 and 'U_GRAND_ARCHITECT' in _over, \
+        'sets whose top rung exceeds their worn capacity drifted: %r' % _over
 
     out.sort(key=lambda o: (o['n'].lower(), o['id']))
     print('  %d base templates excluded (nameless or base_*)' % len(templates))
@@ -1277,8 +1306,38 @@ def write_page(items, coords, png, size, sets):
     with open(os.path.join(app, 'index.html'), encoding='utf-8') as fh:
         shell = fh.read()
 
+    # --- the two assets the card needs that the corpus does not supply ---
+    #
+    # Bitter, as an @font-face rule prepended to the app's own CSS rather than a
+    # token in the shell: it keeps the token count down and puts the face in the
+    # file that uses it. The face is a variable font whose `wght` axis defaults
+    # to 100, so the `font-weight: 400 600` range is load-bearing rather than
+    # decorative -- without it every affix line in the corpus renders in Bitter
+    # Thin. No `font-display`: a data URI has nothing to wait for.
+    with open(os.path.join(app, 'fonts', 'bitter-latin.woff2'), 'rb') as fh:
+        face = base64.b64encode(fh.read()).decode('ascii')
+    css = ("@font-face{font-family:Bitter;font-style:normal;font-weight:400 600;"
+           "src:url(data:font/woff2;base64,%s) format('woff2')}\n" % face) + css
+
+    # The five element marks, a strip of five equal tiles. Its geometry is read
+    # off the PNG instead of being written into app.css, so re-cutting the strip
+    # cannot leave the sprite's offsets and the CSS disagreeing about the size
+    # of a tile. The app's copy is its own -- see app/fonts/README.md and
+    # test/card_mockups/README.md for why there is more than one.
+    with open(os.path.join(app, 'elements.png'), 'rb') as fh:
+        strip = fh.read()
+    with Image.open(io.BytesIO(strip)) as ei:
+        assert ei.size[0] % len(DMG_TYPES) == 0, \
+            'element strip %r does not divide into %d tiles' % (ei.size, len(DMG_TYPES))
+        ew, eh = ei.size[0] // len(DMG_TYPES), ei.size[1]
+    elems = base64.b64encode(strip).decode('ascii')
+    # The offsets into that strip, so app.js never has to do arithmetic on a CSS
+    # length. Order is DMG_TYPES's, which is also the order the marks were cut
+    # in -- physical, fire, ice, electric, poison.
+    elem = {k: i * ew for i, k in enumerate(DMG_TYPES)}
+
     data = json.dumps({'items': items, 'icons': coords, 'sheet': list(size),
-                       'sets': sets},
+                       'elem': elem, 'sets': sets},
                       separators=(',', ':'), ensure_ascii=False)
     # The rail's grouping travels with the page rather than being re-declared in
     # app.js -- one list, so the CSV's category column and the sidebar cannot
@@ -1286,11 +1345,15 @@ def write_page(items, coords, png, size, sets):
     tax = json.dumps([{'g': g, 's': sub, 't': ts} for g, sub, ts in TYPE_GROUPS],
                      separators=(',', ':'), ensure_ascii=False)
     sprite = base64.b64encode(png).decode('ascii')
+
     html = (shell.replace('/*__CSS__*/', css)
                  .replace('/*__DATA__*/', data)
                  .replace('/*__TAXONOMY__*/', tax)
                  .replace('/*__JS__*/', js)
-                 .replace('__SPRITE__', sprite))
+                 .replace('__SPRITE__', sprite)
+                 .replace('__ELEM__', elems)
+                 .replace('__EW__', str(ew))
+                 .replace('__EH__', str(eh)))
     path = os.path.join(OUT, 'index.html')
     with open(path, 'w', encoding='utf-8') as fh:
         fh.write(html)

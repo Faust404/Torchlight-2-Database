@@ -1,8 +1,18 @@
 # Item card studies
 
 The tooltip card as settled — the P3 corner, the requirement block as chips, the
-spawn band under it — on ten items. **Nothing here is wired into the site** —
-`db/app/**` is untouched and `db/out/index.html` is unaffected.
+spawn band under it — on ten items.
+
+**The card has shipped.** It now lives in `db/app/`, drawn by `app.js` and styled
+by `app.css`, and that is the live copy; the app's detail pane no longer looks
+anything like it did before this folder existed. This folder is kept as the study
+that settled it — the sheets below are the evidence for choices the app's own
+comments now only assert, and they are the place to come back to when one of
+those choices needs re-opening.
+
+That leaves **two copies of one card, in two trees, with nothing keeping them in
+step.** They were identical at the port and will drift from here. To change the
+card, edit `db/app/`; edit these templates only to re-run a study.
 
     python card_mockups/build_mockups.py     # -> card_mockups/index.html
                                              #    card_mockups/affix.html
@@ -49,8 +59,15 @@ They are a one-off out of `MEDIA/UI/HUD/INGAMETEXTURESHEETS4.PNG`, five 27×29
 tiles at x=996 — physical y=156, fire y=342, ice y=249, electric y=435,
 poison y=63 — committed as `elements.png` (75×16, five 15×16 tiles). So the
 mockup still reads nothing at build time but the pipeline's output; the PAK is
-opened once, by hand, not by `build_mockups.py`. The recipe, re-run to check it
-and byte-identical to the committed file:
+opened once, by hand, not by `build_mockups.py`.
+
+There are now **two copies of that strip** — this one and `db/app/elements.png`,
+which is the copy the live card draws from. A build input inside a study folder
+would have made `build_mockups.py`'s standalone claim false, and having the app
+reach across into `test/` for an asset would have made the app's; one committed
+copy per tree keeps both true. It is fixed game art that never changes, so the
+two cannot drift in any way that matters. The recipe, re-run to check it and
+byte-identical to both:
 
 ```python
 tile = sheet.crop((996, y, 996 + 27, y + 29))
@@ -490,11 +507,11 @@ was a data fault rather than a styling one.
 
 **S7 is applied to the card, with S8's heading.** The sheet keeps all eight
 variations, because the reasons the others lost are the part worth keeping;
-`mock.tpl.html` carries S8 alone.
+`mock.tpl.html` carries S8 alone, and so does the app.
 
 ### `10 pieces` from nine items
 
-The heading reads `16 pieces (10 piece set)` on Mondon's Vestment. The 16 is
+The heading read `16 pieces (10 piece set)` on Mondon's Vestment. The 16 is
 `sets.json`'s `c`: how many entries in `items.json` carry that `setid`. Mondon's
 ships two item levels of the same seven armour slots — Mondon's at 99, Outercore
 at 105 — plus one necklace and one ring, so 7×2+1+1 = **16 records across 9 item
@@ -560,7 +577,7 @@ strict.
 
 | | |
 |---|---|
-| **S1** | what ships — sans, flat `#bdb4a6` values, purple pill |
+| **S1** | what shipped then — sans, flat `#bdb4a6` values, purple pill |
 | **S2** | the heading quotes the top rung |
 | **S3** | the dimming measures slot capacity, not records |
 | **S4** | the bonus text takes `--doc`, as the affixes now do |
@@ -638,6 +655,9 @@ ladder reaches the muted state at all.
 
 ## Not a proposal
 
-The grid tiles — the 350px `.card`s in the results grid — are untouched. These
-studies are about the card shown for one item, which is what the grimtools
-reference shows.
+These studies are about the card shown for one item, which is what the grimtools
+reference shows. The grid tiles — the 350px `.card`s in the results grid — were
+never redesigned here, and the port did not touch their markup. Their *icons* did
+change: they draw from the same atlas and fell under the same fix, so they went
+from invisible to visible with the card. That was a bug being repaired, not a
+tile being redesigned.
