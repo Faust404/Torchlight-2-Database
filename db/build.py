@@ -31,6 +31,10 @@ ALFGEIR = os.path.join(TEST, 'alfgeir_db_website', 'tl2-master', 'data', 'All', 
 
 sys.path.insert(0, TL2)
 import dat_decode as DD
+# The Blood/Iron/Void ember values are the one table in this build that no
+# source reads: the affix files hold a single fixed float and the game scales it
+# by a per-stat curve that is not in the PAK's readable section. See its header.
+import ember_values
 from PIL import Image
 
 BS = chr(92)
@@ -668,6 +672,155 @@ def flat_damage(lines):
     return total
 
 
+# ------------------------------------------------------------- the ember pools
+# The four rare ember families -- BLOOD, CHAOS, IRON and VOID EMBER, 7 ranks
+# each -- are the only socketables whose two bonuses are not fixed. Their item
+# DATs carry an empty AFFIXES list (`n_lists=0` on every rank file), and the
+# game rolls one Armor/Trinket affix and one Weapon affix when the gem spawns.
+# The pool those rolls come from is not declared anywhere: it is the set of
+# affixes in MEDIA/AFFIXES/GEMS/ that name the family in their own applicability
+# list. An affix is a candidate for a gem of level L when its `0xED6CBF91` list
+# contains the gem's UNITTYPE and its [0xF5C798D8, 0x95C798C9] band contains L;
+# which of the two columns it lands in is the same list -- ARMOR for the
+# Armor/Trinket one, WEAPON for the weapon one. The `0x2BB67F8F` slot list is
+# not consulted: it names all three slots on both sides of every family, and the
+# one file that differs (GEM_UNIQUE_PERCENTLIFESTEAL, ARMOR+TRINKET only) is a
+# weapon affix that the wiki puts in the weapon column, matching its
+# applicability list rather than its slots.
+#
+# CHAOS EMBER is the family that can be derived: each of its 20 families ships
+# seven files, one per band -- 1-13, 14-27, 28-41, 42-55, 56-69, 70-83, 84-999,
+# matching the seven rank levels -- and each holds that band's value outright.
+# Blood, Iron and Void do not: each of their affixes is one 1-999 file with a
+# fixed float (Health 10, Armor 20, Mana 20) that the game scales by a per-stat
+# multiplier this project cannot read. Their 42 values are transcribed in
+# db/ember_values.py, which also says where from and why.
+#
+# The pool text follows the game's own tooltip wording, the same source every
+# other effect line on this site comes from -- TIDBI's `texteffect`, which is
+# the game's string to the character (the wiki's Normal-gems table lists 56
+# values and all 56 match it). Three of the wiki's rare-gem lists disagree with
+# the files, and the files win, as they do everywhere else here:
+#   * its Armor/Trinket lists omit the Dodge option entirely, at all 7 ranks;
+#   * its weapon lists give one Attack Speed option per rank, where the files
+#     have two at every rank -- WEAPON_ATTACKSPEED is a 1-999 file (3%, all
+#     ranks) beside a per-band one (3.5% at rank 1 rising to 6% at 6), so ranks
+#     2-6 roll either;
+#   * its rank-7 Attack Speed of 6.5% has no file at all (the last band file
+#     stops at 70-83), so Giant Chaos Ember's weapon list carries the 3% option
+#     and no more.
+# One affix the wiki does not list is excluded by construction rather than by
+# name: GEM_EYEOFGALLO_LIFESTEAL (666) also declares BLOOD EMBER + WEAPON, but
+# it is The Eye of Gallo's own affix -- that UNIQUE SOCKETABLE names it in its
+# AFFIXES list -- and TIDBI renders the item with two Weapon lines of its own.
+# Blood's weapon pool is transcribed from the wiki, so it cannot pick the file
+# up by accident.
+GEMS_PREFIX = 'MEDIA/AFFIXES/GEMS/'
+EMBER_TOKEN = 'CHAOS EMBER'
+EMBER_RANKS = ember_values.RANK_LEVELS
+
+# family -> (column, tooltip template, which effect member holds the value).
+# The keys are the affix file's own name with the family prefix and any band
+# number stripped. Most families carry the value under 0x0000BD6E; three do not,
+# and a table is the honest way to say so -- knockback holds its amount under
+# 0x0E46C025, knockback resistance under 0xE343B7AF, and silence prints the
+# duration it carries as a string member of the effect list, not the 50-80
+# chance beside it.
+EMBER_VALUE_KEYS = {'v': '0x0000BD6E', 'kb': '0x0E46C025', 'kbr': '0xE343B7AF',
+                    'dur': '0xE03B279B'}
+EMBER_FAMILIES = {
+    'ARMOR_DODGE':                  ('a', '+{v}% Dodge chance', 'v'),
+    'ARMOR_MISSILEREFLECT':         ('a', '{v}% chance to reflect missiles at 50% weapon DPS', 'v'),
+    'ARMOR_PERCENTARMOR':           ('a', '+{v}% to Physical Armor', 'v'),
+    # This one prints a double negative -- "reduced by -3%" -- at every rank,
+    # because the file's value is negative and the game's own line already
+    # carries the "reduced by". TIDBI has the same string on the game's own
+    # items (Quest_ManaVent_Acquire: "Physical Damage Taken is reduced by -3%"),
+    # so it is the wording, not a sign that got flipped here.
+    'ARMOR_PERCENTDAMAGE':          ('a', 'Physical Damage Taken is reduced by {v}%', 'v'),
+    'ARMOR_PERCENTKNOCKBACKRESIST': ('a', '{v}% Knock Back Resistance', 'kbr'),
+    'ARMOR_PERCENTPETARMOR':        ('a', '+{v}% pet and minion Armor', 'v'),
+    'ARMOR_PERCENTPETDAMAGE':       ('a', '+{v}% pet and minion Damage', 'v'),
+    'ARMOR_POTIONEFFICIENCY':       ('a', '+{v}% Potion effectiveness', 'v'),
+    'ARMOR_SPEED':                  ('a', '{v}% faster movement speed', 'v'),
+    'WEAPON_ATTACKSPEED':           ('w', '+{v}% Attack Speed', 'v'),
+    'WEAPON_CASTSPEED':             ('w', '+{v}% Cast Speed', 'v'),
+    'WEAPON_CRITCHANCE':            ('w', '+{v}% Critical Hit Chance', 'v'),
+    'WEAPON_CRITDAMAGE':            ('w', '{v}% bonus to Critical Damage', 'v'),
+    'WEAPON_DUALWIELD':             ('w', '{v}% Damage bonus when dual-wielding', 'v'),
+    'WEAPON_EXECTUE':               ('w', '+{v}% chance to Execute', 'v'),
+    'WEAPON_KNOCKBACK':             ('w', '+{v} Knockback', 'kb'),
+    'WEAPON_MISSILERANGE':          ('w', '+{v}m to Bow, Crossbow, Pistol and Wand range', 'v'),
+    'WEAPON_SILENCE':               ('w', 'Silence for {v} sec.', 'dur'),
+    'WEAPON_SPLASH':                ('w', '+{v}% Damage to secondary targets', 'v'),
+    'UNIQUE_PERCENTLIFESTEAL':      ('w', '{v}% Health stolen (% of dealt damage)', 'v'),
+}
+_pools = None
+
+
+def _effect_members(rows):
+    """{member name: value} for the first effect list in a decoded affix.
+
+    Names are the DAT's own -- `TYPE`, or a DEK hash for the stat's value
+    members -- so a caller keyed on EMBER_VALUE_KEYS can reach the one it wants.
+    The two floats sharing a value (0x0000BD6E, 0x0000BC78) collapse here, which
+    is the point: they are the same number written twice."""
+    cur, out = None, {}
+    for r in rows:
+        if r[0] == 0 and str(r[2]).startswith('list'):
+            cur = r[1] if r[1] == '0x0E421C35' else None
+            continue
+        if r[0] == 1 and cur:
+            out[r[1]] = r[3]
+    return out
+
+
+def ember_pools():
+    """{unittype: {'a': [per-rank options], 'w': [...]}} for all four families.
+
+    Chaos is read from the PAK; the other three come from ember_values.py. Each
+    list is indexed by rank -- 0 is rank 1 -- and holds whole tooltip lines."""
+    global _pools
+    if _pools is not None:
+        return _pools
+    band, ok = {}, set()
+    for p in sorted(DD.pak_index()):
+        u = p.upper()
+        if not (u.startswith(GEMS_PREFIX) and u.endswith('.DAT')):
+            continue
+        rows = DD.decode(DD.read_pak_entry(p))[3]
+        scalar = {r[1]: r[3] for r in rows if r[0] == 0}
+        app, cur = [], None
+        for r in rows:
+            if r[0] == 0 and str(r[2]).startswith('list'):
+                cur = r[1] if r[1] == '0xED6CBF91' else None
+                continue
+            if r[0] == 1 and cur:
+                app.append(r[3])
+        if EMBER_TOKEN not in app:
+            continue
+        fam = re.sub(r'\d+$', '', p.split('/')[-1][:-4].upper())
+        fam = re.sub(r'^GEM_(?:CHAOSEMBER_)?', '', fam)
+        assert fam in EMBER_FAMILIES, 'unmapped ember affix: %s' % p
+        col, tpl, vk = EMBER_FAMILIES[fam]
+        assert col == ('w' if 'WEAPON' in app else 'a'), \
+            'ember affix %s moved columns: %s' % (fam, app)
+        members = _effect_members(rows)
+        val = members[EMBER_VALUE_KEYS[vk]]
+        lo, hi = int(scalar['0xF5C798D8']), int(scalar['0x95C798C9'])
+        ok.add(fam)
+        for i, lvl in enumerate(EMBER_RANKS):
+            if lo <= lvl <= hi:
+                band.setdefault(i, {'a': [], 'w': []})[col].append(tpl.replace('{v}', val))
+    assert ok == set(EMBER_FAMILIES), \
+        'ember affix family never seen: %s' % sorted(set(EMBER_FAMILIES) - ok)
+    chaos = {'a': [band[i]['a'] for i in range(len(EMBER_RANKS))],
+             'w': [band[i]['w'] for i in range(len(EMBER_RANKS))]}
+    _pools = {'CHAOS EMBER': chaos}
+    _pools.update(ember_values.FAMILIES)
+    return _pools
+
+
 def load_pak_items():
     """Decode every item DAT and resolve BASEFILE inheritance."""
     index = DD.pak_index()
@@ -1167,6 +1320,16 @@ def build():
             o['fx'] = affixes
         if augs:
             o['aug'] = augs
+        # The 28 rare ember ranks -- 4 families x 7 -- get their two option
+        # lists here. Keyed on the UNITTYPE and the level, which is all the gem
+        # itself says: only these four tokens carry a pool, and the four BASE
+        # templates that share them have no LEVEL, so they fall out on the
+        # lookup rather than needing to be excluded. See ember_pools().
+        pool = ember_pools().get((rec.get('UNITTYPE') or '').strip().upper())
+        lvl = int(_num(rec.get('LEVEL')) or 0)
+        if pool and lvl in ember_values.RANK_LEVELS:
+            i = ember_values.RANK_LEVELS.index(lvl)
+            o['ep'] = {'a': pool['a'][i], 'w': pool['w'][i]}
         if it['icon']:
             o['ic'] = it['icon']
             if it.get('inherited'):
