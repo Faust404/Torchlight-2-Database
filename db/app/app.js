@@ -41,6 +41,11 @@
   var showAll = false;
 
   var DMGTYPES = ['physical', 'fire', 'ice', 'electric', 'poison'];
+  // Keyed on the tier an item actually wears, so nothing looks up 'Set' any more
+  // -- ownTier never returns it. The entry stays because the class it names
+  // still has a job: --t-set paints the set-name line in the detail view, so a
+  // .q-set that reached this map should still get the Set ink rather than fall
+  // through to Unclassified's grey.
   var TIERCLS = {
     'Normal': 'q-normal', 'Rare': 'q-rare', 'Unique': 'q-unique',
     'Set': 'q-set', 'Legendary': 'q-legendary', 'Unclassified': 'q-unclassified'
@@ -57,8 +62,19 @@
   // rarity, which build.py emits only on set items, so this is identity
   // everywhere else.
   function ownTier(o) { return o.uq || o.q; }
-  var TIERRANK = { 'Legendary': 0, 'Set': 1, 'Unique': 2, 'Rare': 3, 'Normal': 4, 'Unclassified': 5 };
-  var TIERORDER = ['Legendary', 'Set', 'Unique', 'Rare', 'Normal', 'Unclassified'];
+  // Ascending rarity: Normal is the commonest and sits first, Legendary the
+  // rarest and last. This one order drives two things that must not disagree --
+  // TIERORDER is the strip's pill order and TIERRANK is the sort's primary key,
+  // so the pills read left to right in the same order the list runs top to
+  // bottom. Unclassified is last and stays in both even though the built page
+  // carries none: it is the canonical order, and tierInk's fallback names it.
+  //
+  // Set is deliberately absent. It is a membership, not a rarity -- every set
+  // item is really Rare or Unique -- so the facet files each one under the
+  // rarity it actually is (see FACETDEF's ownTier) and the 556 are counted in
+  // those two pills. Set filtering is a separate control over the top.
+  var TIERRANK = { 'Normal': 0, 'Rare': 1, 'Unique': 2, 'Legendary': 3, 'Unclassified': 4 };
+  var TIERORDER = ['Normal', 'Rare', 'Unique', 'Legendary', 'Unclassified'];
 
   // The game's names for the .DAT's requirement fields. TL2 renamed Torchlight
   // 1's Magic -> Focus and Defense -> Vitality, but the field names kept the
@@ -67,6 +83,13 @@
   var REQLABEL = { str: 'Strength', dex: 'Dexterity', mag: 'Focus', def: 'Vitality' };
 
   // ------------------------------------------------------------------ state
+  // What the page opens on, what #reset restores, what readHash falls back to
+  // when a URL names a sort it cannot read, and the value writeHash elides
+  // because writing the default into a URL says nothing. Four call sites that
+  // have to agree -- as four separate literals, one edited and the others
+  // missed gives a page whose reset button and first paint disagree.
+  var DEFAULT_SORT = 'tier';
+
   // There is no separate `cats` facet. The rail groups types under a category
   // header and the header toggles those types, so "category is Weapons" and
   // "every weapon type is checked" are the same filter -- keeping both would
@@ -74,9 +97,9 @@
   // #cat= link is expanded to its types on read; see readHash.
   var S = {
     q: '', types: new Set(), tiers: new Set(), dmg: new Set(),
-    set: '', sock: false, lvlMin: null, lvlMax: null,
+    set: '', setOnly: false, sock: false, lvlMin: null, lvlMax: null,
     req: { str: null, dex: null, mag: null, def: null },
-    sort: 'name', dir: 1, item: ''
+    sort: DEFAULT_SORT, dir: 1, item: ''
   };
 
   // ------------------------------------------------------------------ utils
@@ -150,7 +173,7 @@
           o.t.toLowerCase().indexOf(q) < 0) return false;
     }
     if (skip !== 'types' && S.types.size && !S.types.has(o.t)) return false;
-    if (skip !== 'tiers' && S.tiers.size && !S.tiers.has(o.q)) return false;
+    if (skip !== 'tiers' && S.tiers.size && !S.tiers.has(ownTier(o))) return false;
     if (skip !== 'dmg' && S.dmg.size) {
       if (!o.dmg) return false;
       var hit = false;
@@ -158,6 +181,11 @@
       if (!hit) return false;
     }
     if (S.sock && !n(o.sk)) return false;
+    // Two independent narrowings: the toggle asks "is it in any set at all",
+    // the select asks "which one". Picking a set implies the first, but they
+    // are separate state so that clearing the select does not silently drop
+    // the toggle the reader set.
+    if (S.setOnly && !o.set) return false;
     if (S.set && o.set !== S.set) return false;
     if (S.lvlMin != null && n(o.lv) < S.lvlMin) return false;
     if (S.lvlMax != null && n(o.lv) > S.lvlMax) return false;
@@ -179,7 +207,12 @@
       var r;
       if (s === 'level') r = n(x.lv) - n(y.lv);
       else if (s === 'type') r = x.t.localeCompare(y.t) || x.n.localeCompare(y.n);
-      else if (s === 'tier') r = (TIERRANK[x.q] - TIERRANK[y.q]) || x.n.localeCompare(y.n);
+      // Tier first, then item level within it. `n` coalesces a missing level to
+      // 0, which is right: an item with no level is a level-1 drop, not a
+      // wildcard. The name compare only breaks ties the two keys leave, so
+      // equal items hold a stable order instead of whatever the array had.
+      else if (s === 'tier') r = (TIERRANK[ownTier(x)] - TIERRANK[ownTier(y)]) ||
+        (n(x.lv) - n(y.lv)) || x.n.localeCompare(y.n);
       else if (s === 'damage') r = (x.dmg ? total(x.dmg) : -1) - (y.dmg ? total(y.dmg) : -1);
       else if (s === 'armor') r = (x.arm ? total(x.arm) : -1) - (y.arm ? total(y.arm) : -1);
       else r = x.n.localeCompare(y.n) || x.id.localeCompare(y.id);
@@ -192,7 +225,11 @@
   var SEC = {};                      // collapsed state per rail section
   var FACETDEF = [
     { k: 'types', title: 'Type', get: function (o) { return [o.t]; } },
-    { k: 'tiers', title: 'Tier', get: function (o) { return [o.q]; } },
+    // ownTier, not q: a set item is really Rare or Unique, and the facet files
+    // it there so the strip carries four rarities rather than a fifth that is
+    // not one. `uq` is the DAT's displaced rarity, which build.py emits only on
+    // set items, so this is identity on every other item.
+    { k: 'tiers', title: 'Tier', get: function (o) { return [ownTier(o)]; } },
     { k: 'dmg', title: 'Damage type', get: function (o) {
         return o.dmg ? Object.keys(o.dmg) : []; } }
   ];
@@ -281,26 +318,64 @@
     return h;
   }
 
+  // The tier facet renders as the strip above the grid, not as a rail section:
+  // it is the one filter that pairs with the default sort, so it sits next to
+  // the results it orders instead of behind the rail. FACETDEF keeps its entry
+  // -- matches(), facetValues(), sig() and writeHash() all key off it -- and
+  // only the rail's own loop skips it.
+  function renderTiers() {
+    var h = facetValues('tiers').arr.map(function (p) {
+      var on = S.tiers.has(p[0]);
+      return '<label class="tpill ' + tierInk(p[0]) + (on ? '' : ' off') + '">' +
+        '<input type="checkbox" data-f="tiers" value="' + esc(p[0]) + '"' +
+        (on ? ' checked' : '') + '>' +
+        '<span class="lbl">' + esc(p[0]) + '</span>' +
+        // left empty on purpose: paintCounts fills every [data-ct] span, and a
+        // figure written here would flash and then be overwritten
+        '<span class="ct" data-ct="tiers|' + esc(p[0]) + '"></span></label>';
+    }).join('');
+    document.getElementById('tiers').innerHTML = h;
+    paintCounts();
+  }
+
+  // Set membership is not a rarity -- every one of the 556 set items is really
+  // Rare or Unique, and the tier facet files it there (see FACETDEF). What is
+  // left is a filter *over* those rarities: "only set items" narrows to the
+  // pieces belonging to any set, and the select narrows further to one named
+  // set. Both live in the toolbar, next to each other, because picking a set
+  // from the list is how you would reach for the toggle.
+  var SETCOUNT = 0;
+  function renderSetCtl() {
+    if (!SETCOUNT) for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].set) SETCOUNT++;
+    var sets = Object.create(null);
+    ITEMS.forEach(function (o) { if (o.set) sets[o.set] = (sets[o.set] || 0) + 1; });
+    var opts = '<option value="">any set</option>' + Object.keys(sets).sort().map(function (s) {
+      return '<option value="' + esc(s) + '">' + esc(s) + ' (' + sets[s] + ')</option>';
+    }).join('');
+    var sel = document.getElementById('setsel');
+    // Rebuilt only when the option list itself would differ: rewriting the
+    // options on every route change would drop a selection mid-navigation.
+    if (sel.getAttribute('data-n') !== String(SETCOUNT)) {
+      sel.innerHTML = opts;
+      sel.setAttribute('data-n', String(SETCOUNT));
+    }
+    sel.value = S.set;
+    var btn = document.getElementById('onlyset');
+    btn.classList.toggle('on', !!S.setOnly);
+    btn.setAttribute('aria-pressed', S.setOnly ? 'true' : 'false');
+    btn.innerHTML = 'Only sets <span class="ct">' + SETCOUNT + '</span>';
+  }
+
   function renderRail() {
     var h = '';
     FACETDEF.forEach(function (f) {
+      if (f.k === 'tiers') return;   // renderTiers above owns this one
       var fv = facetValues(f.k);
       var body = f.k === 'types' ? typesBody()
                                 : fv.arr.map(function (p) { return checkRow(f.k, p[0], p[0]); }).join('');
       if (!fv.arr.length) body = '<div class="f off"><span class="lbl">nothing matches</span></div>';
       h += section(f.k, f.title, body, fv.total);
     });
-
-    // sets: too many to checkbox, so a select
-    var sets = Object.create(null);
-    ITEMS.forEach(function (o) { if (o.set) sets[o.set] = (sets[o.set] || 0) + 1; });
-    var setKeys = Object.keys(sets).sort();
-    var opts = '<option value="">any</option>' + setKeys.map(function (s) {
-      return '<option value="' + esc(s) + '"' + (S.set === s ? ' selected' : '') + '>' +
-        esc(s) + ' (' + sets[s] + ')</option>';
-    }).join('');
-    h += section('set', 'Set', '<div class="rng"><select id="setsel" style="width:100%">' +
-      opts + '</select></div>', setKeys.length);
 
     h += section('lvl', 'Item Level', '<div class="rng">' +
       '<input type="number" id="lvmin" placeholder="min" value="' + (S.lvlMin == null ? '' : S.lvlMin) + '">' +
@@ -414,7 +489,7 @@
     // silently yields [] and every facet would look unchanged.
     var s = function (set) { return Array.from(set).sort(); };
     return JSON.stringify([S.q, s(S.types), s(S.tiers), s(S.dmg),
-      S.set, S.sock, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
+      S.set, S.setOnly, S.sock, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
       ['str', 'dex', 'mag', 'def'].map(function (k) { return S.req[k]; })]);
   }
 
@@ -738,9 +813,20 @@
   function readHash() {
     var s = location.hash.replace(/^#/, '');
     S.types = new Set(); S.tiers = new Set(); S.dmg = new Set();
-    S.set = ''; S.sock = false; S.lvlMin = S.lvlMax = null; S.item = '';
+    S.set = ''; S.setOnly = false; S.sock = false; S.lvlMin = S.lvlMax = null; S.item = '';
     S.req = { str: null, dex: null, mag: null, def: null };
-    S.q = ''; S.sort = 'name'; S.dir = 1;
+    S.q = ''; S.sort = DEFAULT_SORT; S.dir = 1;
+    // The tier facet starts fully selected, unlike the rail's other facets,
+    // which start empty. An empty set and a full one filter identically --
+    // matches() only applies a facet when the set is non-empty -- so this
+    // changes nothing about which items show. What it changes is the strip:
+    // its pills carry their own state, and "nothing selected" would paint all
+    // four dimmed above an unfiltered grid, which reads as a broken control
+    // rather than as no filter. Populated here rather than in renderTiers so
+    // that the state exists before anything renders, and before the early
+    // return below, so #reset lands on the same four-on strip the page opens
+    // with. A hash that names the facet still overrides it, below.
+    S.tiers = new Set(allVals().tiers);
     if (!s || s === 'reset') return;
     s.split('&').forEach(function (kv) {
       var i = kv.indexOf('='), k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i)),
@@ -768,10 +854,11 @@
       else if (k === 'tier') S.tiers = new Set(list);
       else if (k === 'dmg') S.dmg = new Set(list);
       else if (k === 'set') S.set = v;
+      else if (k === 'setonly') S.setOnly = v === '1';
       else if (k === 'sock') S.sock = v === '1';
       else if (k === 'q') S.q = v.toLowerCase();
       else if (k === 'item') S.item = v;
-      else if (k === 'sort') S.sort = v || 'name';
+      else if (k === 'sort') S.sort = v || DEFAULT_SORT;
       else if (k === 'dir') S.dir = v === 'desc' ? -1 : 1;
       else if (k === 'lvl') { var p = v.split('-'); S.lvlMin = p[0] === '' ? null : +p[0];
                               S.lvlMax = p[1] ? +p[1] : null; }
@@ -809,6 +896,7 @@
       }
     });
     if (S.set) p.push('set=' + encodeURIComponent(S.set));
+    if (S.setOnly) p.push('setonly=1');
     if (S.sock) p.push('sock=1');
     if (S.lvlMin != null || S.lvlMax != null)
       p.push('lvl=' + (S.lvlMin == null ? '' : S.lvlMin) + '-' + (S.lvlMax == null ? '' : S.lvlMax));
@@ -816,7 +904,7 @@
       .map(function (k) { return k + ':' + S.req[k]; });
     if (rq.length) p.push('req=' + rq.join(','));
     if (S.q) p.push('q=' + encodeURIComponent(S.q));
-    if (S.sort !== 'name') p.push('sort=' + S.sort);
+    if (S.sort !== DEFAULT_SORT) p.push('sort=' + S.sort);
     if (S.dir === -1) p.push('dir=desc');
     if (S.item) p.push('item=' + encodeURIComponent(S.item));
     var h = p.join('&');
@@ -865,6 +953,8 @@
     if (sig() === lastSig) return;
     showAll = false;
     renderRail();
+    renderTiers();
+    renderSetCtl();
     paintGrid();
     lastSig = sig();
   }
@@ -902,6 +992,18 @@
 
   document.getElementById('dir').addEventListener('click', function () {
     S.dir = -S.dir; apply();
+  });
+
+  // The toggle is a button, not a checkbox, so it fires click rather than change
+  // and nothing else repaints it: writeHash uses replaceState wherever the page
+  // is served (no hashchange follows), and on file:// the event that does follow
+  // is asynchronous. renderSetCtl therefore updates the button itself rather
+  // than waiting to be called back.
+  document.getElementById('onlyset').addEventListener('click', function () {
+    S.setOnly = !S.setOnly;
+    showAll = false; writeHash();
+    renderSetCtl();
+    render(); paintCounts();
   });
 
   document.getElementById('reset').addEventListener('click', function (e) {

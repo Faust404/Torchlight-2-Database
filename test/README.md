@@ -858,26 +858,34 @@ items named `*_m<digit>` are tiered Rare by TIDBI. So no Magic tier is offered.
 | Tier | Items | On the site |
 |---|---|---|
 | Normal | 2,161 | yes |
-| Rare | 1,851 | yes |
-| Unique | 1,391 | yes |
-| Set | 556 | yes |
+| Rare | 2,061 | yes |
+| Unique | 1,737 | yes |
 | Legendary | 92 | yes |
 | Unclassified | 125 | **no** |
 
-**Set is promoted deliberately.** 556 items carry a non-empty `SET` field, which
-is the DAT itself asserting membership; TIDBI tiers those 210 Rare / 346 Unique.
-The game shows set items as their own tier, so the `SET` field wins.
+**Set is a membership, not a rarity.** 556 items carry a non-empty `SET` field,
+which is the DAT itself asserting membership; TIDBI tiers those 210 Rare / 346
+Unique. The builder emits that displaced rarity as **`uq`** on set items only,
+and `ownTier(o)` returns `o.uq || o.q`. That single function drives the card's
+colour, the detail's name, the type line's first word **and the tier facet**, so
+each of the 556 is filed under the rarity it actually is — which is why the two
+rows above carry 2,061 and 1,737 rather than the builder's own 1,851 and 1,391,
+and why the four tiers still sum to 6,051. The game paints a set piece in the
+colour of what it
+actually is and prints **"Unique Set Belt"**, not "Set Belt".
 
-**But Set is a membership, not a rarity**, and the tier it displaces is kept as
-**`uq`** — emitted on set items only. The game paints a set piece in the colour
-of what it actually is and prints **"Unique Set Belt"**, not "Set Belt", so the
-site does too: `ownTier(o)` returns `o.uq || o.q` and drives the card's colour,
-the detail's name and the type line's first word, while the Set tag stays
-alongside it and the **Set tier still filters all 556**. The recolour is paint,
-not classification. All 556 resolve to Rare or Unique and the build asserts
-exactly `210 / 346` — the `_set` name fallback in `base_tier()` is the one path
-that could return `Set` as a rarity, and a set piece reaching it would mean its
-rarity was being read off the fact that it is in a set, which is circular.
+Set membership is therefore a filter *over* the rarities, not a fifth tier: the
+toolbar carries a **`setonly`** toggle for "in any set at all" and a `set`
+select for one named set, and the two are independent state, so clearing the
+select does not silently drop the toggle.
+
+The build asserts the split exactly `210 / 346` — the `_set` name fallback in
+`base_tier()` is the one path that could return `Set` as a rarity, and a set
+piece reaching it would mean its rarity was being read off the fact that it is
+in a set, which is circular. `uq` stays out of `items.csv`, whose `q` column
+keeps the pipeline's own classification — `Set` for all 556 — so the CSV and the
+site are answering different questions, and only the site needs the displaced
+rarity.
 
 **A set's name is not its token.** The `SET` field holds a bare token —
 `SENTINAL`, `U_GRAND_ARCHITECT`, `BERSERKER_FINAL` — which is what the site used
@@ -1173,8 +1181,14 @@ site's — its *magical* (green) tier is not a tier the facet emits, so the 576
 `*_m<digit>` items sit under **Rare** (blue) here. The `set` colour is defined
 but no longer worn: because Set is a membership rather than a rarity, every set
 piece is now painted in its own rarity's colour (below), leaving `--t-set` as
-the game's value on record and the Set tier as a live filter rather than as
-anything on screen.
+the game's value on record — it still paints the set-name line in the detail
+view — rather than as anything a card wears.
+
+**The rarity filter is a strip of pills above the grid**, not a rail section: it
+is the one filter that pairs with the default sort, so it sits next to the
+results it orders. One pill per rarity, each carrying its own count and inked in
+its own colour, in the same order the list runs. It is the same facet as before
+— same key, same values, same cross-facet counts — rendered somewhere else.
 
 **The detail's type line reads tier-then-type** — `Legendary Axe`, `Rare Sword`,
 `Set Shoulder Armor` — with the tier word painted in its own tier colour, so the
@@ -1225,7 +1239,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 103
+`db\check_page.js` goes further and drives the built page in a real DOM — 151
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the base-value badge, the
 grouped rail (that Shield and Belt sit where the taxonomy puts them, that a
@@ -1233,10 +1247,14 @@ group's count equals the sum of its rows, that a group header checks the boxes
 it stands in for, and that a retired `#cat=` link still resolves), the set bonus
 ladder in three shapes (a set that ships every piece it gates on, one that does
 not, one gated on more pieces than exist), and a set piece's rarity (the type
-line, the word that carries the colour, the card class for both rarities, and
-that the Set tier still filters all 556), and both halves of `MINLEVEL` — absent
-on the Aenigma, present and relabelled on a gem. It needs jsdom, which is not a
-project dependency:
+line, the word that carries the colour, the card class for both rarities, and a
+stale `#tier=Set` failing legibly), the tier strip (its pill order and counts,
+that the four counts are the data's own with the set pieces folded in and sum to
+the corpus, and that no pill names Set), the set controls (the toggle's 556, the
+select's 9, that the two spell themselves separately in the URL and narrow
+rather than union), and both halves of `MINLEVEL` — absent on the Aenigma,
+present and relabelled on a gem. It needs jsdom, which is not a project
+dependency:
 
 ```
 npm i jsdom          # anywhere on NODE_PATH

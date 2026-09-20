@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 109 assertions.
+ * view, provenance and hash deep links -- 151 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 db/check_page.js
@@ -42,6 +42,24 @@ const cnt = () => d.getElementById('count').textContent;
 const det = () => d.getElementById('detail').textContent;
 const lvls = () => [].map.call(cards(), c => {
   const m = /Lv (\d+)/.exec(c.querySelector('.sub').textContent); return m ? +m[1] : 0; });
+// The rendered cards split into contiguous runs of one tier. Tier is the
+// primary sort key, so the level sequence *resets* at every boundary -- the 92
+// Legendary items end at level 54 and the Unique run after them starts again at
+// 105. Any claim about level order therefore has to be made per run; asserting
+// it across the whole page asserts something the sort deliberately does not do.
+const tierRuns = () => {
+  const out = [];
+  [].forEach.call(cards(), c => {
+    const q = (c.className.match(/q-[a-z]+/) || ['?'])[0];
+    if (!out.length || out[out.length - 1].q !== q) out.push({ q, lv: [] });
+    const m = /Lv (\d+)/.exec(c.querySelector('.sub').textContent);
+    out[out.length - 1].lv.push(m ? +m[1] : 0);
+  });
+  return out;
+};
+const monotonic = up => tierRuns().every(r =>
+  r.lv.every((v, i) => !i || (up ? r.lv[i - 1] <= v : r.lv[i - 1] >= v)));
+const runSummary = () => tierRuns().map(r => `${r.q.slice(2)}(${r.lv.length})`).join(' ');
 
 const errors = [];
 w.addEventListener('error', e => errors.push(String(e.message)));
@@ -281,7 +299,29 @@ async function go(hash) {
   ok('search state lands in the hash', /q=aenigma/.test(w.location.hash), w.location.hash);
 
   // ----------------------------------------------------------------- sort
+  // The default order, asserted before anything touches the select: rarity
+  // ascending, level ascending within each rarity. The first card has to be the
+  // lowest-level Normal there is, and the opening run must climb without a step
+  // back -- the whole first screen is one tier, so this reads the tier key and
+  // the level key in one pass.
   await go('');
+  ok('the page opens sorted by tier, not name',
+     d.getElementById('sort').value === 'tier', d.getElementById('sort').value);
+  {
+    const first = cards()[0];
+    ok('the first card is a Normal item', first.className.indexOf('q-normal') >= 0,
+       first.className);
+    // Normal is 2,161 items and the grid stops at 500, so the whole first page
+    // is one tier. That is what makes the level assertion below a statement
+    // about order *within* a tier rather than about a tier boundary -- and it
+    // is the consequence the sort change was signed off on.
+    const off = [].filter.call(cards(), c => !/q-normal/.test(c.className));
+    ok('the whole first page is one tier, the commonest one', off.length === 0,
+       `${off.length} of ${cards().length} are not Normal`);
+    ok('levels ascend within the tier', monotonic(true),
+       lvls().slice(0, 12).join(','));
+  }
+
   const sel = d.getElementById('sort');
   sel.value = 'level';
   sel.dispatchEvent(new w.Event('change', { bubbles: true }));
@@ -539,13 +579,22 @@ async function go(hash) {
        !!zcard && zcard.className.indexOf('q-rare') >= 0,
        zcard ? zcard.className : '(no card)');
   }
-  // The recolour is paint, not classification: the Set tier must still be
-  // filterable, or 556 items would have been re-filed as Rare/Unique to get a
-  // colour and the facet would have quietly changed meaning.
+  // The recolour is paint, not classification: the 556 set items must still be
+  // reachable as a group, or they would have been re-filed as Rare/Unique just
+  // to get a colour and the facet would have quietly changed meaning. What
+  // reaches them is no longer a tier -- see the set-control block below -- and
+  // #tier=Set is left to mean exactly what it says: a tier called Set, of which
+  // the corpus has none. Asserted rather than special-cased, because that link
+  // is the shape a stale bookmark takes and the page should fail it legibly:
+  // four dimmed pills and an empty grid read as "no tier selected", which is
+  // what the hash says. Translating it to setonly would be inventing a filter
+  // the link never asked for.
   const stier = await deep('#tier=Set');
-  ok('the Set tier still filters the 556 set items',
-     /556/.test(stier.getElementById('count').textContent),
-     stier.getElementById('count').textContent);
+  ok('a stale #tier=Set selects no tier and matches nothing',
+     [].every.call(stier.querySelectorAll('#tiers input'), i => !i.checked) &&
+     /Nothing matches/.test(stier.getElementById('more').textContent),
+     stier.getElementById('count').textContent + ' | ' +
+     stier.getElementById('more').textContent);
 
   // ------------------------------------------------ the three reported bugs
   // Reported against heavy_g_amulet_f_alt_b: fire armor should be 140-174, the
@@ -631,6 +680,223 @@ async function go(hash) {
      rkl.length === 1 && /\+2 Physical Damage/.test(rkl[0]) &&
      rkp.length === 1 && /90% Interrupt chance/.test(rkp[0]),
      rkl.join(' | ') + '  //  ' + rkp.join(' | '));
+
+  // ------------------------------------------------------------- tier strip
+  // The rarity filter moved out of the rail onto its own row between the
+  // toolbar and the grid. It is the same facet -- same key, same values, same
+  // counts -- rendered by a different function, so what has to be asserted is
+  // that the move did not change what the filter *is*: the values, their order,
+  // their counts, and that a click still does what a rail checkbox did.
+  await go('');
+  const strip = d.getElementById('tiers');
+  ok('the tier strip sits between the toolbar and the grid',
+     !!strip && strip.previousElementSibling.id === 'bar' &&
+     strip.nextElementSibling.id === 'scroll',
+     strip ? `${strip.previousElementSibling.id} / ${strip.nextElementSibling.id}` : 'no #tiers');
+  const pills = () => [].slice.call(d.querySelectorAll('#tiers .tpill'));
+  const pval = p => p.querySelector('input').value;
+  // The user's order, and the sort's order, which the app derives from one
+  // constant precisely so the two cannot disagree: the strip reads left to
+  // right in the order the list runs top to bottom.
+  ok('the pills run Normal, Rare, Unique, Legendary -- the four rarities',
+     pills().map(pval).join(',') === 'Normal,Rare,Unique,Legendary',
+     pills().map(pval).join(','));
+  ok('each pill is its own box wearing its own tier ink',
+     pills().every(p => p.className.indexOf('t-' + pval(p).toLowerCase()) >= 0),
+     pills().map(p => p.className).join(' | '));
+  // The counts are the ones build.py asserts against, read off the pills rather
+  // than off the header -- a strip wired to the wrong facet, or reading its
+  // counts from the wrong place, would still show 6,051 in the count line. The
+  // 556 set items are counted inside Rare and Unique, not beside them: 210 +
+  // 346 = 556, and 2161+2061+1737+92 = 6,051, so nothing was lost or doubled.
+  ok('each pill carries its own tier count, with the set pieces folded in',
+     pills().map(p => +p.querySelector('.ct').textContent).join(',') ===
+       '2161,2061,1737,92',
+     pills().map(p => `${pval(p)}=${p.querySelector('.ct').textContent}`).join(' '));
+  // The one place this facet deliberately parts company with the rail's others:
+  // those start empty -- no box checked, nothing filtered -- but a strip of five
+  // dimmed pills above a full grid reads as a broken control, so tiers start
+  // fully selected. An empty set and a full one filter identically.
+  ok('the pills all start selected, and none is dimmed',
+     pills().every(p => p.querySelector('input').checked && !p.classList.contains('off')),
+     pills().map(p => `${pval(p)}:${p.querySelector('input').checked}`).join(' '));
+  // Set is a membership, not a rarity, so no pill may offer it -- a second
+  // control owns it now, and a pill named Set would be a fifth rarity again.
+  ok('no pill names Set', pills().every(p => pval(p) !== 'Set'),
+     pills().map(pval).join(','));
+  // The fold, re-derived from the data rather than restated from the numbers
+  // above: each item counted under `uq` -- its displaced rarity -- falling back
+  // to `q`. If the 556 had been dropped instead of folded, or filed under the
+  // wrong rarity, this is what would catch it.
+  {
+    const want = { Normal: 0, Rare: 0, Unique: 0, Legendary: 0 };
+    w.DB.items.forEach(o => { const t = o.uq || o.q; if (t in want) want[t]++; });
+    const got = pills().map(p => `${pval(p)}=${+p.querySelector('.ct').textContent}`).join(' ');
+    ok('...and every count is the data\'s own, set pieces under their real rarity',
+       got === Object.keys(want).map(k => `${k}=${want[k]}`).join(' '),
+       `${got} | data: ${Object.keys(want).map(k => `${k}=${want[k]}`).join(' ')}`);
+  }
+  ok('...and the four sum to the corpus, so nothing was dropped or double-counted',
+     [].reduce.call(pills(), (a, p) => a + (+p.querySelector('.ct').textContent), 0) === 6051,
+     String([].reduce.call(pills(), (a, p) => a + (+p.querySelector('.ct').textContent), 0)));
+  ok('a full tier selection is elided from the URL', !/tier=/.test(w.location.hash),
+     w.location.hash || '(empty)');
+  {
+    const rail = d.getElementById('railbody');
+    ok('the tier facet is gone from the rail',
+       !rail.querySelector('input[data-f="tiers"]') &&
+       !rail.querySelector('.sec[data-sec="tiers"]'),
+       [].map.call(rail.querySelectorAll('.sec'), s => s.getAttribute('data-sec')).join(','));
+  }
+
+  // A pill click is a rail checkbox click: filter, dim, land in the URL. The
+  // URL names what is *left on*, not what was turned off -- writeHash writes
+  // the selection -- so unchecking Normal writes the other four.
+  const tierParam = h => {
+    const m = /(?:^|[#&])tier=([^&]*)/.exec(h);
+    return m ? decodeURIComponent(m[1]).split(',') : null;
+  };
+  const flip = (v, on) => {
+    const box = d.querySelector(`#tiers input[value="${v}"]`);
+    box.checked = on;
+    box.dispatchEvent(new w.Event('change', { bubbles: true }));   // the rail's idiom
+  };
+  flip('Normal', false);
+  ok('unchecking Normal drops its 2,161', /3,890/.test(cnt()), cnt());
+  ok('...and the pill dims itself',
+     d.querySelector('#tiers input[value="Normal"]').parentNode.classList.contains('off'));
+  // writeHash sorts a facet's values so the same selection always spells the
+  // same URL (see its comment), so this compares membership, not sequence.
+  {
+    const left = tierParam(w.location.hash) || [];
+    ok('...and the URL names the three that are left, and not Normal',
+       left.length === 3 && left.indexOf('Normal') < 0 &&
+       ['Rare', 'Unique', 'Legendary'].every(v => left.indexOf(v) >= 0),
+       w.location.hash);
+  }
+  await wait(30);
+  flip('Normal', true);
+  // The identity that catches a strip wired to the wrong facet, or a count read
+  // from the wrong place: down and back up must land exactly where it started.
+  ok('checking it again restores the full corpus', /6,051/.test(cnt()), cnt());
+  ok('...and the tier facet is elided from the URL again', !/tier=/.test(w.location.hash),
+     w.location.hash || '(empty)');
+  ok('...and no pill is left dimmed',
+     pills().every(p => !p.classList.contains('off')));
+  await wait(30);
+
+  // #reset takes the other path through readHash -- a named hash that returns
+  // early -- so the default it lands on is not the one the boot took. Asserted
+  // because the fill above sits deliberately *before* that early return, and
+  // moving it after would leave reset showing five dimmed pills.
+  await go('#tier=Rare');
+  ok('a tier-naming hash leaves only its own pill on',
+     pills().filter(p => p.querySelector('input').checked).length === 1 &&
+     d.querySelector('#tiers input[value="Rare"]').checked,
+     pills().map(p => `${pval(p)}:${p.querySelector('input').checked}`).join(' '));
+  d.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  ok('#reset restores all four pills, checked and undimmed',
+     pills().every(p => p.querySelector('input').checked && !p.classList.contains('off')),
+     pills().map(p => `${pval(p)}:${p.querySelector('input').checked ? 'on' : 'off'}`).join(' '));
+  ok('#reset restores the default sort too',
+     d.getElementById('sort').value === 'tier', d.getElementById('sort').value);
+  await wait(30);
+
+  // Reversed, the same order runs the other way: rarest first, levels descend.
+  await go('');
+  d.getElementById('dir').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  {
+    const first = cards()[0];
+    ok('reversed, the first card is a Legendary',
+       first.className.indexOf('q-legendary') >= 0, first.className);
+    // Legendary is only 92 items, so reversing the order reaches into the next
+    // tier within the same page -- which is what makes this a real test of the
+    // per-run claim rather than the single-run case above.
+    ok('...and levels descend within each tier run', monotonic(false), runSummary());
+    ok('...and the reversed page reaches into the tier below',
+       tierRuns().length > 1, runSummary());
+  }
+  await wait(30);
+
+  // ------------------------------------------------------- set is not a tier
+  // The user's first change: a set is a membership, not a rarity, so it left the
+  // tier facet and became its own control pair in the toolbar -- a toggle for
+  // "in any set at all" and a select for one named set. What has to be asserted
+  // is that the two are independent (clearing the select must not silently
+  // unship the toggle, and picking a set must not require it) and that both
+  // reach the same 556 the old Set tier did.
+  await go('');
+  const sbtn = () => d.getElementById('onlyset');
+  const ssel = () => d.getElementById('setsel');
+  ok('the set controls sit in the toolbar, right of the count, left of Sort',
+     !!sbtn() && !!ssel() && sbtn().parentNode.id === 'bar' &&
+     sbtn().compareDocumentPosition(ssel()) === 4 &&     // FOLLOWING
+     ssel().compareDocumentPosition(d.querySelector('#bar label[for="sort"]')) === 4,
+     [].map.call(d.getElementById('bar').children, c => c.id || c.tagName).join(','));
+  ok('the toggle starts off and the select on "any set"',
+     !sbtn().classList.contains('on') && sbtn().getAttribute('aria-pressed') === 'false' &&
+     ssel().value === '',
+     `${sbtn().className} / ${ssel().value}`);
+  ok('the toggle carries the 556 set items',
+     /556/.test(sbtn().textContent), sbtn().textContent);
+
+  // The click, not the change: this is a button, and nothing else repaints it,
+  // so the handler updates it itself. Asserted synchronously -- the handler
+  // paints in place, and under jsdom's spurious empty-hash hashchange (see the
+  // header) anything waited on can be reset out from under the assertion.
+  sbtn().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  ok('clicking it narrows to the 556 set items', /^556 items/.test(cnt()), cnt());
+  ok('...and the button shows itself pressed',
+     sbtn().classList.contains('on') && sbtn().getAttribute('aria-pressed') === 'true',
+     sbtn().className);
+  ok('...and every card left is a set piece',
+     [].every.call(cards(), c => !!w.DB.items.find(o => o.id === c.getAttribute('data-id')).set),
+     `${cards().length} cards`);
+  ok('...and it rides in the URL as setonly=1', /(?:^|[#&])setonly=1/.test(w.location.hash),
+     w.location.hash);
+  // Independent of the tier facet: all four pills stay on, because "is it in a
+  // set" says nothing about which rarity it is.
+  ok('...and it does not disturb the tier pills',
+     pills().every(p => p.querySelector('input').checked),
+     pills().map(p => `${pval(p)}:${p.querySelector('input').checked}`).join(' '));
+
+  // The select, driven *without* the toggle, to pin that the two are separate
+  // state rather than one flag wearing two faces. Same track as the reset above
+  // leaves it: back to the whole corpus first.
+  sbtn().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  ok('clicking it again restores the corpus', /6,051/.test(cnt()), cnt());
+  ok('...and drops setonly from the URL', !/setonly/.test(w.location.hash), w.location.hash);
+  const zsel = ssel();
+  zsel.value = 'Zeraphi Alchemy';
+  zsel.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ok('the select narrows to one set on its own, toggle untouched',
+     /^9 items/.test(cnt()) && !sbtn().classList.contains('on'), cnt());
+  ok('...and the two spell themselves separately in the URL',
+     /(?:^|[#&])set=Zeraphi%20Alchemy/.test(w.location.hash) && !/setonly/.test(w.location.hash),
+     w.location.hash);
+  // Both at once is a narrowing, not a union: the select already picks a set, so
+  // the toggle holds and the result is the same 9 rather than more.
+  sbtn().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  ok('both together are the same 9 -- a narrowing, not a union',
+     /^9 items/.test(cnt()) && ssel().value === 'Zeraphi Alchemy' && sbtn().classList.contains('on'),
+     `${cnt()} / ${ssel().value}`);
+  // And a cold load of a hash naming both, which is the path a shared link takes.
+  const both = await deep('#set=Zeraphi%20Alchemy&setonly=1');
+  ok('a hash naming a set and the toggle lands with both set',
+     both.getElementById('setsel').value === 'Zeraphi Alchemy' &&
+     both.getElementById('onlyset').classList.contains('on') &&
+     /^9 items/.test(both.getElementById('count').textContent),
+     both.getElementById('count').textContent + ' / ' + both.getElementById('setsel').value);
+  // #reset restores them the way it restores everything else: readHash clears
+  // S before its early return, so both controls come back to their defaults.
+  d.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  ok('#reset clears both set controls and the 6,051 behind them',
+     ssel().value === '' && !sbtn().classList.contains('on') && /6,051/.test(cnt()),
+     `${ssel().value} / ${sbtn().className} / ${cnt()}`);
+  await go('');
+  await wait(30);
 
   // ------------------------------------------------------------ rail labels
   // The rail filter must use TL2's own stat names too. MAG/DEF are Torchlight
@@ -748,8 +1014,30 @@ async function go(hash) {
 
   // ---------------------------------------------------------------- icons
   await go('');
-  const noIcon = [].filter.call(d.querySelectorAll('#grid .art'), a => !a.querySelector('i')).length;
-  ok('every rendered card got a sprite icon', noIcon === 0, `${noIcon} placeholders`);
+  // Four items in the visible corpus have no icon at all, and it is a gap in
+  // the sources rather than in the page: glyph1/2/3 name glyph_purple,
+  // glyph_orange and glyph_blue in their DATs, and TIDBI's icon dump -- 1,053
+  // files, the only icon source there is -- holds none of them and no file
+  // whose name contains "glyph"; TomeOfRevelation's ICON field reads "loot",
+  // which names no file either. Nothing here can manufacture that art.
+  //
+  // All four are levelless Normal items, so they sort to the very front of the
+  // default tier-then-level order and all four land in the first 500. Under the
+  // old name sort not one of them reached it, which is why this went unseen.
+  // The assertion is therefore split: what must hold is that a card renders an
+  // icon whenever its item *has* one, and that the iconless set is exactly the
+  // four known ids -- so a fifth, or a regression, still fails.
+  const ICONLESS = ['TomeOfRevelation', 'glyph1', 'glyph2', 'glyph3'];
+  const iconlessData = new Set(w.DB.items.filter(o => !o.ic).map(o => o.id));
+  const rendered = [].slice.call(d.querySelectorAll('#grid .card'));
+  const blank = rendered.filter(c => !c.querySelector('.art i'))
+                        .map(c => c.getAttribute('data-id'));
+  const unexplained = blank.filter(id => !iconlessData.has(id));
+  ok('every rendered card whose item has an icon draws that icon',
+     unexplained.length === 0, `no icon for: ${unexplained.join(', ')}`);
+  ok('the items with no icon are exactly the four the sources cannot supply',
+     iconlessData.size === ICONLESS.length && ICONLESS.every(id => iconlessData.has(id)),
+     [...iconlessData].sort().join(', ') || '(none)');
   // The assertion above cannot see whether anything was *painted*. The sheet is
   // 4.46 MB, its base64 is 6.2 MB, and Chrome silently drops a custom property
   // holding a data URI over about 2 MB -- dropping the substitution, not the

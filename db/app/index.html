@@ -37,18 +37,21 @@
       <div id="bar">
         <button id="railbtn" title="Filters">&#9776;</button>
         <span class="count" id="count"></span>
+        <button id="onlyset" aria-pressed="false" title="Show only set items">Only sets</button>
+        <select id="setsel" title="Show one set"><option value="">any set</option></select>
         <span class="sp"></span>
         <label for="sort">Sort</label>
         <select id="sort">
+          <option value="tier">Tier</option>
           <option value="name">Name</option>
           <option value="level">Level</option>
           <option value="type">Type</option>
-          <option value="tier">Tier</option>
           <option value="damage">Damage</option>
           <option value="armor">Armor</option>
         </select>
         <button id="dir" title="Reverse order">&#8595;</button>
       </div>
+      <div id="tiers"></div>
       <div id="scroll"><div id="grid"></div><div id="more"></div></div>
     </div>
     <div id="detail"></div>
