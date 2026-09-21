@@ -745,22 +745,20 @@
   }
 
   // ---- requirements ----
-  // A socketable's MINLEVEL is read as a gate on the host item rather than on the
-  // player, and that phrasing does not survive being shortened, so it is emitted
-  // whole on its own line rather than bent to fit a chip it does not have. It is
-  // also why socketables show no spawn band below: it is the same field, and the
-  // card must not print one number twice under two labels.
-  function reqSocket(o) {
-    return n(o.ml) && o.t === 'Socketable'
-      ? 'Required Item Level to Socket: <b>' + n(o.ml) + '</b>' : '';
-  }
+  // One vocabulary for every item: a level requirement is a "Player Level" chip,
+  // whichever table it was read from. Socketables were the exception, printing a
+  // line of their own that read "Required Item Level to Socket" over MINLEVEL --
+  // but MINLEVEL is the drop band, not a gate, so the card stated a requirement
+  // the game does not have while hiding the one it does. The real requirement now
+  // arrives as `lr` like every other item's (src/build.py, read from the game's
+  // own ITEM_LEVEL_REQUIREMENTS_SOCKETABLE curve), and the special case is gone.
+  //
   // The chips make the either/or structural. Requirements are alternatives, not
   // a conjunction: the game grants equip once you meet the player level OR all
   // of the stats, whichever you reach first. A reader who takes it for an "and"
   // has been told something false about the item.
   function requirements(o) {
-    var req = o.rq || {}, rows = [], socket = reqSocket(o);
-    if (socket) rows.push('<p class="req">' + socket + '</p>');
+    var req = o.rq || {}, rows = [];
     var level = n(o.lr)
       ? '<span class="rchip">Player Level <b>' + n(o.lr) + '</b></span>' : '';
     var stats = ['str', 'dex', 'mag', 'def'].filter(function (k) { return req[k]; })
@@ -784,13 +782,17 @@
   // where the item comes from, not a gate on the reader -- and it sits below the
   // requirements so the two level numbers never read as one block.
   //
+  // Socketables were the one exception, and only because the same field was being
+  // printed above as their socketing gate: one number twice under two labels.
+  // With that line gone (see requirements) the band is the only thing MINLEVEL
+  // means on any card, so socketables show it like everything else.
+  //
   // The numbers print as the data has them, sentinels included: 999 says "no
   // ceiling" to anyone who has played the game, and rewriting it was
   // editorialising a field the reader can see for themselves. 999 is only one of
   // them -- 999999 and 9999999 both appear -- and a MINLEVEL of 777 marks
   // monster-only gear, which never drops for a player.
   function lvlRange(o) {
-    if (o.t === 'Socketable') return '';
     var lo = n(o.ml), hi = n(o.xl), bits = [];
     if (lo) bits.push('<span class="k">Min Level</span> <b>' + lo + '</b>');
     if (hi) bits.push('<span class="k">Max Level</span> <b>' + hi + '</b>');

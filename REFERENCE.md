@@ -1154,6 +1154,9 @@ Three things the derivation does not settle, all reported rather than guessed:
   `Armor / Trinket or Weapon`. The wiki leaves the Lucky Coin's weapon cell
   blank; the affix's own list says both, so the file wins. That is a **fourth
   known wiki divergence**, alongside the three in the rare-gems table below.
+  A **fifth** is the nine skull rows in its `Required Level` column that break
+  the `level - 8` rule its own other 43 skull rows keep — see the socketable
+  requirement section below, which has the game's own curve as the tiebreak.
 
 `src\slots.py` is the derivation. The build prints its tally and **names** the
 `split` and `conflict` rows, so the seven above can be rechecked against the wiki
@@ -1432,16 +1435,50 @@ and all stay in `items.json` (none was ever a CSV column — that export carries
   `lv` on 64 of the 2,245 records carrying one, and is 1 on 258 where `lr` is
   the real requirement, so a "Min level" row said nothing a player could use.
 
-`MINLEVEL` keeps its row on **socketables**, where it is a different field
-entirely and is labelled **Required Item Level to Socket** — the item level a
-gem needs before it can go into a socket. The evidence is a clean ladder: the
-seven ranks of every gem family carry exactly **1, 14, 28, 42, 56, 70, 84** (a
-step of 14) against their own levels of 8, 22, 36, 50, 64, 78, 92 — a fixed 8
-higher — and all eight ember families agree on all seven numbers. Nothing else
-in a gem's record explains a second level field, and the only level-shaped
-requirement a gem has is the item it goes into. The `*_BASE` templates carry
-`998`, a sentinel rather than a requirement. The reading is the user's and it is
-an inference from that ladder, not a figure the game states on the gem.
+`MINLEVEL` keeps its row on **socketables**, and there it is **the drop band,
+like everywhere else** — `ml`–`xl`, stated in plain text below the requirements.
+What a socketable *requires* is a **character level**, and it is `lr`, the same
+field every other item's requirement arrives in. The `*_BASE` templates carry
+`998`, a sentinel rather than a band.
+
+That requirement has no home in either table: **no socketable DAT carries
+`LEVEL_REQUIRED`**, and TIDBI's export has it for none of them. It is read from
+the game's own curve instead:
+
+    MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT
+
+105 points, and **every one is `max(1, level - 8)`** — levels 1–9 map to 1, then
+10 → 2 and one per level up to 105 → 97. `build.py` reads it through the same
+`graph_points()` the damage and armor curves use (`GRAPH_SOCKET_LEVEL`). The
+file's siblings are `ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_REQUIREMENTS`, whose
+curves are what an item's own `*_REQUIRED` fields derive from, and that is what
+fixes the quantity as a gate on the character rather than on the host item.
+
+**An earlier reading of this section was wrong, and it shipped.** `MINLEVEL` on a
+socketable was read as "the item level a gem needs before it can go into a
+socket" and printed on the card under that label. The ladder that seemed to prove
+it — every gem family's seven ranks carrying exactly 1, 14, 28, 42, 56, 70, 84
+against their own levels of 8, 22, 36, 50, 64, 78, 92 — is real, but `MINLEVEL`
+tracks `LEVEL - 8` because that is the band's floor, not because it gates
+anything. The card stated a requirement the game does not have while hiding the
+one it does; the `lv` 15 Eye of King Pogg printed "Required Item Level to
+Socket: 1" (its placeholder `MINLEVEL`) where the game's answer is 7.
+
+**The wiki agrees and is the cross-check, not the source.** Its `Gems (T2)`
+`Required Level` column is the same rule applied by hand: all 26 eyes, every
+normal gem, and **43 of its 52 skull rows**. The nine skull rows that break it
+(Tibbeek 81→40, Yololo 96→50, …) are bad cells rather than a second curve, and
+the proof is that **four rows inside the same block follow the rule** — Vastok
+85→77, Whorlbarb 88→80, X'n!troph 91→83, Zardon's Mighty 99→91. A rule change
+sweeping in by level band cannot alternate like that; a botched column copy can.
+Skull of Whorlbarb carries the wiki's own doubt in the cell, `80 (45?)`, where 80
+is the rule and 45 is nothing.
+
+Three socketables have no requirement because they have **no `LEVEL` at all** —
+the fishing rewards Devil Fish, Unicorn Fish and Fish Bones (`MINLEVEL` 2,
+`MAXLEVEL` 9999999, `RARITY` 0). No curve entry exists to read, TIDBI's `iLEVEL`
+is empty for all three, and the wiki lists none of them, so `lr` is left unset
+rather than guessed.
 
 Damage and armor render as ranges. Weapons also show **Damage per Second** and
 the attack speed in the game's wording (`Very Fast Attack Speed (0.72 seconds)`).
@@ -1644,7 +1681,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 182
+`verify\check_page.js` goes further and drives the built page in a real DOM — 189
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance

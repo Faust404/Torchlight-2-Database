@@ -412,8 +412,6 @@ button,input,select{font:inherit; color:inherit}
    --head against a --body label -- applied to the affix block. */
 .aff{margin:0; padding:1px 0; color:var(--magic); font-family:var(--doc)}
 .aff .n{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}
-.req{margin:0; padding:1px 0; color:var(--dim)}
-.req b{color:var(--val); font-weight:400; font-variant-numeric:tabular-nums}
 .sep{color:var(--faint)}
 .flav{margin:10px 0 0; color:#8d8579; font-style:italic; font-size:12px}
 

@@ -389,23 +389,51 @@ async function go(hash) {
      /^Weapon Range 9$/.test(frng) &&
      !/range/i.test(thr.querySelector('#detail .dtype').textContent), frng);
 
-  // The other half of MINLEVEL, which the Aenigma assertion above turns off.
-  // On a socketable it is a real gate and a clean one: the seven ranks of every
-  // gem family carry exactly 1, 14, 28, 42, 56, 70, 84 -- a step of 14 -- while
-  // the gems' own levels run 8, 22, 36 ... a fixed 8 higher, and the eight ember
-  // families agree on all seven numbers. Nothing else in a gem's record explains
-  // a second level field, and the only level-shaped requirement a gem has is the
-  // item it goes into. Blood Ember Shard is rank 3, so 28 against its own 36.
+  // A socketable's requirement, settled from the game files. Two candidates
+  // looked like it and neither was it: MINLEVEL is the drop band (the Aenigma
+  // assertion above), and TIDBI holds no LEVEL_REQUIRED for any socketable. The
+  // real source is the game's own curve, MEDIA/GRAPHS/STATS/
+  // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT -- 105 points, every one of them
+  // max(1, level - 8) -- which build.py reads into the same `lr` field every
+  // other item's requirement arrives in. Blood Ember Shard is rank 3: level 36
+  // gives 28. The old card printed MINLEVEL here instead, under the label
+  // "Required Item Level to Socket", which stated a requirement the game does
+  // not have over a field that means something else entirely.
   const gem = await deep('#item=tl2_bloodember_rank3');
   const gemt = gem.getElementById('detail').textContent;
-  // The card prints it whole, with the colon, because "Required Item Level to
-  // Socket" is a sentence rather than a label and does not shorten into one.
-  // It is also why a socketable shows no spawn band below: ml is the same field,
-  // and the card must not print one number twice under two labels.
-  const gemc = gem.querySelector('#detail .corner').textContent;
-  ok('a socketable shows MINLEVEL as the item level needed to socket it',
-     /Required Item Level to Socket:\s*28/.test(gemt) &&
-     /Level 36/.test(gemc) && !/Min Level/.test(gemt), gemt.slice(0, 240));
+  ok('a socketable states the player level the game curve gives it',
+     /Player Level\s*28(?!\d)/.test(gemt) &&
+     !/Required Item Level to Socket/.test(gemt), gemt.slice(0, 240));
+
+  // ...and shows its spawn band like every other item. It was suppressed here
+  // only because the same field was being printed above as the socketing gate;
+  // with that line gone, the band is the only thing MINLEVEL means on a card.
+  ok('...and shows its spawn band like any other item',
+     /Min Level\s*28(?!\d)/.test(gemt) && /Max Level\s*46(?!\d)/.test(gemt) &&
+     /Level\s*36(?!\d)/.test(gemt), gemt.slice(0, 240));
+
+  // The case that prompted the change. Every eye carries the placeholder
+  // MINLEVEL 1, so the card used to read "Required Item Level to Socket: 1";
+  // the game's curve gives level 15 -> 7, which is the number the wiki's column
+  // shows for it too.
+  const pogg = await deep('#item=tl2_eyeofkingpogg');
+  const poggt = pogg.getElementById('detail').textContent;
+  ok('an eye states its real requirement, not MINLEVEL\'s placeholder 1',
+     /Player Level\s*7(?!\d)/.test(poggt) &&
+     !/Player Level\s*1(?!\d)/.test(poggt) &&
+     !/Required Item Level to Socket/.test(poggt), poggt.slice(0, 240));
+
+  // A skull is where the curve and the wiki part company. The wiki's Gems (T2)
+  // "Required Level" column follows the same rule on 43 of its 52 skull rows --
+  // Vastok, Whorlbarb, X'n!troph and Zardon's Mighty among them, interleaved
+  // with the nine that do not -- and that interleaving is what marks those nine
+  // as bad cells rather than a different curve above level 80. Tibbeek is level
+  // 81, so the curve gives 73 where the wiki's own cell reads 40.
+  const tib = await deep('#item=tl2_skull040');
+  const tibt = tib.getElementById('detail').textContent;
+  ok('a skull takes the game curve, not the wiki\'s bad cell',
+     /Player Level\s*73(?!\d)/.test(tibt) && !/Player Level\s*40(?!\d)/.test(tibt),
+     tibt.slice(0, 240));
 
   // ----------------------------------------------------------- the ember pool
   // The four rare ember families are the only socketables whose two bonuses are

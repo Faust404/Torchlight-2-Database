@@ -485,6 +485,16 @@ GRAPH_WEAPON_DAMAGE = 'MEDIA/GRAPHS/STATS/BASE_WEAPON_DAMAGE.DAT'
 # armor with; it is the only one in the PAK (the other *_BYLEVEL graphs are the
 # monsters'), and its own NAME field calls it Armor_Player_byLevel_forSet.
 GRAPH_ARMOR = 'MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT'
+# The character level a socketable of a given item level requires. No socketable
+# DAT carries LEVEL_REQUIRED and TIDBI has it for none of them, so the field the
+# rest of the corpus reads from the tables is read from the game's own curve
+# here. All 105 of its points are max(1, level - 8) -- 1-9 map to 1, then 10 to
+# 2 and one per level up to 105 -> 97 -- which is why the wiki's Gems (T2)
+# "Required Level" column, hand-computed from the same rule, agrees with it.
+# The quantity is a *character* level gate, not a gate on the host item: the
+# file's siblings are ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_REQUIREMENTS, and
+# those curves are what an item's own *_REQUIRED fields are read from.
+GRAPH_SOCKET_LEVEL = 'MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT'
 _graphs = {}
 
 
@@ -517,6 +527,10 @@ def weapon_damage_curve():
 
 def armor_curve():
     return graph_points(GRAPH_ARMOR)
+
+
+def socket_level_curve():
+    return graph_points(GRAPH_SOCKET_LEVEL)
 
 
 def derived_range(rec, curve):
@@ -1291,6 +1305,12 @@ def build():
         # DAT's LEVEL in all 5,945 cases where both exist, so lv/ml need no
         # such treatment.)
         lr = _num(t.get('LEVEL_REQUIRED')) or _num(rec.get('LEVEL_REQUIRED'))
+        if not lr and typ == 'Socketable':
+            # Neither table holds this for a socketable, so it comes from the
+            # game's own curve (see GRAPH_SOCKET_LEVEL). A level the curve does
+            # not reach leaves lr unset rather than guessing, the same as every
+            # other optional derivation here.
+            lr = socket_level_curve().get(_num(rec.get('LEVEL')))
         if lr:
             o['lr'] = fmt(lr)
         rq = {}
@@ -1662,6 +1682,16 @@ def build():
              if s['b'][-1][0] > s['cap']}
     assert len(_over) == 1 and 'U_GRAND_ARCHITECT' in _over, \
         'sets whose top rung exceeds their worn capacity drifted: %r' % _over
+    # Every socketable that has a level has a requirement (see
+    # GRAPH_SOCKET_LEVEL). Asserted rather than tallied because an unreadable
+    # curve fails *quietly* -- graph_points() returns {} rather than raising, so
+    # 167 cards would just stop showing a requirement with nothing in the log to
+    # say why. The three fishing rewards carry no LEVEL at all and so have none
+    # to read: they are excluded by the `lv` test, not named as exceptions.
+    _nolr = sorted(o['id'] for o in out
+                   if o['t'] == 'Socketable' and 'lv' in o and 'lr' not in o)
+    assert not _nolr, 'socketables lost the requirement curve: %d without lr, e.g. %s' \
+        % (len(_nolr), _nolr[:5])
 
     out.sort(key=lambda o: (o['n'].lower(), o['id']))
     print('  %d base templates excluded (nameless or base_*)' % len(templates))
