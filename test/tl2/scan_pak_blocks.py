@@ -15,12 +15,17 @@ on a sample.
 
 Usage: python scan_pak_blocks.py [--dump blocks.tsv] [--verify N]
 """
-import io, mmap, random, struct, sys, zlib
+import io, os, mmap, random, struct, sys, zlib
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# Anchored to this file rather than to the caller's directory: these were
+# written to be run from the folder they lived in, and that folder has moved.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src'))
+import paths
 
-PAK = (r'E:\Games\Steam\steamapps\common\Torchlight II'
-       r'\PAKS\DATA.PAK')
+
+PAK = paths.PAK
 
 f = open(PAK, 'rb')
 mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)

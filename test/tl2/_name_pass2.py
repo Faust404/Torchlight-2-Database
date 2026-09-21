@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 """Throwaway pass 2: wider vocabulary, including the names the modding docs
 list, plus *_SOUND / *_ANIM_MULT style variants."""
-import io, sys, itertools
+import os, io, sys, itertools
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, '.')
+# Anchored to this file rather than to the caller's directory: these were
+# written to be run from the folder they lived in, and that folder has moved.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src'))
+import paths
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src', 'tl2'))   # dat_hash lives in src/tl2 now
 from dat_hash import dek
 
 UNK = {

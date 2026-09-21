@@ -24,3 +24,7 @@ test/alfgeir/*
 !test/alfgeir/EN.json
 test/tidbi/base.mdb
 test/tidbi/TIDBI.exe
+# The original TIDBI distribution folder. Its two files are copied to test/tidbi/
+# above and untracked; this folder is a leftover because TIDBI.exe still holds a
+# handle on them. Close TIDBI and delete the folder, then delete this rule.
+test/tidbi/TIDBI_original/

@@ -6,12 +6,17 @@ assumption holds, and the bytes at the break say what the real field is.
 
 Usage: python diag_man.py [start] [tail]
 """
-import io, struct, sys
+import io, os, struct, sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# Anchored to this file rather than to the caller's directory: these were
+# written to be run from the folder they lived in, and that folder has moved.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src'))
+import paths
 
-MAN = (r'E:\Games\Steam\steamapps\common\Torchlight II'
-       r'\PAKS\DATA.PAK.MAN')
+
+MAN = paths.MAN
 data = open(MAN, 'rb').read()
 N = len(data)
 

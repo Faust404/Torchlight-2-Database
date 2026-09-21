@@ -1,11 +1,11 @@
 """Build the item-card mockups.
 
-Standalone: this does not touch db/app/**, does not run the pipeline, and does
-not write db/out/**. It reads the pipeline's *output* (items.json, sets.json)
-and the icon sheet, crops the handful of icons the mockups show into a small
-strip, and injects the whole lot into mock.tpl.html.
+Standalone: this does not touch web/**, does not run the pipeline, and does not
+write out/**. It reads the pipeline's *output* (items.json, sets.json) and the
+icon sheet, crops the handful of icons the mockups show into a small strip, and
+injects the whole lot into mock.tpl.html.
 
-    python card_mockups/build_mockups.py
+    python test/card_mockups/build_mockups.py
 
 Writes three pages, each self-contained apart from its base64 sprite -- no local
 file references, so they open off file:// and publish as-is:
@@ -21,9 +21,16 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Two levels up to the repo root, then into the production tree: the mockups sit
-# in test/ but read what db/ writes.
-OUT = os.path.normpath(os.path.join(HERE, '..', '..', 'db', 'out'))
+# Two levels up to the repo root, then into src/ for the one module that knows
+# where everything is. This used to be an ancestor walk -- normpath(join(HERE,
+# '..', '..', 'db', 'out')) -- which could not fail: after the tree moved it
+# would have gone on resolving, against a db/out/ that was either stale or gone,
+# and written mockups from a build nobody had run. Importing paths instead means
+# a wrong walk raises here, at import, before anything is read.
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'src'))
+import paths
+
+OUT = paths.OUT
 
 # The five element marks the game draws beside an elemental stat, taken from
 # MEDIA/UI/HUD/INGAMETEXTURESHEETS4.PNG at x=996, 27x29 each, in this order:

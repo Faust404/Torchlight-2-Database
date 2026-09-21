@@ -7,18 +7,24 @@ For an AFFIXES record at index i the bytes are
 
 so the question is what u[i-1] is, and whether u[i-1] tracks N.
 """
-import struct, io, sys, zlib, mmap, collections
+import os, struct, io, sys, zlib, mmap, collections
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, '.')
+# Anchored to this file rather than to the caller's directory: these were
+# written to be run from the folder they lived in, and that folder has moved.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src'))
+import paths
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'src', 'tl2'))   # dat_hash lives in src/tl2 now
 from dat_hash import dek
 
-TL2 = r'E:\Games\Steam\steamapps\common\Torchlight II'
 idx = {}
-with open('../tl2/index.tsv', encoding='utf-8') as fh:
+with open(paths.TL2_INDEX, encoding='utf-8') as fh:
     next(fh)
     for line in fh:
         o, u, p = line.rstrip('\n').split('\t'); idx[p] = (int(o), int(u))
-pf = open(TL2 + r'\PAKS\DATA.PAK', 'rb'); pak = mmap.mmap(pf.fileno(), 0, access=mmap.ACCESS_READ)
+pf = open(paths.PAK, 'rb'); pak = mmap.mmap(pf.fileno(), 0, access=mmap.ACCESS_READ)
 
 def read(p):
     off, unc = idx[p]; u, c = struct.unpack_from('<II', pak, off)
