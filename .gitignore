@@ -9,10 +9,6 @@ node_modules/
 # tracked because the build cannot run without them; this is regenerated.
 out/
 
-# Pre-migration output path. Nothing writes here any more; this rule goes when
-# the directory does.
-db/out/
-
 # A scrape of grimtools.com kept for reference while designing the rail and the
 # card. Not ours, and not something this repo should republish.
 test/grimtools_ui_reference/
