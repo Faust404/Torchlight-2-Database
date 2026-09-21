@@ -48,8 +48,6 @@ affix 2, since a heading marks where its affix begins). That guess is checked
 against the affix names before it is used -- see _splittable and _corroborates
 -- and the row is marked 'split' whether or not the check passed.
 """
-import collections
-import json
 import os
 import re
 import sys
@@ -273,34 +271,3 @@ def _splittable(blocks, slots, names):
         return False
     return (_corroborates(names[0], lines[:1])
             and _corroborates(names[1], lines[1:]))
-
-
-def _main(argv):
-    """Re-derive every prefixed item in an items.json and report the tally.
-
-    The build prints the same counts; this reads them back off the output, so it
-    answers "did the derivation actually run" rather than "did it run without
-    raising". Reported, not asserted -- a status is a fact about the sources,
-    not a failure.
-    """
-    src = argv[0] if argv else os.path.join(paths.OUT, 'items.json')
-    with open(src, encoding='utf-8') as fh:
-        items = json.load(fh)
-    hits = [o for o in items if any(HEAD.match(l) for l in o.get('fx') or ())]
-    tally = collections.Counter()
-    where = {}
-    for o in hits:
-        st = status(o['p'], o['fx'])
-        tally[st] += 1
-        where.setdefault(st, []).append(o['id'])
-    print('%s: %d items, %d with a slot prefix' % (src, len(items), len(hits)))
-    for st, k in sorted(tally.items()):
-        # ids, not names: two different items are both called "Rift Ember"
-        print('  %-9s %3d  %s' % (st, k, ', '.join(sorted(where[st]))))
-    bad = [o['id'] for o in items if 'fxs' in o and len(o['fx']) != len(o['fxs'])]
-    print('  fx/fxs length mismatches: %d' % len(bad))
-    return 1 if bad else 0
-
-
-if __name__ == '__main__':
-    sys.exit(_main(sys.argv[1:]))

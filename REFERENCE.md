@@ -1155,11 +1155,12 @@ Three things the derivation does not settle, all reported rather than guessed:
   blank; the affix's own list says both, so the file wins. That is a **fourth
   known wiki divergence**, alongside the three in the rare-gems table below.
 
-`src\slots.py` is the derivation, and it reports its own tally
-(`python src\slots.py`) so the numbers above can be read back off the output. The
-split ships as `fx` (the lines, prefix stripped) and `fxs` (the slot beside each
-one), and the build asserts the two never drift apart. The strip happens at the
-JSON write and **not** where the lines are collected, and that placement is
+`src\slots.py` is the derivation. The build prints its tally and **names** the
+`split` and `conflict` rows, so the seven above can be rechecked against the wiki
+on any build — by id, because two different items are both called "Rift Ember".
+The split ships as `fx` (the lines, prefix stripped) and `fxs` (the slot beside
+each one), and the build asserts the two never drift apart. The strip happens at
+the JSON write and **not** where the lines are collected, and that placement is
 load-bearing: `FLAT_DAMAGE` is anchored `^+N <type> Damage$`, so the prefix is
 what keeps a socketable's flat damage out of the weapon's dps.
 

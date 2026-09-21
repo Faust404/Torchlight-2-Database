@@ -1235,7 +1235,7 @@ def build():
     # obtainable or ever shown in game; they exist to be inherited *from*. They
     # stay in the icon-donor pool above but are not items.
     out, skipped_stat, templates, dropped = [], 0, [], []
-    slot_status = collections.Counter()
+    slot_status = collections.defaultdict(list)
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
@@ -1474,7 +1474,7 @@ def build():
                 pairs = slots.attribute(rec['_path'], affixes)
                 o['fx'] = [ln for _, ln in pairs]
                 o['fxs'] = [sl for sl, _ in pairs]
-                slot_status[slots.status(rec['_path'], affixes)] += 1
+                slot_status[slots.status(rec['_path'], affixes)].append(o['id'])
             else:
                 o['fx'] = affixes
         if augs:
@@ -1644,10 +1644,15 @@ def build():
     assert not _bad, 'fx and fxs drifted apart: %s' % _bad[:3]
     # Which source settled each row is a fact about TIDBI, not a failure, so it
     # is reported rather than asserted. 'split' and 'conflict' are the rows where
-    # the files overruled it; python src/slots.py names them.
+    # the files overruled it, and they are named so the seven can be checked
+    # against the wiki by hand -- by id, because two different items are both
+    # called "Rift Ember".
     print('  SLOT: %d items split by slot (%s)'
-          % (len(_slotted), ', '.join('%s %d' % (k, n)
-                                      for k, n in sorted(slot_status.items()))))
+          % (len(_slotted), ', '.join('%s %d' % (k, len(v)) for k, v
+                                      in sorted(slot_status.items()))))
+    for _st in ('split', 'conflict'):
+        if slot_status[_st]:
+            print('        %s: %s' % (_st, ', '.join(sorted(slot_status[_st]))))
     # And the other reading of the same question: `_short` counts the corpus, this
     # counts what a character can wear. The site dims a rung on _over, not on
     # _short, because a set may ship one record of a piece that fills two slots.
