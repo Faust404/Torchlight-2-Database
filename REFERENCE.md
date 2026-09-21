@@ -555,9 +555,11 @@ That divider is the boundary, and it is a reliable one: it appears on exactly
 the 74 items that carry an `Augmented Weapon:` header and on no other item in
 the corpus. `split_effects()` in `build.py` cuts there and emits `aug`
 (`[{task, fx}]`) separately from `fx`, and the detail view renders the unlockable
-group **before** the affixes — the order the game's own tooltip uses — with the
-task as a chip, an explicit *"locked until the task above is complete"* divider,
-and the stats set apart so they cannot be read as already active.
+group **last** of the stat blocks — after the affixes and the ember pool, the
+opposite of the order the game's own tooltip uses, so a reader meets the numbers
+the item has before the ones it could grow into — with the task as a chip, an
+explicit *"locked until the task above is complete"* divider, and the stats set
+apart so they cannot be read as already active.
 
 Three things this took getting right, all of them measured:
 
@@ -917,10 +919,14 @@ Speck, Chip, Shard, Ember, Large, Huge, Giant) — but a socketed gem is an item
 its own right and none of the three sources here folds one into a weapon's damage
 lines. They ship here too (178 of them), under their own names.
 
+Their other two-part fact — which bonus applies in armor and which in a weapon —
+is derived from the files and has a section of its own below.
+
 ```
 src\
   build.py         the pipeline
   ember_values.py  the 42 ember values the files cannot supply, with their source
+  slots.py         a socketable's slot split, read from its AFFIXES order
   paths.py         every path in the repo, anchored to this file
   tl2\             the PAK reader: dat_decode, dat_hash, parse_man, extract
 web\               the browser's source: index.html, app.css, app.js, fonts\
@@ -1091,6 +1097,71 @@ own `UNITTYPE` for it reads `NORMAL AXE`, so the bare-type rule reads its raw `9
 as a one-hander's and makes it 0.72 s. Two rules, two answers, one item: it is
 left out of the db and the site rather than given a guess, and `build()` asserts
 the drop happened.
+
+### Every socketable's slot split, and the seven rows TIDBI files wrong
+
+A socketable grants one thing in armor or a trinket and a different thing in a
+weapon, and the card shows the two as labelled groups. Until 2026-09-21 that
+split came from TIDBI's tooltip text alone, which carries it as a literal
+`Weapon:` / `Armor/Trinket:` prefix **inside** the line — so the card printed the
+game's own slot label as though it were part of the effect, and the grid cards'
+`Effect` teaser read `Effect Weapon: +8% to Electric Damage`.
+
+The files have the same split as structure, and the derivation is the ember
+pool's: the item's **ordered `AFFIXES` list** (walked down `BASEFILE` by hand,
+because `scalar_fields` skips list fields), each affix naming its own slots in
+its `0xED6CBF91` applicability list — `ARMOR` → the Armor/Trinket column,
+`WEAPON` → the weapon column, **both** → either slot — and the list order is the
+order the tooltip prints in, so affix *i*'s slots belong to the *i*-th block of
+TIDBI's text.
+
+Of the 143 rows, **129 agree with TIDBI outright, 7 fall back to it, and 7
+contradict it** — and on all seven the wiki's `Gems (T2)` table has the same
+column as the files, so two independent sources contradict the export:
+
+| item | TIDBI's prefix | files and wiki | kind |
+|---|---|---|---|
+| Skull of Quato | `Weapon:` over the freeze line *and* four armor lines | four `+64 <element> Armor` → Armor/Trinket; freeze → Weapon | lost heading |
+| Grapilio Skull | `Weapon: +6% to Physical Armor` | → Armor/Trinket | lost heading |
+| Rift Ember (reward) | `Weapon: 10 Mana stolen on hit`, charge rate unlabelled | charge rate → Armor/Trinket | lost heading |
+| Rift Ember (acquired) | `Weapon:` on both lines | both affixes are `*_ARMOR_*` → Armor/Trinket | wrong heading |
+| The Eye of Gallo | `Weapon: +10% Potion effectiveness` | → Armor/Trinket | wrong heading |
+| The Eye of King Pogg | `Weapon: +1% Dodge chance` | → Armor/Trinket | wrong heading |
+| The Eye of Mordrox | `Weapon: Poison Damage Taken is reduced by -6%` | → Armor/Trinket | wrong heading |
+
+A **lost** heading is a merge: TIDBI puts two affixes in one block, so the second
+affix's lines silently join the block above and are filed under the first's slot.
+The boundary inside a merged block is the one thing here that is *inferred*
+rather than read — a heading marks where affix 1 begins, so its first line is
+affix 1's and the rest are affix 2's — and it is checked against the affix names
+(`UNIQUE_OFRESISTANCE5`, `UNIQUE_ARMOR_PERCENT_BONUS3`,
+`UNIQUE_TL2_CHARGERATEBONUS`) before it is used. A **wrong** heading needs no
+inference: the three eyes print `Weapon:` for an affix whose file name literally
+reads `CHAOSEMBER_ARMOR_*`. Note also that the wiki confirms the *second* line of
+each eye, not just the first, so the whole two-way split is corroborated rather
+than the one correction being made.
+
+Three things the derivation does not settle, all reported rather than guessed:
+
+- **The Ice Embers fall back to TIDBI.** `GEM_SAPPHIRE` and `GEM_SAPPHIRE_ARMOR`
+  carry no `0xED6CBF91` list at all. Their TIDBI headings are complete and
+  correct, so they are used as they stand and the row is marked `text`.
+- **Every socketable is derived, not just the labelled ones.** Lucky Coin and
+  Lucky Die rank 1 have no prefix on their single line; scoping by prefix would
+  have left those two as the only members of their families with no slot label.
+- **15 rows name an affix that lists both slots** — the six Lucky Coins, the six
+  Lucky Dice and the three fish scales. Those lines are shown once, under
+  `Armor / Trinket or Weapon`. The wiki leaves the Lucky Coin's weapon cell
+  blank; the affix's own list says both, so the file wins. That is a **fourth
+  known wiki divergence**, alongside the three in the rare-gems table below.
+
+`src\slots.py` is the derivation, and it reports its own tally
+(`python src\slots.py`) so the numbers above can be read back off the output. The
+split ships as `fx` (the lines, prefix stripped) and `fxs` (the slot beside each
+one), and the build asserts the two never drift apart. The strip happens at the
+JSON write and **not** where the lines are collected, and that placement is
+load-bearing: `FLAT_DAMAGE` is anchored `^+N <type> Damage$`, so the prefix is
+what keeps a socketable's flat damage out of the weapon's dps.
 
 ### Rare embers: a two-roll pool no item declares
 

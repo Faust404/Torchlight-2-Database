@@ -35,6 +35,10 @@ import dat_decode as DD
 # source reads: the affix files hold a single fixed float and the game scales it
 # by a per-stat curve that is not in the PAK's readable section. See its header.
 import ember_values
+# Which slot a socketable's lines belong to, read from the item's AFFIXES order
+# and each affix's own 0xED6CBF91 list. TIDBI carries the same split as text
+# prefixes and loses a heading on 7 items; see the module docstring.
+import slots
 from PIL import Image
 
 BS = chr(92)
@@ -1231,6 +1235,7 @@ def build():
     # obtainable or ever shown in game; they exist to be inherited *from*. They
     # stay in the icon-donor pool above but are not items.
     out, skipped_stat, templates, dropped = [], 0, [], []
+    slot_status = collections.Counter()
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
@@ -1445,8 +1450,33 @@ def build():
             o['ut'] = rec['UNITTYPE']
         # Effect text, already split above. For the 74 augmented weapons this is
         # two groups, not one flat list -- see split_effects().
+        #
+        # 143 items carry the slot a line belongs to as a `Weapon:` /
+        # `Armor/Trinket:` prefix in the text rather than as structure. That
+        # prefix is the game's own label, and the card was printing it as if it
+        # were part of the effect, so it is stripped here and the slot written
+        # beside the line as `fxs` instead. The answer comes from the item's
+        # AFFIXES order, with TIDBI's prefixes as the fallback -- see slots.py.
+        #
+        # The strip is HERE, not where `affixes` is built, and that placement is
+        # load-bearing: FLAT_DAMAGE is anchored `^+N <type> Damage$`, so the
+        # prefix is what keeps a socketable's flat damage out of the weapon's
+        # dps. flat_damage() ran on the prefixed strings back at `flat =` above.
+        #
+        # Every socketable is derived, not just the ones TIDBI prefixed. Two of
+        # them -- Lucky Coin and Lucky Die rank 1 -- have no prefix on their
+        # single line, and scoping by prefix alone would leave those two as the
+        # only members of their families with no slot label. Outside the
+        # socketables this fires exactly once, on a quest item.
         if affixes:
-            o['fx'] = affixes
+            if o.get('t') == 'Socketable' or any(slots.HEAD.match(ln)
+                                                 for ln in affixes):
+                pairs = slots.attribute(rec['_path'], affixes)
+                o['fx'] = [ln for _, ln in pairs]
+                o['fxs'] = [sl for sl, _ in pairs]
+                slot_status[slots.status(rec['_path'], affixes)] += 1
+            else:
+                o['fx'] = affixes
         if augs:
             o['aug'] = augs
         # The 28 rare ember ranks -- 4 families x 7 -- get their two option
@@ -1604,6 +1634,20 @@ def build():
     _commas += [t for s in sets.values() for _, ts in s['b'] for t in ts
                 if DECIMAL_COMMA.search(t)]
     assert not _commas, 'comma decimals reached the output: %s' % _commas[:3]
+    # `fx` and `fxs` are parallel lists -- the effect lines and the slot each
+    # belongs to -- so a drift between them would move a line into the wrong
+    # group on the card rather than fail. Checked corpus-wide for the same
+    # reason the commas are: the invariant is a property of the output, not of
+    # any one item, and nothing downstream would notice it breaking.
+    _slotted = [o for o in out if 'fxs' in o]
+    _bad = [o['id'] for o in _slotted if len(o['fx']) != len(o['fxs'])]
+    assert not _bad, 'fx and fxs drifted apart: %s' % _bad[:3]
+    # Which source settled each row is a fact about TIDBI, not a failure, so it
+    # is reported rather than asserted. 'split' and 'conflict' are the rows where
+    # the files overruled it; python src/slots.py names them.
+    print('  SLOT: %d items split by slot (%s)'
+          % (len(_slotted), ', '.join('%s %d' % (k, n)
+                                      for k, n in sorted(slot_status.items()))))
     # And the other reading of the same question: `_short` counts the corpus, this
     # counts what a character can wear. The site dims a rung on _over, not on
     # _short, because a set may ship one record of a piece that fills two slots.

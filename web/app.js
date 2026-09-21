@@ -658,10 +658,36 @@
     return out + esc(s.slice(last));
   }
 
+  // A socketable's effect lines are its two slots, and the slot is data now
+  // (`fxs`), not text. TIDBI carried it as a `Weapon:` / `Armor/Trinket:`
+  // prefix inside the line itself, which meant the card printed the game's own
+  // label as if it were part of the effect -- and where the export lost a
+  // heading, the lines after it joined the block above and were filed under the
+  // wrong slot. build.py resolves the slot from the item's AFFIXES order and
+  // strips the prefix, so this groups and labels rather than parsing.
+  //
+  // `b` is a real third case, not a fallback: an affix whose own list names both
+  // slots, so the line belongs in either. It is shown once, first, because it is
+  // the whole-item grant. Armor/Trinket before Weapon is poolHTML's order, so a
+  // fixed ember and a rolled one read the same way round.
+  var SLOT_LABEL = { a: 'Armor / Trinket', w: 'Weapon',
+                     b: 'Armor / Trinket or Weapon' };
+  var SLOT_ORDER = ['b', 'a', 'w'];
+
   function affLines(o) {
-    return (o.fx || []).map(function (f) {
-      return '<p class="aff">' + mark(f) + '</p>';
-    }).join('');
+    function aff(f) { return '<p class="aff">' + mark(f) + '</p>'; }
+    if (!o.fxs) return (o.fx || []).map(aff).join('');
+    var order = SLOT_ORDER.slice(), out = '';
+    // Any code the build has not taught this list about still renders, under
+    // its own name, rather than dropping the line off the card.
+    o.fxs.forEach(function (sl) { if (order.indexOf(sl) < 0) order.push(sl); });
+    order.forEach(function (sl) {
+      var lines = o.fx.filter(function (_, i) { return o.fxs[i] === sl; });
+      if (!lines.length) return;
+      out += '<p class="fxh">' + esc(SLOT_LABEL[sl] || sl) + '</p>' +
+        lines.map(aff).join('');
+    });
+    return out;
   }
 
   // ---- the corner ----

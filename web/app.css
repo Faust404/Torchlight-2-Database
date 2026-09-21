@@ -503,10 +503,16 @@ button,input,select{font:inherit; color:inherit}
    language; the locked block's dim grey is not borrowed, because these options
    are not hidden behind anything. The numbers keep the tooltip's value
    treatment (--val at 600, tabular) rather than the affix block's --head,
-   since they sit inside body-coloured lines. */
-.poolh{display:flex; align-items:baseline; gap:7px; margin:9px 0 2px;
+   since they sit inside body-coloured lines.
+
+   `.fxh` is the same label on a socketable that does NOT roll -- the 143 embers,
+   eyes, skulls and gems whose two bonuses are fixed, so their lines are facts
+   and take `.aff`'s magic green under the same slot heading. The heading is
+   shared; the line treatment is the distinction, and it is the pool's own:
+   green means "this item has it", a bullet means "one of these is rolled". */
+.poolh, .fxh{display:flex; align-items:baseline; gap:7px; margin:9px 0 2px;
   color:var(--label); font-size:10px; letter-spacing:.13em; text-transform:uppercase}
-.poolh:first-child{margin-top:0}
+.poolh:first-child, .fxh:first-child{margin-top:0}
 .poolh .ct{color:var(--faint); font-size:9.5px; letter-spacing:.04em;
   text-transform:none}
 .pool{margin:0; padding:0; list-style:none}

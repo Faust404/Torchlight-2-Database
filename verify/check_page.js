@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 182 assertions.
+ * view, provenance and hash deep links -- 186 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 verify/check_page.js
@@ -424,6 +424,23 @@ async function go(hash) {
              opts: [].map.call(u.querySelectorAll('li'), li => li.textContent) };
   });
   const show = p => p.map(s => `${s.head}: ${s.count} [${s.opts.join('; ')}]`).join('  ');
+  // A fixed socketable's two bonuses are facts rather than rolls, so they take
+  // `.aff` paragraphs under the same kind of slot heading -- `p.fxh`, sharing
+  // `.poolh`'s declarations, with no "one of N". Read the same way and for the
+  // same reason: each group is the lines that actually follow its own heading,
+  // so a heading attached to the other slot's lines cannot pass.
+  // Leaves of this take either the document or a `#detail` element, so the
+  // selector is relative to whatever was passed rather than re-stating #detail
+  // -- which, handed the element itself, would match nothing and pass vacuously.
+  const slotGroups = doc => [].map.call(doc.querySelectorAll('p.fxh'), h => {
+    const lines = [];
+    for (let e = h.nextElementSibling;
+         e && e.classList.contains('aff'); e = e.nextElementSibling) {
+      lines.push(e.textContent);
+    }
+    return { head: h.textContent, lines };
+  });
+  const showF = g => g.map(s => `${s.head}: ${s.lines.join('; ')}`).join('  ');
   // Blood Ember Speck, rank 1: two options a side, and the transcribed numbers
   // are the ones this rank rolls -- nothing on the card scales them.
   const speck = poolOf(await deep('#item=tl2_bloodember_rank1'));
@@ -459,11 +476,51 @@ async function go(hash) {
   // fixed and arrive as ordinary affix lines.
   const base = poolOf(await deep('#item=tl2_bloodember_BASE'));
   const flame = await deep('#item=tl2_flameember_rank1');
+  const flameDetail = flame.getElementById('detail');
   ok('only the 28 rare ranks carry a pool',
-     base.length === 0 && /Weapon: \+7 Fire Damage/.test(flame.getElementById('detail').textContent) &&
-     flame.querySelectorAll('#detail ul.pool').length === 0 &&
+     base.length === 0 && flame.querySelectorAll('#detail ul.pool').length === 0 &&
      flame.querySelectorAll('#detail .aff').length === 2,
      show(base) + ' | ' + flame.querySelector('#detail .body').textContent.slice(0, 120));
+  // ...and a rolled ember carries no fixed-slot heading, so the two blocks
+  // cannot be confused for one another on the one card family that has either.
+  ok('...and a rolled ember carries no fixed-slot heading',
+     slotGroups(giantChaos).length === 0, showF(slotGroups(giantChaos)));
+  // The normal ember's two bonuses are fixed, so they are facts under a slot
+  // heading rather than a "one of" list. The heading also replaced the game's
+  // own `Weapon:` prefix, which the card used to print as part of the effect --
+  // so the check is both that the prefix is gone and that what it used to
+  // encode is now carried by the structure instead.
+  const flameG = slotGroups(flame);
+  ok('a fixed ember labels its slots instead of printing the game\'s prefix',
+     flameG.length === 2 &&
+     flameG[0].head === 'Armor / Trinket' && flameG[0].lines.join(' | ') === '+8 Fire Armor' &&
+     flameG[1].head === 'Weapon' && flameG[1].lines.join(' | ') === '+7 Fire Damage' &&
+     !/Weapon:|Armor\/Trinket:/.test(flameDetail.textContent), showF(flameG));
+  // The flagship of the seven the files correct. TIDBI lost the heading between
+  // Quato's two affixes, so its four `+64 <element> Armor` lines sat under the
+  // freeze line's Weapon heading and were filed as weapon stats -- the wiki's
+  // table and the gem's own affix files both file them under Armor/Trinket. The
+  // blade here is real: the first heading was right and the lines under it were
+  // not, so a page-wide search for "Armor" passes on the broken card too. Only
+  // reading the groups catches it.
+  const quato = slotGroups(await deep('#item=tl2_skull033'));
+  ok('a lost heading is rebuilt from the files, not from the line above it',
+     quato.length === 2 &&
+     quato[0].head === 'Armor / Trinket' && quato[0].lines.length === 4 &&
+     quato[0].lines.join(' | ') ===
+       '+64 Poison Armor | +64 Ice Armor | +64 Fire Armor | +64 Electric Armor' &&
+     quato[1].head === 'Weapon' &&
+     quato[1].lines.join(' | ') === '10% chance to Freeze for 5 sec.', showF(quato));
+  // The third case, which is neither of the two above: an affix whose own list
+  // names both slots, so the line belongs in either and is shown once. Read off
+  // Lucky Coin rank 2, which TIDBI left with no prefix at all -- so this also
+  // pins that a socketable is derived by being a socketable, not by whether the
+  // export happened to label it.
+  const coin = slotGroups(await deep('#item=tl2_goldgem2'));
+  ok('an either-slot affix is shown once, under a heading that says so',
+     coin.length === 1 && coin[0].head === 'Armor / Trinket or Weapon' &&
+     coin[0].lines.join(' | ') === '2% increase in the amount of gold found',
+     showF(coin));
 
   // ---------------------------------------------------------------- set names
   // An item's SET field is a DAT token, and a token is not a name: SENTINAL is
