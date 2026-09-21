@@ -497,6 +497,18 @@ GRAPH_ARMOR = 'MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT'
 GRAPH_SOCKET_LEVEL = 'MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT'
 _graphs = {}
 
+# MAXLEVEL above this is a sentinel for "never stops dropping", not a band. 259
+# items carry one: 9999 (10), 99999 (4), 999999 (133) and 9999999 (112) -- all
+# of them runs of nines on things that never drop in a band at all (potions,
+# quest items, maps, the three fishing rewards) -- plus the single Map of the
+# Wilds at 1299, whose ceiling is a *map* level on its own scale. They all mean
+# the same thing to a reader, and 999 is the number the corpus already uses to
+# say it (1,068 items). So they collapse to 999 here, on the way into
+# items.json, rather than at render time: one number in the data, and every
+# consumer sees it. MINLEVEL is deliberately untouched -- it has sentinels of
+# its own (777 marks monster-only gear) and none of them is a ceiling.
+MAX_LEVEL_CEILING = 999
+
 
 def graph_points(path):
     """{level: value} from one by-level graph DAT, parsed once per file. Empty if
@@ -1298,6 +1310,15 @@ def build():
                        ('RANGE', 'rng')):
             if nonzero(rec.get(k)):
                 o[src] = rec[k]
+        # MAXLEVEL's sentinels all say "no ceiling" (see MAX_LEVEL_CEILING).
+        # Clamped after the loop, not inside it, so the exception is stated once
+        # and reads as a rule about this one field rather than as a condition
+        # smuggled into a table of field names.
+        # `or 0` for the same reason every other level read here tolerates
+        # absence: _num returns None for a missing or non-numeric field, and the
+        # 4,307 items with no MAXLEVEL at all must not trip the comparison.
+        if (_num(o.get('xl')) or 0) > MAX_LEVEL_CEILING:
+            o['xl'] = fmt(MAX_LEVEL_CEILING)
         # LEVEL_REQUIRED is its own field -- not LEVEL, not MINLEVEL. TIDBI has
         # it for 5,474 items against the DAT's 844, and the two disagree in 429
         # of the 810 cases where both exist, again because the DAT holds a

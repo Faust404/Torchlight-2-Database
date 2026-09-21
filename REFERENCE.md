@@ -1417,7 +1417,18 @@ and all stay in `items.json` (none was ever a CSV column — that export carries
 `lv`, `ml` and `lr`):
 
 - **`xl` (`MAXLEVEL`)** — the level the item stops scaling at, a property of the
-  drop rather than of the item. Present on 2,666 of the 6,176 records.
+  drop rather than of the item. Present on 2,666 of the 6,176 records, and
+  **clamped to 999** on the way in (`MAX_LEVEL_CEILING` in `src/build.py`).
+  Above 999 the field is a sentinel for "never stops dropping", and the files
+  write it four different ways — `9999` (10 items), `99999` (4), `999999` (133),
+  `9999999` (112) — all of them on things that never drop in a band at all
+  (potions, quest items, maps, the three fishing rewards); the one other
+  exception is `Map of the Wilds` at `1299`, whose ceiling is a *map* level on a
+  different scale. All 259 collapse to the `999` the rest of the corpus already
+  used for the same idea, taking the population at 999 from 1,068 to 1,327 and
+  the corpus maximum to 999. `MINLEVEL` is **not** clamped — it has sentinels of
+  its own (`777` marks monster-only gear, `998` the ember base templates) and
+  none of them is a ceiling.
 - **`skm` (`MAX_SOCKETS`)** — **not** the item's own cap, which is why it is
   gone. It is the ceiling across the item's variants: `legendary2_sword05`
   (Cerulean Nightmare) declares `SOCKETS` 2 and `MAX_SOCKETS` 4, and the 4
@@ -1476,9 +1487,9 @@ is the rule and 45 is nothing.
 
 Three socketables have no requirement because they have **no `LEVEL` at all** —
 the fishing rewards Devil Fish, Unicorn Fish and Fish Bones (`MINLEVEL` 2,
-`MAXLEVEL` 9999999, `RARITY` 0). No curve entry exists to read, TIDBI's `iLEVEL`
-is empty for all three, and the wiki lists none of them, so `lr` is left unset
-rather than guessed.
+`MAXLEVEL` 9999999 in the file, `RARITY` 0). No curve entry exists to read,
+TIDBI's `iLEVEL` is empty for all three, and the wiki lists none of them, so `lr`
+is left unset rather than guessed.
 
 Damage and armor render as ranges. Weapons also show **Damage per Second** and
 the attack speed in the game's wording (`Very Fast Attack Speed (0.72 seconds)`).
@@ -1681,7 +1692,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 189
+`verify\check_page.js` goes further and drives the built page in a real DOM — 191
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -1703,7 +1714,10 @@ the corpus, and that no pill names Set), the set controls (the toggle's 556, the
 select's 9, that the two spell themselves separately in the URL and narrow
 rather than union, and that the tooltip's set name clears everything else and
 lands on that set alone), both halves of `MINLEVEL` — absent on the Aenigma,
-present and relabelled on a gem — and the ember pool (each slot label paired
+present and relabelled on a gem — the `MAXLEVEL` clamp (no record above 999 and
+at least a thousand at it, asserted across the database because most of the 259
+clamped records are potions and quest items that never render, plus the same
+clamp read off a card whose file holds `9999999`), and the ember pool (each slot label paired
 with its own option list, a rank's numbers against another rank's, the derived
 Chaos lists following the files where the wiki differs, and neither a `_BASE`
 template nor a fixed-bonus Flame Ember carrying a pool at all). It needs jsdom,

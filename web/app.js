@@ -787,11 +787,12 @@
   // With that line gone (see requirements) the band is the only thing MINLEVEL
   // means on any card, so socketables show it like everything else.
   //
-  // The numbers print as the data has them, sentinels included: 999 says "no
-  // ceiling" to anyone who has played the game, and rewriting it was
-  // editorialising a field the reader can see for themselves. 999 is only one of
-  // them -- 999999 and 9999999 both appear -- and a MINLEVEL of 777 marks
-  // monster-only gear, which never drops for a player.
+  // The ceiling prints as 999 wherever the file holds a sentinel, because the
+  // build collapses them (see MAX_LEVEL_CEILING in src/build.py): the files say
+  // "no ceiling" four different ways -- 9999, 99999, 999999, 9999999 -- and a
+  // reader should not have to recognise all four to read one idea. MINLEVEL is
+  // the field that still prints as the data has it, sentinels included: 777
+  // marks monster-only gear, which never drops for a player.
   function lvlRange(o) {
     var lo = n(o.ml), hi = n(o.xl), bits = [];
     if (lo) bits.push('<span class="k">Min Level</span> <b>' + lo + '</b>');

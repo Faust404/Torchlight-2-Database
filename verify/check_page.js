@@ -217,6 +217,19 @@ async function go(hash) {
   ok('the dropped fields are still built, just not shown here',
      !/Max Level/.test(det()) && !/Max Sockets/i.test(det()) &&
      w.DB.items.some(o => o.xl) && w.DB.items.some(o => o.skm));
+  // MAXLEVEL above 999 is the game's way of writing "never stops dropping", and
+  // it writes it four different ways -- 9999, 99999, 999999, 9999999. The build
+  // collapses all 259 of them to the 999 the rest of the corpus already uses
+  // (see MAX_LEVEL_CEILING in src/build.py). Asserted across the whole database
+  // rather than on one card, because most of those 259 are potions, quest items
+  // and maps that never render, so a regression could sit entirely off-page. The
+  // population check keeps the first half from passing on a field that got
+  // blanked instead of clamped.
+  ok('no max level in the database exceeds the 999 ceiling',
+     w.DB.items.every(o => !o.xl || +o.xl <= 999) &&
+     w.DB.items.filter(o => +o.xl === 999).length > 1000,
+     `${w.DB.items.filter(o => +o.xl > 999).length} above 999, ` +
+     `${w.DB.items.filter(o => +o.xl === 999).length} at 999`);
   // rng (RANGE) is the weapon's attack reach, not a damage range -- it used to
   // render in the type line as "Axe · Legendary · 0.6 range", which read as one.
   // It sits with the weapon's other two output numbers now, under the damage per
@@ -422,6 +435,13 @@ async function go(hash) {
      /Player Level\s*7(?!\d)/.test(poggt) &&
      !/Player Level\s*1(?!\d)/.test(poggt) &&
      !/Required Item Level to Socket/.test(poggt), poggt.slice(0, 240));
+  // The same card carries the clamp's own case: the file's MAXLEVEL for this eye
+  // is 9999999, and the card must read the clamped 999 rather than the raw run of
+  // nines. The negative is what makes it a clamp test rather than a substring
+  // test -- 999 is a prefix of 9999999.
+  ok('...and prints MAXLEVEL\'s sentinel as the 999 ceiling',
+     /Max Level\s*999(?!\d)/.test(poggt) && !/9999999/.test(poggt),
+     poggt.slice(0, 240));
 
   // A skull is where the curve and the wiki part company. The wiki's Gems (T2)
   // "Required Level" column follows the same rule on 43 of its 52 skull rows --
