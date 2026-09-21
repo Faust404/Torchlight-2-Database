@@ -319,6 +319,74 @@ async function go(hash) {
   ok('search on Enter narrows to Aenigma', cards().length === 1, `${cards().length}`);
   ok('search state lands in the hash', /q=aenigma/.test(w.location.hash), w.location.hash);
 
+  // ------------------------------------------------- numeric filter floors
+  // The level and stat-requirement boxes are counts and their floor is 0. The
+  // markup states that to the browser with min="0", which is what limits the
+  // spinner and what :invalid keys off -- but it does not stop a typed or
+  // pasted "-5", so the value is floored in the state as well.
+  //
+  // Typing is the only path that can produce a negative, and that is a finding
+  // rather than a simplification. In the deep link the '-' is the *delimiter*:
+  // `lvl=MIN-MAX` splits on it, so `#lvl=-5-` reads as "no floor, ceiling 5" and
+  // a negative ceiling is unrepresentable. `req` carries a value after a colon,
+  // so `#req=str:-5` does parse as a negative -- and it is floored, but the URL
+  // is left as the reader wrote it, because a hashchange deliberately does not
+  // rewrite the hash (writeHash runs on interaction, not on load). The state
+  // and the grid are what must be right; the URL catches up on the next edit.
+  await go('');
+  {
+    const lo = d.getElementById('lvmin');
+    lo.value = '-5';
+    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    // The filter must also still *work*: "level >= -5" floored to 0 is every
+    // item, so a negative carried through -- or turned into NaN, which compares
+    // false against everything -- would empty the grid rather than show 0.
+    ok('a negative typed into the level floor is clamped to 0',
+       d.getElementById('lvmin').value === '0' && /lvl=0-/.test(w.location.hash) &&
+       cards().length === 500,
+       `field=${d.getElementById('lvmin').value} hash=${w.location.hash} cards=${cards().length}`);
+    // The case no re-render can fix, and it is not an edge case: a control
+    // moving goes through apply(), which repaints the grid *in place* rather
+    // than rebuilding the rail -- onRoute() is the rebuild, and that runs on a
+    // URL move. So the box keeps whatever was typed and nothing later corrects
+    // it; the handler has to floor the field itself. This is the assertion that
+    // fails if that write-back is dropped, on the first typed negative as much
+    // as on a repeat one.
+    lo.value = '-5';
+    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('...and the typed text is corrected in place, since nothing re-renders it',
+       d.getElementById('lvmin').value === '0' && /lvl=0-/.test(w.location.hash),
+       `field=${d.getElementById('lvmin').value} hash=${w.location.hash}`);
+    const hi = d.getElementById('lvmax');
+    hi.value = '-1';
+    hi.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('...and the level ceiling clamps the same way',
+       d.getElementById('lvmax').value === '0' && /lvl=0-0/.test(w.location.hash),
+       `field=${d.getElementById('lvmax').value} hash=${w.location.hash}`);
+    const sr = d.querySelector('input[data-req="str"]');
+    sr.value = '-5';
+    sr.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('...and a stat requirement clamps the same way',
+       d.querySelector('input[data-req="str"]').value === '0' &&
+       /str:0/.test(w.location.hash),
+       `field=${d.querySelector('input[data-req="str"]').value} hash=${w.location.hash}`);
+  }
+  await go('#req=str:-5');
+  ok('a negative stat bound in a deep link floors the state, not just the field',
+     d.querySelector('input[data-req="str"]').value === '0',
+     d.querySelector('input[data-req="str"]').value);
+  await go('#lvl=-5-');
+  ok('the level deep link cannot carry a negative at all: "-" is its own delimiter',
+     d.getElementById('lvmin').value === '' && d.getElementById('lvmax').value === '5',
+     `min=${d.getElementById('lvmin').value} max=${d.getElementById('lvmax').value}`);
+  await go('');
+  {
+    const nums = [].slice.call(d.querySelectorAll('#railbody input[type=number]'));
+    ok('every numeric filter field declares the same floor to the browser',
+       nums.length === 6 && nums.every(i => i.min === '0'),
+       nums.map(i => `${i.id || i.getAttribute('data-req')}=${i.min}`).join(' '));
+  }
+
   // ----------------------------------------------------------------- sort
   // The default order, asserted before anything touches the select: rarity
   // ascending, level ascending within each rarity. The first card has to be the

@@ -109,6 +109,27 @@
     return escEl.innerHTML;
   }
   function n(v) { return v == null || v === '' ? 0 : (+v || 0); }
+  // A numeric filter's floor is 0. Every one of these fields takes a count --
+  // of levels, of points of a stat -- and no item has a negative one, so a
+  // negative bound is not a narrower filter but a broken one: "level >= -5"
+  // matches everything while looking like it does something, and "at most -5"
+  // matches nothing at all. `min="0"` states the floor to the browser, which is
+  // what limits the spinner and what :invalid keys off, but it cannot stop a
+  // typed or pasted "-5" and it cannot see the URL -- and this page's filters
+  // live in the hash, so a hand-written `#lvl=-5-` is a supported way in. So
+  // the value is floored here instead, where both paths meet: the same function
+  // reads a deep link, a typed value and the state back/forward restores.
+  //
+  // A non-numeric value reads as no filter rather than as NaN. It used to be
+  // `+v`, which made `#lvl=abc-` compare against NaN -- false for every item, so
+  // it filtered nothing -- while the field showed "abc" and writeHash wrote
+  // `lvl=NaN-` back into the URL.
+  function floor0(v) {
+    if (v == null || v === '') return null;
+    var x = +v;
+    if (!isFinite(x)) return null;
+    return x < 0 ? 0 : x;
+  }
   // Damage and armor arrive as the string the game shows: '140-174' when the
   // value varies, '140' when it does not. Everything that has to *compare* two
   // of them uses the midpoint, which is also what the dps figure is built on.
@@ -427,10 +448,14 @@
       h += section(f.k, f.title, body, fv.total);
     });
 
+    // min="0" on everything here: these are counts, and the floor is stated to
+    // the browser as well as enforced in floor0 -- it is what limits the
+    // spinner and what :invalid keys off. See floor0 for why it is not enough
+    // on its own.
     h += section('lvl', 'Item Level', '<div class="rng">' +
-      '<input type="number" id="lvmin" placeholder="min" value="' + (S.lvlMin == null ? '' : S.lvlMin) + '">' +
+      '<input type="number" min="0" id="lvmin" placeholder="min" value="' + (S.lvlMin == null ? '' : S.lvlMin) + '">' +
       '<span>&ndash;</span>' +
-      '<input type="number" id="lvmax" placeholder="max" value="' + (S.lvlMax == null ? '' : S.lvlMax) + '">' +
+      '<input type="number" min="0" id="lvmax" placeholder="max" value="' + (S.lvlMax == null ? '' : S.lvlMax) + '">' +
       '</div>');
 
     // "Stat requirement", not "Requirement": with the either/or rule an item's
@@ -440,7 +465,7 @@
     // or "Defense" stat, so MAG/DEF pointed at attributes that do not exist.
     h += section('req', 'Stat requirement at most', ['str', 'dex', 'mag', 'def'].map(function (k) {
       return '<div class="rng"><span class="rl">' + REQLABEL[k] + '</span>' +
-        '<input type="number" data-req="' + k + '" placeholder="any" value="' +
+        '<input type="number" min="0" data-req="' + k + '" placeholder="any" value="' +
         (S.req[k] == null ? '' : S.req[k]) + '"></div>';
     }).join(''));
 
@@ -987,10 +1012,10 @@
       else if (k === 'item') S.item = v;
       else if (k === 'sort') S.sort = v || DEFAULT_SORT;
       else if (k === 'dir') S.dir = v === 'desc' ? -1 : 1;
-      else if (k === 'lvl') { var p = v.split('-'); S.lvlMin = p[0] === '' ? null : +p[0];
-                              S.lvlMax = p[1] ? +p[1] : null; }
+      else if (k === 'lvl') { var p = v.split('-'); S.lvlMin = floor0(p[0]);
+                              S.lvlMax = floor0(p[1]); }
       else if (k === 'req') list.forEach(function (r) {
-        var q = r.split(':'); if (q[0]) S.req[q[0]] = +q[1]; });
+        var q = r.split(':'); if (q[0]) S.req[q[0]] = floor0(q[1]); });
     });
   }
 
@@ -1100,10 +1125,21 @@
     else if (t.id === 'sort') { S.sort = t.value; apply(); }
     else if (t.getAttribute && t.getAttribute('data-req')) {
       var k = t.getAttribute('data-req');
-      S.req[k] = t.value === '' ? null : +t.value; showAll = false; writeHash(); render(); paintCounts();
+      S.req[k] = floor0(t.value);
+      // The field is floored in place, and this is the only place that can do
+      // it: a control moving goes through apply(), which repaints the grid in
+      // place rather than rebuilding the rail (onRoute() is the rebuild, and it
+      // runs on a URL move). So the box keeps whatever was typed into it, and no
+      // later render will correct it -- without this line a typed "-5" would sit
+      // in the field looking like a bound while the state filtered at 0.
+      t.value = S.req[k] == null ? '' : S.req[k];
+      showAll = false; writeHash(); render(); paintCounts();
     } else if (t.id === 'lvmin' || t.id === 'lvmax') {
-      S.lvlMin = document.getElementById('lvmin').value === '' ? null : +document.getElementById('lvmin').value;
-      S.lvlMax = document.getElementById('lvmax').value === '' ? null : +document.getElementById('lvmax').value;
+      var lvmin = document.getElementById('lvmin'), lvmax = document.getElementById('lvmax');
+      S.lvlMin = floor0(lvmin.value);
+      S.lvlMax = floor0(lvmax.value);
+      lvmin.value = S.lvlMin == null ? '' : S.lvlMin;   // see the stat box above
+      lvmax.value = S.lvlMax == null ? '' : S.lvlMax;
       showAll = false; writeHash(); render(); paintCounts();
     }
   });

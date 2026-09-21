@@ -1609,6 +1609,21 @@ on `file://`, and legibility was worth more than shortness here. Note chrome
 refuses `history.replaceState` on `file://`, so `writeHash` falls back to
 assigning `location.hash`.
 
+The level range and the four stat-requirement caps are **counts, and every one of
+them is floored at 0** — `min="0"` on the input and `floor0` on the way into the
+state. The attribute is not enough on its own, for two reasons. It limits the
+spinner and drives `:invalid`, but it cannot stop a typed or pasted `-5`; and a
+moving control goes through `apply()`, which repaints the grid *in place* rather
+than rebuilding the rail (`onRoute()` is the rebuild, and it runs on a URL move),
+so nothing would ever rewrite the box afterwards. The handler therefore floors
+the field as well as the state, which is why a typed negative is visibly replaced
+by `0` rather than sitting there looking like a bound. Only typing can produce
+one: in `lvl=MIN-MAX` the `-` is the *delimiter*, so `#lvl=-5-` reads as "no
+floor, ceiling 5" and a negative bound is unrepresentable; `req` carries its
+value after a colon, so `#req=str:-5` does parse as a negative and is floored —
+though a hashchange deliberately leaves the URL as the reader wrote it, since
+`writeHash` runs on interaction and not on load.
+
 A retired `#cat=` link is still accepted and expanded into the types of the
 group it names, so an old bookmark filters rather than silently doing nothing —
 silently showing all 6,048 items is the one failure mode worth avoiding here.
@@ -1702,7 +1717,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 192
+`verify\check_page.js` goes further and drives the built page in a real DOM — 199
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
