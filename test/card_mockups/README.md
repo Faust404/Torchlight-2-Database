@@ -3,7 +3,7 @@
 The tooltip card as settled — the P3 corner, the requirement block as chips, the
 spawn band under it — on ten items.
 
-**The card has shipped.** It now lives in `db/app/`, drawn by `app.js` and styled
+**The card has shipped.** It now lives in `web/`, drawn by `app.js` and styled
 by `app.css`, and that is the live copy; the app's detail pane no longer looks
 anything like it did before this folder existed. This folder is kept as the study
 that settled it — the sheets below are the evidence for choices the app's own
@@ -12,15 +12,15 @@ those choices needs re-opening.
 
 That leaves **two copies of one card, in two trees, with nothing keeping them in
 step.** They were identical at the port and will drift from here. To change the
-card, edit `db/app/`; edit these templates only to re-run a study.
+card, edit `web/`; edit these templates only to re-run a study.
 
     python card_mockups/build_mockups.py     # -> card_mockups/index.html
                                              #    card_mockups/affix.html
                                              #    card_mockups/set.html
 
-`build_mockups.py` reads only the pipeline's *output* (`db/out/items.json`,
+`build_mockups.py` reads only the pipeline's *output* (`out/items.json`,
 `sets.json`, `icons.json`, `icons.png`). It does not run the pipeline and does
-not write to `db/out/`. The three pages are generated — `index.html` from
+not write to `out/`. The three pages are generated — `index.html` from
 `mock.tpl.html`, `affix.html` from `affix.tpl.html`, `set.html` from
 `set.tpl.html`. Edit the template and rebuild.
 
@@ -61,7 +61,7 @@ poison y=63 — committed as `elements.png` (75×16, five 15×16 tiles). So the
 mockup still reads nothing at build time but the pipeline's output; the PAK is
 opened once, by hand, not by `build_mockups.py`.
 
-There are now **two copies of that strip** — this one and `db/app/elements.png`,
+There are now **two copies of that strip** — this one and `web/elements.png`,
 which is the copy the live card draws from. A build input inside a study folder
 would have made `build_mockups.py`'s standalone claim false, and having the app
 reach across into `test/` for an asset would have made the app's; one committed
@@ -98,7 +98,7 @@ file it as one. It is `#bdb4a6` in the card's own serif, its numbers lifted by
 the same rule the affixes use.
 
 **Augmented weapons.** The group on Bloodbath uses the shipping page's own three
-devices, lifted from `db/app/app.css`: the task as a gold chip (`.task` —
+devices, lifted from `web/app.css`: the task as a gold chip (`.task` —
 `#241d12` ground, gold text, `#2b251b` border), a dashed ruled divider stating
 the condition in words (`.cond`), and the gated stats behind a left rule with
 dim bullets (`.fx.locked`). The base affixes keep the tooltip's magic green, so
@@ -314,9 +314,11 @@ different thing. Nothing min/max-level-shaped appears in any record's
 So **for the 3,071 equipment items with no band there is nowhere else to
 look.** The number is absent because the file omits it, not because the pipeline
 dropped it — `MINLEVEL` and `MAXLEVEL` are both in `scalar_fields`' `KEEP` list,
-read whenever a file carries them. The pipeline's fallback list at
-`db/build.py:984` takes `ml` and `xl` from the DAT record alone, and that is the
-right scope for it.
+read whenever a file carries them. The pipeline's fallback list — the `MINLEVEL`/`MAXLEVEL` entry in `build()`'s
+DAT-field copy loop, in `src/build.py` — takes `ml` and `xl` from the DAT
+record alone, and that is the right scope for it. (This used to cite a line
+number; that loop sits six hundred lines into `build()`, so the citation was
+wrong the moment anything above it moved.)
 
 Worth splitting that 3,071 when judging how much is really missing:
 

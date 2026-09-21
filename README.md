@@ -27,7 +27,7 @@ and `PAKS\`. Everything is in two containers:
 | `PAKS\DATA.PAK` | 869,065,014 | the payload |
 | `PAKS\DATA.PAK.MAN` | 5,309,883 | the index |
 
-Both formats are cracked; `tl2\index.tsv` holds **70,437 validated file paths**.
+Both formats are cracked; `data\tl2\index.tsv` holds **70,437 validated file paths**.
 
 ---
 
@@ -162,23 +162,24 @@ with `.replace('\\','/').lstrip('/').upper()` before looking a path up.
 
 ## 3. Tools
 
-`tl2\` holds the extractors, `db\` the build. Python 3.10, plus Pillow for the
-sprite sheet (`pip install pillow`). Note `strings` is **not** installed in this
-Git Bash — do binary scanning in Python.
+`src\tl2\` holds the extractors, `src\` the build, `web\` the browser source and
+`data\` the inputs. Python 3.10, plus Pillow for the sprite sheet (`pip install
+pillow`). Note `strings` is **not** installed in this Git Bash — do binary
+scanning in Python.
 
 | Script | Status | Purpose |
 |---|---|---|
-| `tl2\dat_decode.py` | **current** | Decodes a `.DAT` in full: header, string block and binary field section. `python dat_decode.py <file.dat\|path/in/pak> [--raw] [--strings]`. |
-| `tl2\dat_hash.py` | **current** | The DEK hash and the verified field-name table. `python dat_hash.py NAME` hashes a name; `--fields` prints the table. |
-| `tl2\parse_man.py` | **current** | Walks the MAN using the PAK as validator. `--dump index.tsv` regenerates the index. |
-| `tl2\extract.py` | **current** | `python extract.py <pak-path> [outdir]`; `--grep <substr>` lists matching paths. |
-| `tl2\dump_dat.py` | superseded | Decodes a `.DAT`'s header and string block only. Superseded by `dat_decode.py`. |
-| `db\build.py` | **current** | Builds the item database and browser into `db\out\` (§7). `--no-app` skips the page. |
-| `db\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
-| `scan_pak_blocks.py` | superseded | Early PAK walk; validated offsets but its chained walk drifts at a `comp=0` boundary. |
-| `probe_man.py`, `fit_man_layout.py`, `diag_man.py`, `parse_pak_man.py` | superseded | Layout probes that found the real tail sizes. Useful as a record of how the format was derived. |
-| `index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `parse_man.py --dump`. |
-| `sample\` | extracted | `1X1_CLIFF_CONCAVE_S1E1_LM_A.LAYOUT`, `BOSS_BLOATFANG.DAT`, `CHAMPION_TREASURE.DAT`, `TREASURE_MONSTERLOOT_BOSS.DAT`, `FROSTEDHILLS_RULES.TEMPLATE`, `A3-OASIS.DAT`, `GLOBALS.DAT`. |
+| `src\tl2\dat_decode.py` | **current** | Decodes a `.DAT` in full: header, string block and binary field section. `python dat_decode.py <file.dat\|path/in/pak> [--raw] [--strings]`. |
+| `src\tl2\dat_hash.py` | **current** | The DEK hash and the verified field-name table. `python dat_hash.py NAME` hashes a name; `--fields` prints the table. |
+| `src\tl2\parse_man.py` | **current** | Walks the MAN using the PAK as validator. `--dump data\tl2\index.tsv` regenerates the index. |
+| `src\tl2\extract.py` | **current** | `python extract.py <pak-path> [outdir]`; `--grep <substr>` lists matching paths. |
+| `test\tl2\dump_dat.py` | superseded | Decodes a `.DAT`'s header and string block only. Superseded by `dat_decode.py`. |
+| `src\build.py` | **current** | Builds the item database and browser into `out\` (§7). `--no-app` skips the page. |
+| `test\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
+| `test\tl2\scan_pak_blocks.py` | superseded | Early PAK walk; validated offsets but its chained walk drifts at a `comp=0` boundary. |
+| `test\tl2\probe_man.py`, `fit_man_layout.py`, `diag_man.py`, `parse_pak_man.py` | superseded | Layout probes that found the real tail sizes. Useful as a record of how the format was derived. |
+| `data\tl2\index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `src\tl2\parse_man.py --dump data\tl2\index.tsv`. |
+| `test\tl2\sample\` | extracted | `1X1_CLIFF_CONCAVE_S1E1_LM_A.LAYOUT`, `BOSS_BLOATFANG.DAT`, `CHAMPION_TREASURE.DAT`, `TREASURE_MONSTERLOOT_BOSS.DAT`, `FROSTEDHILLS_RULES.TEMPLATE`, `A3-OASIS.DAT`, `GLOBALS.DAT`. |
 
 ---
 
@@ -291,8 +292,8 @@ machine and mdbtools is absent, but Microsoft's ACE OLEDB provider is
 registered, so .NET's `System.Data.OleDb` reads it directly. `pip install
 pyodbc` would work through the same driver.
 
-`tidbi\export_tidbi.ps1` dumps the tables to CSV. **Already run** — the output
-is in `tidbi\csv\` (UTF-8 with BOM, headers quoted):
+`src\export_tidbi.ps1` dumps the tables to CSV. **Already run** — the output
+is in `data\tidbi\csv\` (UTF-8 with BOM, headers quoted):
 
 | Table | Rows | |
 |---|---|---|
@@ -378,7 +379,7 @@ and items are built from it (§7). What remains:
    named `STRENGTH_REQUIRED` works here.
 2. **64 field hashes are still unnamed**, covering 7,493 of 90,561 field
    occurrences (8.3%) and touching 1,962 of the 6,262 items. The rest are named
-   in `tl2\dat_hash.py`.
+   in `src\tl2\dat_hash.py`.
 3. **Level geometry.** Dump all pieces and diff a few from one zone to find the
    record stride and where the transform floats sit. The `.MPP` companion is
    the obvious next thing to look at — it likely holds the piece metadata and
@@ -408,9 +409,9 @@ and items are built from it (§7). What remains:
 
 ---
 
-## 7. The item database (`db\`)
+## 7. The item database (`src\`)
 
-`python db\build.py` merges three sources into `db\out\`:
+`python src\build.py` merges three sources into `out\`:
 
 | Source | Rows | Supplies | Join key | Join rate |
 |---|---|---|---|---|
@@ -901,18 +902,24 @@ its own right and none of the three sources here folds one into a weapon's damag
 lines. They ship here too (178 of them), under their own names.
 
 ```
-db\
-  build.py      the pipeline
+src\
+  build.py         the pipeline
   ember_values.py  the 42 ember values the files cannot supply, with their source
-  check_page.js optional DOM test of the built page (§7, Verifying)
-  app\          the browser's source: index.html, app.css, app.js
-  out\          generated
-    index.html  8.38 MB, self-contained — open it straight off disk
-    items.json  2.28 MB, 6,176 items
-    items.csv   flat table for Excel/pandas
-    sets.json   the 80 set bonus ladders, shared by the 556 set pieces
-    icons.png   1,485x1,440 sprite of all 1,053 icons
-    icons.json  icon name -> [x, y, w, h]
+  paths.py         every path in the repo, anchored to this file
+  tl2\             the PAK reader: dat_decode, dat_hash, parse_man, extract
+web\               the browser's source: index.html, app.css, app.js, fonts\
+data\              the three inputs the build cannot run without
+  tl2\index.tsv    70,437 validated PAK paths
+  tidbi\csv\       TIDBI's tables
+  tidbi\icons\     1,053 sprite PNGs
+test\              non-production: the jsdom suite, the card studies, research
+out\               generated
+  index.html  8.41 MB, self-contained — open it straight off disk
+  items.json  2.31 MB, 6,176 items
+  items.csv   flat table for Excel/pandas
+  sets.json   the 80 set bonus ladders, shared by the 556 set pieces
+  icons.png   1,485x1,440 sprite of all 1,053 icons
+  icons.json  icon name -> [x, y, w, h]
 ```
 
 **6,176 items** ship. The 85 excluded templates are not obtainable and exist only
@@ -1114,7 +1121,7 @@ It is **per stat**: Blood's Health and Health Regen share one factor (10 ×
 `0.4·ilvl + 1.6` reproduces both ladders exactly, 48 … 384), but Iron's Armor
 (20 at file, 5 shown at ilvl 8) and Iron's Ranged bonus (10 at file, 6 shown) do
 not. That is the one unsolved piece here. The 42 values are accordingly
-**transcribed** into `db\ember_values.py`, whose docstring carries the source
+**transcribed** into `src\ember_values.py`, whose docstring carries the source
 and the reasoning.
 
 The source is the wiki's rare-gems table, and it is trustworthy on numbers for a
@@ -1460,7 +1467,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`db\check_page.js` goes further and drives the built page in a real DOM — 182
+`test\check_page.js` goes further and drives the built page in a real DOM — 182
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -1490,5 +1497,5 @@ which is not a project dependency:
 
 ```
 npm i jsdom          # anywhere on NODE_PATH
-node db\check_page.js
+node test\check_page.js
 ```
