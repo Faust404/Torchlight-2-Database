@@ -1154,11 +1154,19 @@ Three things the derivation does not settle, all reported rather than guessed:
 - **Every socketable is derived, not just the labelled ones.** Lucky Coin and
   Lucky Die rank 1 have no prefix on their single line; scoping by prefix would
   have left those two as the only members of their families with no slot label.
-- **15 rows name an affix that lists both slots** — the six Lucky Coins, the six
-  Lucky Dice and the three fish scales. Those lines are shown once, under
-  `Armor / Trinket or Weapon`. The wiki leaves the Lucky Coin's weapon cell
-  blank; the affix's own list says both, so the file wins. That is a **fourth
-  known wiki divergence**, alongside the three in the rare-gems table below.
+- **12 rows name an affix that lists both slots** — the six Lucky Coins and the
+  six Lucky Dice. Those lines are shown once, under `Armor / Trinket or Weapon`.
+  The corpus holds **15** such affixes; the other three are the fish scales, and
+  `TL1_ITEMS` drops their items, so their affix files sit in the PAK with no row
+  left to land on. The wiki leaves the Lucky Coin's weapon cell blank; the
+  affix's own list says both, so the file wins. That is a **fourth known wiki
+  divergence**, alongside the three in the rare-gems table below.
+  (`UNIQUE_GOLD_DICEB1..6` could be mistaken for contrary evidence — they are
+  the same `N% increase in the amount of gold found` with the **weapon-only**
+  list. They are not evidence either way: no DAT in the 16,084-file corpus names
+  any of the six, so the shipped coin's own affix is the only statement there
+  is. The trade-off the project applies elsewhere holds here too — count what is
+  referenced, never what merely exists.)
   A **fifth** is the nine skull rows in its `Required Level` column that break
   the `level - 8` rule its own other 43 skull rows keep — see the socketable
   requirement section below, which has the game's own curve as the tiebreak.

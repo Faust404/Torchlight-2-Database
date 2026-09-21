@@ -122,9 +122,12 @@ def affix_slot(name):
     socketables list both ARMOR and WEAPON, and they are exactly the ones whose
     effect reads the same either way -- the six Lucky Coins, the six Lucky Dice
     and the three fish scales. Those lines belong in both columns, which is why
-    this returns a fourth value instead of picking a side. The wiki leaves the
-    Lucky Coin's weapon cell blank; the file's own list says both, so the file
-    wins and the divergence is recorded in REFERENCE.md with the others.
+    this returns a fourth value instead of picking a side. The fish are
+    Torchlight 1 content and TL1_ITEMS drops their items, so 12 of the 15 reach
+    a card; the count here is the corpus's, which the affix files still make up.
+    The wiki leaves the Lucky Coin's weapon cell blank; the file's own list says
+    both, so the file wins and the divergence is recorded in REFERENCE.md with
+    the others.
     """
     global _BY
     if name not in _affix_cache:
