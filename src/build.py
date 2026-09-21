@@ -7,7 +7,7 @@ Merges three sources into one dataset and a grimtools-style browser over it:
     TIDBI            a recovered 2014 Access DB -- display text, effects, icons
     alfgeir          a third-party site's curated name/type/classification
 
-Outputs land in out/: items.json, items.csv, icons.png, icons.json, index.html.
+Outputs land in out/: items.json, items.csv, icons.webp, icons.json, index.html.
 
 Reads only. Nothing here writes to the game install.
 
@@ -1108,8 +1108,22 @@ def build_sheet(icon_files, cols=33):
         sheet.paste(imgs[k], (x, y))
         coords[k] = [x, y, imgs[k].width, imgs[k].height]
     buf = io.BytesIO()
-    sheet.save(buf, 'PNG', optimize=True)
-    return buf.getvalue(), coords, (cols * cw, rows * ch)
+    # Lossless WebP, not PNG: 4.46 MB -> 3.63 MB for the same pixels, and the
+    # sheet is 92% of what a visitor downloads, since brotli already undoes the
+    # base64 expansion exactly -- inlining it costs nothing, so the sheet's own
+    # encoding is the whole of the payload.
+    #
+    # `exact=True` is what makes the decode bit-identical: without it libwebp is
+    # free to rewrite the RGB under fully transparent pixels, which is invisible
+    # but no longer lossless. The assert below pins that, because "lossless" is
+    # the entire reason this format was chosen and a Pillow default moving under
+    # us would otherwise ship the game's art silently re-encoded.
+    sheet.save(buf, 'WEBP', lossless=True, quality=100, method=6, exact=True)
+    data = buf.getvalue()
+    with Image.open(io.BytesIO(data)) as back:
+        assert back.convert('RGBA').tobytes() == sheet.tobytes(), \
+            'the sheet did not survive the webp encode unchanged'
+    return data, coords, (cols * cw, rows * ch)
 
 
 # ------------------------------------------------------------------------ build
@@ -1595,7 +1609,7 @@ def write_csv(items, path):
                         o.get('ic', ''), o['p']])
 
 
-def write_page(items, coords, png, size, sets):
+def write_page(items, coords, sheet_bytes, size, sets):
     app = paths.WEB
     with open(os.path.join(app, 'app.css'), encoding='utf-8') as fh:
         css = fh.read()
@@ -1643,7 +1657,7 @@ def write_page(items, coords, png, size, sets):
     # disagree about where a shield goes.
     tax = json.dumps([{'g': g, 's': sub, 't': ts} for g, sub, ts in TYPE_GROUPS],
                      separators=(',', ':'), ensure_ascii=False)
-    sprite = base64.b64encode(png).decode('ascii')
+    sprite = base64.b64encode(sheet_bytes).decode('ascii')
 
     html = (shell.replace('/*__CSS__*/', css)
                  .replace('/*__DATA__*/', data)
@@ -1663,12 +1677,12 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     items, icon_files, no_stats, templates, sets = build()
 
-    png, coords, size = build_sheet(icon_files)
-    with open(os.path.join(OUT, 'icons.png'), 'wb') as fh:
-        fh.write(png)
+    sheet_bytes, coords, size = build_sheet(icon_files)
+    with open(os.path.join(OUT, 'icons.webp'), 'wb') as fh:
+        fh.write(sheet_bytes)
     with open(os.path.join(OUT, 'icons.json'), 'w', encoding='utf-8') as fh:
         json.dump(coords, fh, separators=(',', ':'))
-    print('  sprite %dx%d, %.2f MB' % (size[0], size[1], len(png) / 1048576))
+    print('  sprite %dx%d, %.2f MB' % (size[0], size[1], len(sheet_bytes) / 1048576))
 
     with open(os.path.join(OUT, 'items.json'), 'w', encoding='utf-8') as fh:
         json.dump(items, fh, separators=(',', ':'), ensure_ascii=False)
@@ -1967,7 +1981,7 @@ def main():
 
     if '--no-app' not in sys.argv:
         shown = [o for o in items if o['q'] not in SITE_HIDDEN_TIERS]
-        n = write_page(shown, coords, png, size, sets)
+        n = write_page(shown, coords, sheet_bytes, size, sets)
         print('index.html  %.2f MB (%d of %d items shown; %d hidden: %s)'
               % (n / 1048576, len(shown), len(items), len(items) - len(shown),
                  ', '.join(SITE_HIDDEN_TIERS)))

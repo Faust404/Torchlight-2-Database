@@ -931,11 +931,11 @@ data\              the three inputs the build cannot run without
 verify\            check_page.js — the regression suite the build has to pass
 test\              local scratch, gitignored: research, fixtures, third-party
 out\               generated
-  index.html  8.41 MB, self-contained — open it straight off disk
+  index.html  7.30 MB, self-contained — open it straight off disk
   items.json  2.31 MB, 6,176 items
   items.csv   flat table for Excel/pandas
   sets.json   the 80 set bonus ladders, shared by the 556 set pieces
-  icons.png   1,485x1,440 sprite of all 1,053 icons
+  icons.webp  1,485x1,440 sprite of all 1,053 icons (lossless)
   icons.json  icon name -> [x, y, w, h]
 ```
 
@@ -1269,6 +1269,31 @@ same `RESOURCEDIRECTORY`/`MESHFILE`. Only 20 fall back to a type-tinted
 placeholder. All 1,053 icons pack into one 1,485×1,440 sheet at native size
 (1,052 are 45×45, one is 44×44); a 2× sheet would be 13.5 MB and is a non-starter.
 
+The sheet is **lossless WebP, 3.63 MB**, not PNG (4.46 MB). The format is chosen
+for weight, and the sheet is where the weight is: it is inlined into the page as
+a base64 data URI, brotli already undoes that expansion exactly, so the sprite's
+own encoding *is* the page's payload — 92% of what a visitor downloads. A
+lossless re-encode is worth having precisely because it costs nothing in pixels;
+`build_sheet` asserts the decode is bit-identical to the sheet it encoded, so a
+Pillow default moving under us cannot quietly turn the game's art into a lossy
+copy. `exact=True` is load-bearing for that: without it libwebp rewrites the RGB
+under fully transparent pixels, which nothing can see and which would make the
+format a lie. WebP has been in every current browser since Safari 14 in 2020, so
+the page still opens anywhere.
+
+Splitting the sprite out as its own file was considered and rejected on
+measurement. It sounds like a win and is not. Brotli undoes the base64 expansion
+so nearly completely that the split is worth **2,210 bytes in 4.1 MB — 0.05%**:
+inlined, the compressed page is 4,145,574 bytes; split, it is 338,937 of page
+plus 3,804,427 of sprite = 4,143,364. What it would buy is the rebuild case
+only, where a returning visitor re-fetches 0.32 MB and revalidates an unchanged
+sprite instead of pulling the page again — not worth giving up `index.html`
+opening as one self-contained file.
+
+256-colour WebP was rejected as well: 0.76 MB, a 6× cut, but the mean channel
+error is 8.2 and this is the game's art. Lossless was the whole of the win
+available at no cost to the pixels, so that is what shipped.
+
 ### The browser
 
 `out\index.html` opens from `file://` with no server and no network. Filters live
@@ -1475,7 +1500,7 @@ like this one: a `wrangler.jsonc` with an `assets` block and **no `main` entry a
 all**, so there is no Worker script and nothing runs per request. Static asset
 requests are served straight off the edge and are free and unlimited; the limits
 that matter are 25 MiB per file and 20,000 files on the free plan, against six
-files and an 8.41 MB largest.
+files and a 7.30 MB largest.
 
 ```
 python src\build.py     # or: powershell -File deploy.ps1, which does both
@@ -1517,8 +1542,13 @@ The zone already carried a stale `tl2db` record answering 525 (Cloudflare unable
 to handshake with an origin); the `custom_domain` route replaced it, and the
 hostname went from 525 to 200 on the first deploy.
 
-Transfer is smaller than the file: the 8.41 MB page is **5,155,667 bytes over
-the wire** with Brotli, a 42% cut.
+Transfer is smaller than the file: the 7.30 MB page is **4,277,426 bytes over
+the wire** with Brotli, a 44% cut (Cloudflare's brotli is a little less
+effective than zlib's at the same setting, 4.28 MB against 4.15 MB locally).
+**92% of that is the icon sheet** — measured locally, where the compressed page
+splits 3.63 MB of sprite against 0.32 MB of everything else. The sheet's
+encoding is therefore very nearly the whole of the site's weight, which is what
+the Icons section above is about.
 
 ### Verifying
 

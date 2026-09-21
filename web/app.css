@@ -64,19 +64,19 @@ button,input,select{font:inherit; color:inherit}
    The icon atlas, written straight into the rule that draws it rather than into
    a custom property beside the other tokens in `:root`.
 
-   A data URI this long does not survive `var()`. The sheet is 4.46 MB and its
-   base64 is 6.2 MB; Chrome silently drops a custom property holding a data URI
+   A data URI this long does not survive `var()`. The sheet is 3.63 MB and its
+   base64 is 4.8 MB; Chrome silently drops a custom property holding a data URI
    over about 2 MB, and it drops the substitution rather than the declaration --
    so every icon on the page disappears at once -- grid and card alike -- and
    nothing in the console says why. Measured on this Chrome: 1,998,072 base64
-   characters resolve, 2,401,524 do not. The same 6.2 MB written directly into a
+   characters resolve, 2,401,524 do not. The same 4.8 MB written directly into a
    rule renders fine, which is why the two selectors below are grouped: the
    base64 appears exactly once in the file, as it did as a variable.
 
    The study in test/card_mockups/ never met this because it crops the sheet to
    the items on the sheet -- 62 KB, comfortably under the line. */
 .card .art i, .tile i{
-  background-image:url(data:image/png;base64,__SPRITE__);
+  background-image:url(data:image/webp;base64,__SPRITE__);
   background-repeat:no-repeat; display:block;
 }
 

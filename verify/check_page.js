@@ -6,7 +6,7 @@
  *   node --max-old-space-size=6144 verify/check_page.js
  *
  * The heap flag is not optional. Twenty of these assertions build a fresh
- * JSDOM over the whole built page, and that page is 8.36 MB -- mostly a 6.2 MB
+ * JSDOM over the whole built page, and that page is 7.30 MB -- mostly a 4.8 MB
  * base64 icon sheet sitting in a <style> text node -- so the suite holds several
  * gigabytes of live DOMs and node's default old-space (about 4 GB) runs out
  * partway through. 5,120 MB completes; 4,096 MB does not.
@@ -1332,7 +1332,7 @@ async function go(hash) {
      iconlessData.size === ICONLESS.length && ICONLESS.every(id => iconlessData.has(id)),
      [...iconlessData].sort().join(', ') || '(none)');
   // The assertion above cannot see whether anything was *painted*. The sheet is
-  // 4.46 MB, its base64 is 6.2 MB, and Chrome silently drops a custom property
+  // 3.63 MB, its base64 is 4.8 MB, and Chrome silently drops a custom property
   // holding a data URI over about 2 MB -- dropping the substitution, not the
   // declaration, so every icon on the page vanishes at once with nothing in the
   // console. The icons were missing on the whole site for exactly this reason.
@@ -1345,9 +1345,9 @@ async function go(hash) {
   {
     const css = [].map.call(d.querySelectorAll('style'), s => s.textContent).join('\n');
     ok('the icon sheet is written into the rule, not carried through var()',
-       /\.card \.art i, \.tile i\{[^}]*background-image:url\(data:image\/png;base64,[A-Za-z0-9+/]{1000}/
+       /\.card \.art i, \.tile i\{[^}]*background-image:url\(data:image\/webp;base64,[A-Za-z0-9+/]{1000}/
          .test(css) && !/var\(--sprite\)/.test(css),
-       'a 6.2 MB data URI does not survive a custom property');
+       'a 4.8 MB data URI does not survive a custom property');
   }
 
   ok('no uncaught errors in the page', errors.length === 0, errors.join(' | '));

@@ -10,7 +10,7 @@ test props that carry no tier the sources agree on, so they stay in the JSON and
 the CSV but out of the listing.
 
 There is no server and no database. The build reads the game's archives and
-inlines everything into one self-contained `out/index.html` (8.4 MB) that works
+inlines everything into one self-contained `out/index.html` (7.3 MB) that works
 offline, straight off disk.
 
 ## Building it
@@ -39,11 +39,11 @@ That is the only dependency. `--no-app` stops after the data and skips the page.
 
 | File | What it is |
 |---|---|
-| `out/index.html` | the whole site, 8.41 MB, self-contained — open it straight off disk |
+| `out/index.html` | the whole site, 7.30 MB, self-contained — open it straight off disk |
 | `out/items.json` | 6,176 items, 2.31 MB |
 | `out/items.csv` | the same rows as a flat table, for Excel or pandas |
 | `out/sets.json` | the 80 set bonus ladders |
-| `out/icons.png` | all 1,053 icons as one 1,485×1,440 sprite |
+| `out/icons.webp` | all 1,053 icons as one 1,485×1,440 lossless sprite |
 | `out/icons.json` | icon name → `[x, y, w, h]` |
 
 ## Publishing it

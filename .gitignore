@@ -3,8 +3,8 @@ __pycache__/
 node_modules/
 
 # Build output. `python src/build.py` regenerates all of it from `data/`, and two
-# of the files make it a bad thing to carry in history: index.html is 8.4 MB
-# rewritten on every build, and icons.png is an atlas cut from the game's own art
+# of the files make it a bad thing to carry in history: index.html is 7.3 MB
+# rewritten on every build, and icons.webp is an atlas cut from the game's own art
 # -- the same art the source PNGs under data/icons/ carry. Those are tracked
 # because the build cannot run without them; this is regenerated.
 out/
