@@ -5,7 +5,7 @@ TIDBI ("Torchlight Item DataBase International") is a 2014 third-party item
 viewer. Its base.mdb is a Jet 4 (Access 2000/2003) database and is by far the
 easiest source of structured Torchlight II item stats -- it already contains
 the numbers that are locked in the binary field section of the game's own .DAT
-files. See README.md for what it does and does not cover.
+files. See REFERENCE.md section 5 for what it does and does not cover.
 
 No installs are needed: Python has no MDB reader on this machine and mdbtools
 is absent, but Microsoft's ACE OLEDB provider is registered, so .NET's
@@ -52,8 +52,8 @@ if ($null -eq $conn) { throw "no Access OLEDB provider could open $Mdb" }
 # (verified: 0 differing cells across all 47 shared columns) plus six computed
 # DPS columns the table has no field for: DPS_ALL and one per damage type. Those
 # are TIDBI's own dps figures, and this project does not use them -- they round
-# each damage type and then add, where the game rounds once (see README §7,
-# "Damage per second"). Exporting them anyway keeps the difference checkable
+# each damage type and then add, where the game rounds once (see REFERENCE.md
+# section 7, "Damage per second"). Exporting them anyway keeps it checkable
 # instead of invisible, which is exactly how "TIDBI says 182" becomes a question
 # nobody can answer.
 foreach ($t in @("items", "QItems", "effects", "sets", "SetsSpisok")) {

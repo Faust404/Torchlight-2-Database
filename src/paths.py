@@ -40,8 +40,8 @@ TL2_SRC = os.path.join(SRC, 'tl2')
 # --- build inputs, committed -------------------------------------------------
 # Flat on purpose: these names say what the data is, not who published it.
 # index.tsv is the game's own archive index and the tables began as TIDBI's
-# export, but TIDBI is a cross-check now -- README.md §5 records its provenance,
-# and nothing in the build needs to know it.
+# export, but TIDBI is a cross-check now -- REFERENCE.md section 5 records its
+# provenance, and nothing in the build needs to know it.
 PAK_INDEX = os.path.join(DATA, 'index.tsv')   # 70,437 validated PAK paths
 CSV_DIR = os.path.join(DATA, 'csv')           # the item tables the build reads
 ICON_DIR = os.path.join(DATA, 'icons')        # the 1,053-file sprite source
