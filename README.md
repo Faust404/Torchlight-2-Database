@@ -175,11 +175,18 @@ scanning in Python.
 | `src\tl2\extract.py` | **current** | `python extract.py <pak-path> [outdir]`; `--grep <substr>` lists matching paths. |
 | `test\tl2\dump_dat.py` | superseded | Decodes a `.DAT`'s header and string block only. Superseded by `dat_decode.py`. |
 | `src\build.py` | **current** | Builds the item database and browser into `out\` (§7). `--no-app` skips the page. |
-| `test\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
+| `verify\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
 | `test\tl2\scan_pak_blocks.py` | superseded | Early PAK walk; validated offsets but its chained walk drifts at a `comp=0` boundary. |
 | `test\tl2\probe_man.py`, `fit_man_layout.py`, `diag_man.py`, `parse_pak_man.py` | superseded | Layout probes that found the real tail sizes. Useful as a record of how the format was derived. |
 | `data\index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `src\tl2\parse_man.py --dump data\index.tsv`. |
 | `test\tl2\sample\` | extracted | `1X1_CLIFF_CONCAVE_S1E1_LM_A.LAYOUT`, `BOSS_BLOATFANG.DAT`, `CHAMPION_TREASURE.DAT`, `TREASURE_MONSTERLOOT_BOSS.DAT`, `FROSTEDHILLS_RULES.TEMPLATE`, `A3-OASIS.DAT`, `GLOBALS.DAT`. |
+
+Every `test\` path in that table is local, not repo content: `test\` is
+gitignored wholesale, so a clone will not have any of it, and nothing in the
+build reads it. It stays on disk because it is the record of how the two binary
+formats were cracked — the rows above are a map to it, not a manifest of the
+repo. The one piece that had to survive a clone was the regression suite, which
+is why it lives in `verify\` instead.
 
 ---
 
@@ -912,7 +919,8 @@ data\              the three inputs the build cannot run without
   index.tsv        70,437 validated PAK paths
   csv\             the item tables, read at build time
   icons\           1,053 sprite PNGs
-test\              non-production: the jsdom suite, the card studies, research
+verify\            check_page.js — the regression suite the build has to pass
+test\              local scratch, gitignored: research, fixtures, third-party
 out\               generated
   index.html  8.41 MB, self-contained — open it straight off disk
   items.json  2.31 MB, 6,176 items
@@ -1467,7 +1475,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`test\check_page.js` goes further and drives the built page in a real DOM — 182
+`verify\check_page.js` goes further and drives the built page in a real DOM — 182
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -1497,5 +1505,10 @@ which is not a project dependency:
 
 ```
 npm i jsdom          # anywhere on NODE_PATH
-node test\check_page.js
+node --max-old-space-size=6144 verify\check_page.js
 ```
+
+The heap flag is not optional. Twenty of the assertions build a fresh JSDOM over
+the whole built page, so the suite holds several gigabytes of live DOMs and
+node's default old-space runs out partway through, with no summary line. 5,120 MB
+completes; 4,096 MB does not.

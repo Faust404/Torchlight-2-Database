@@ -3,7 +3,7 @@
  * view, provenance and hash deep links -- 182 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
- *   node --max-old-space-size=6144 test/check_page.js
+ *   node --max-old-space-size=6144 verify/check_page.js
  *
  * The heap flag is not optional. Twenty of these assertions build a fresh
  * JSDOM over the whole built page, and that page is 8.36 MB -- mostly a 6.2 MB
@@ -22,7 +22,10 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-// This suite lives in test/ but reads what src/ writes, so out/ is one level up.
+// verify/ is a sibling of out/ -- both sit at the repo root -- so the page is
+// one level up. This is why the suite is not under test/: it is not scratch, it
+// is the check the build has to pass, and it lives beside src/ and web/ where a
+// fresh clone can still run it.
 const PAGE = path.join(__dirname, '..', 'out', 'index.html');
 if (!fs.existsSync(PAGE)) {
   console.error('no built page at ' + PAGE + '\nrun `python src/build.py` first.');
