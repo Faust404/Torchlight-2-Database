@@ -1,0 +1,39 @@
+{
+  // Cloudflare Workers with Static Assets.
+  //
+  // The build cannot run in CI: it reads an 869 MB DATA.PAK out of a local
+  // Torchlight II install, and the game is not in this repo and cannot be. So
+  // there is no git integration here on purpose -- you build on your machine and
+  // `wrangler deploy` uploads the result. See REFERENCE.md section 7 for the
+  // build itself.
+  //
+  // Static assets are served straight off the edge without invoking a Worker,
+  // so asset requests are free and unlimited. There is no `main` entry and no
+  // Worker script: this is assets only.
+  "name": "torchlight2-db",
+  "compatibility_date": "2026-09-21",
+
+  // custom_domain asks Cloudflare to create and own the DNS record and the
+  // certificate for this hostname, rather than us pointing a CNAME at a
+  // workers.dev address by hand. hreddy.in is already a zone in this account,
+  // which is what makes that possible.
+  //
+  // Note there is a stale, broken `tl2db` record in the zone right now -- it
+  // answers 525, Cloudflare failing to handshake with some origin. This
+  // replaces it; the old target should be removed in the dashboard.
+  "routes": [
+    { "pattern": "tl2db.hreddy.in", "custom_domain": true }
+  ],
+
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "none"
+  },
+
+  // Both off deliberately. The site is served at tl2db.hreddy.in; leaving these
+  // on would also publish it at torchlight2-db.<subdomain>.workers.dev and at a
+  // fresh preview URL on every deploy, which search engines would index as
+  // duplicate copies of a page whose whole value is being the canonical one.
+  "workers_dev": false,
+  "preview_urls": false
+}

@@ -9,6 +9,9 @@ node_modules/
 # because the build cannot run without them; this is regenerated.
 out/
 
+# wrangler's local cache and dev state, written on any `wrangler deploy`.
+.wrangler/
+
 # Everything under test/ is scratch: the probe scripts that cracked the .DAT
 # format, the sample files they ran on, the card mockups, and the third-party
 # material this repo should not republish -- TIDBI's installer and UI bitmaps,

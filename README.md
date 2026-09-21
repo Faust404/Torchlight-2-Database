@@ -1,5 +1,7 @@
 # Torchlight II item database
 
+**Live at <https://tl2db.hreddy.in>.**
+
 Torchlight II's items, extracted from the game's own files and built into a
 single browsable HTML page — 6,176 items with damage, armor, requirements, set
 bonuses, socketables and icons, each one traced back to the `.DAT` file it came
@@ -43,6 +45,23 @@ That is the only dependency. `--no-app` stops after the data and skips the page.
 | `out/sets.json` | the 80 set bonus ladders |
 | `out/icons.png` | all 1,053 icons as one 1,485×1,440 sprite |
 | `out/icons.json` | icon name → `[x, y, w, h]` |
+
+## Publishing it
+
+The site is on Cloudflare Workers with Static Assets. It is not built in CI and
+cannot be — the build reads `DATA.PAK` out of a local install of the game — so
+publishing is a local build followed by an upload:
+
+```powershell
+powershell -File deploy.ps1     # builds, then deploys
+```
+
+`deploy.ps1` always rebuilds first, because `wrangler deploy` uploads whatever is
+sitting in `out\` and would otherwise happily publish a stale page. Needs
+[wrangler](https://developers.cloudflare.com/workers/wrangler/) authenticated
+once with `wrangler login`. `wrangler.jsonc` holds the config: the `out\`
+directory, the custom domain, and `workers_dev`/`preview_urls` off so there is
+only ever one canonical URL.
 
 ## Layout
 

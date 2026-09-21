@@ -1462,6 +1462,64 @@ It resolves to the group as the taxonomy defines it *today*: `#cat=Armor` is now
 have moved out. `Jewelry` is aliased to `Accessories`; nothing writes `cat=` any
 more, so the URL normalises to `type=…` on the first checkbox touch.
 
+### Publishing
+
+**Live at <https://tl2db.hreddy.in>**, on Cloudflare Workers with Static Assets.
+
+The platform choice is deliberate and recent. Cloudflare put Pages into
+maintenance mode — their own guidance for new projects is now Workers, quoting
+"will receive the focus of Cloudflare's development efforts going forwards, so
+we therefore are recommending using Cloudflare Workers over Cloudflare Pages for
+any new projects." Workers with Static Assets is the same product for a site
+like this one: a `wrangler.jsonc` with an `assets` block and **no `main` entry at
+all**, so there is no Worker script and nothing runs per request. Static asset
+requests are served straight off the edge and are free and unlimited; the limits
+that matter are 25 MiB per file and 20,000 files on the free plan, against six
+files and an 8.41 MB largest.
+
+```
+python src\build.py     # or: powershell -File deploy.ps1, which does both
+wrangler deploy
+```
+
+`deploy.ps1` exists for one reason: `wrangler deploy` uploads whatever is in
+`out\` and does not care how it got there, so deploying without building first
+publishes the previous build. The script always rebuilds and refuses to deploy
+if the build fails.
+
+**There is no git integration, and there cannot be.** The build reads an 869 MB
+`DATA.PAK` out of a local Torchlight II install; the game is not in this repo
+and cannot be, so no CI container can run it. Publishing is a local build
+followed by an upload. This is also why `wrangler.jsonc` is checked in while
+`out/` is not: the config is the recipe, the output is per-machine.
+
+The config is small and every line of it is load-bearing:
+
+- **`routes: [{ pattern: "tl2db.hreddy.in", custom_domain: true }]`** — Cloudflare
+  creates and owns the DNS record and the certificate for the hostname, rather
+  than us pointing a CNAME at a `workers.dev` address by hand. `hreddy.in` is
+  already a zone in this account, which is what makes that possible.
+- **`not_found_handling: "none"`** — a miss serves a 404 rather than the page.
+  `single-page-application` is the tempting wrong answer: it would return
+  `index.html` with a 200 for every garbage URL, which on a site with hash-routed
+  deep links is exactly the confusion deep links exist to avoid.
+- **`workers_dev` and `preview_urls` both false** — otherwise the site is also
+  published at `torchlight2-db.<subdomain>.workers.dev` and at a fresh preview
+  URL on every deploy, which search engines index as duplicate copies of a page
+  whose entire value is being the canonical one.
+
+Assets are content-addressed, so a rebuild that changes nothing uploads nothing
+— which makes `No updated asset files to upload` in the deploy output a free
+determinism check on the build.
+
+The one-time setup, for the record: `wrangler login`, then `wrangler deploy`.
+The zone already carried a stale `tl2db` record answering 525 (Cloudflare unable
+to handshake with an origin); the `custom_domain` route replaced it, and the
+hostname went from 525 to 200 on the first deploy.
+
+Transfer is smaller than the file: the 8.41 MB page is **5,155,667 bytes over
+the wire** with Brotli, a 42% cut.
+
 ### Verifying
 
 `build.py` self-checks: 6,262 decoded / 0 failures, 85 templates, 6,176 emitted,
