@@ -173,7 +173,7 @@ def token_names(items):
 
 def classify_type(rec, folder, tidbi, alf, tokens):
     """What an item is comes from the game file; what we call it comes from
-    TIDBI. The DAT states a `UNITTYPE` for 6,175 of the 6,176 items, and the
+    TIDBI. The DAT states a `UNITTYPE` for 6,172 of the 6,173 items, and the
     token it carries is the game's own answer, so this reads it first and only
     falls back to the older sources when the token is one the corpus never
     agreed a name for -- the four NOSPAWN monster props in TOKEN_UNSEEN, whose
@@ -400,6 +400,28 @@ SPEED_CLASS_OVERRIDE = {'sturm_polearm': 'POLEARM'}
 # Not obtainable, not meaningful, and no source agrees on its class.
 DROP_ITEMS = ('polearm_vanq01',)
 
+# Torchlight 1 content, shipped inside the Torchlight 2 PAK. TIDBI lists them
+# because TIDBI was built by reading that PAK, and the PAK is where their files
+# are (MEDIA/UNITS/ITEMS/SOCKETABLES/GEM_FISH_*.DAT) -- but nothing in TL2 can
+# hand a player one, and the Torchlight 1 wiki is where all three are
+# documented: fishing-only socketables, one quality tier each, with effects
+# that match this corpus line for line (its "+5% Faster Attack" is the
+# "+5% Attack Speed" below).
+#
+# Three things in the files say they were never wired in. They are the only
+# socketables in the corpus with no LEVEL field at all -- the eight *_BASE ember
+# templates that also lack one are templates (MINLEVEL 998) and are skipped
+# above -- so no level-banded roll can select them. They are typed plain
+# SOCKETABLE, where every socketable the game actually drops is UNIQUE
+# SOCKETABLE or MAGIC SOCKETABLE. And TL2's own fishing machinery hands out pet
+# food and pet trinkets instead: FISHING_TL2_NORMAL grants UNITTYPE FISH, and
+# its PET_TRINKETS_4FISHING pool grants COLLAR and STUD. No socketables.
+#
+# "No drop source names them" is deliberately NOT part of that argument: no
+# spawn class or treasure table names any of the 52 skulls either, and skulls
+# drop normally. Being unnamed is what a socketable looks like, not a defect.
+TL1_ITEMS = ('devil fish', 'unicorn fish', 'fish bones')
+
 # Tiers the browser does not render. "Unclassified" is what the pipeline calls
 # an item TIDBI has no row for -- it means "no tier could be established", not
 # that a tier of that name exists, and the set is overwhelmingly dev, test and
@@ -500,13 +522,16 @@ _graphs = {}
 # MAXLEVEL above this is a sentinel for "never stops dropping", not a band. 259
 # items carry one: 9999 (10), 99999 (4), 999999 (133) and 9999999 (112) -- all
 # of them runs of nines on things that never drop in a band at all (potions,
-# quest items, maps, the three fishing rewards) -- plus the single Map of the
-# Wilds at 1299, whose ceiling is a *map* level on its own scale. They all mean
-# the same thing to a reader, and 999 is the number the corpus already uses to
-# say it (1,068 items). So they collapse to 999 here, on the way into
+# quest items, maps) -- plus the single Map of the Wilds at 1299, whose ceiling
+# is a *map* level on its own scale. They all mean the same thing to a reader,
+# and 999 is the number the corpus already uses to say it (1,068 items come in
+# carrying 999 of their own). So they collapse to 999 here, on the way into
 # items.json, rather than at render time: one number in the data, and every
-# consumer sees it. MINLEVEL is deliberately untouched -- it has sentinels of
-# its own (777 marks monster-only gear) and none of them is a ceiling.
+# consumer sees it. Three of the 259 are the Torchlight 1 socketables, which
+# TL1_ITEMS drops before this point, so 256 rows actually move -- 1,068 to
+# 1,324, the number main() asserts. MINLEVEL is deliberately untouched -- it has
+# sentinels of its own (777 marks monster-only gear) and none of them is a
+# ceiling.
 MAX_LEVEL_CEILING = 999
 
 
@@ -1260,7 +1285,7 @@ def build():
     # templates (base_cannon, base_fist, base_rifle_NOSKILL). None are
     # obtainable or ever shown in game; they exist to be inherited *from*. They
     # stay in the icon-donor pool above but are not items.
-    out, skipped_stat, templates, dropped = [], 0, [], []
+    out, skipped_stat, templates, dropped, tl1 = [], 0, [], [], []
     slot_status = collections.defaultdict(list)
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
@@ -1275,6 +1300,11 @@ def build():
         # number. See DROP_ITEMS for what Polearm_Vanq01's disagreement is.
         if name.lower() in DROP_ITEMS:
             dropped.append(name)
+            continue
+        # Torchlight 1 leftovers: in the PAK, unreachable in the game. See
+        # TL1_ITEMS.
+        if name.lower() in TL1_ITEMS:
+            tl1.append(name)
             continue
         # display name ladder
         dn = rec.get('DISPLAYNAME') or ''
@@ -1719,6 +1749,9 @@ def build():
     if dropped:
         print('  %d dropped (no source agrees on the class): %s'
               % (len(dropped), ', '.join(dropped)))
+    if tl1:
+        print('  %d dropped (Torchlight 1 content, see TL1_ITEMS): %s'
+              % (len(tl1), ', '.join(tl1)))
     return out, icon_files, skipped_stat, templates, sets
 
 
@@ -1838,9 +1871,20 @@ def main():
 
     # --- invariants ---
     assert len(templates) == 85, 'expected 85 base templates, got %d' % len(templates)
-    assert len(items) == 6176, 'expected 6176 items, got %d' % len(items)
+    # Three fewer than 6,176: the Torchlight 1 fishing socketables come out.
+    # See TL1_ITEMS.
+    assert len(items) == 6173, 'expected 6173 items, got %d' % len(items)
     assert not [o for o in items if o['id'].lower() in DROP_ITEMS], \
         'an item in DROP_ITEMS reached the site'
+    assert not [o for o in items if o['id'].lower() in TL1_ITEMS], \
+        'Torchlight 1 content reached the site (see TL1_ITEMS)'
+    # The clamp's own population. This is the number the REFERENCE.md bullet
+    # quotes, so it is asserted rather than left to be re-read off the JSON by
+    # hand: 1,068 rows came in at 999 already, and 256 sentinels joined them.
+    # Not 259 -- the three Torchlight 1 socketables were sentinels too, and
+    # they are dropped above.
+    assert sum(1 for o in items if str(o.get('xl')) == '999') == 1324, \
+        'the 999 population drifted'
 
     # Every emitted type must have a home in the rail's taxonomy. The rail
     # renders in declared order and would otherwise have to invent a bucket for
@@ -1851,7 +1895,9 @@ def main():
     _cat = collections.Counter(o['c'] for o in items)
     # Armor gave one item to Accessories: petcollar_n13b is a collar, and its
     # own UNITTYPE now says so instead of the TL2ARMOR folder answering for it.
-    assert _cat == {'Armor': 1831, 'Weapons': 1461, 'Accessories': 2042, 'Misc': 842}, \
+    # Misc is three lower than 842 because all three Torchlight 1 socketables
+    # were Misc. See TL1_ITEMS.
+    assert _cat == {'Armor': 1831, 'Weapons': 1461, 'Accessories': 2042, 'Misc': 839}, \
         'category counts drifted: %s' % dict(_cat)
     n_dmg = sum(1 for o in items if 'dmg' in o)
     n_arm = sum(1 for o in items if 'arm' in o)
@@ -2090,8 +2136,9 @@ def main():
     tiers = {t: sum(1 for o in items if o['q'] == t) for t in TIER_ORDER}
     # Unclassified is exactly the set of items TIDBI has no row for, less the
     # two NAME markers rescue (_u03, _n13b). Rare carries the two potions the
-    # backtick fold recovered (see _apos).
-    assert tiers == {'Normal': 2161, 'Rare': 1851, 'Unique': 1391, 'Set': 556,
+    # backtick fold recovered (see _apos). Normal is three lower than 2,161
+    # because all three Torchlight 1 socketables were Normal. See TL1_ITEMS.
+    assert tiers == {'Normal': 2158, 'Rare': 1851, 'Unique': 1391, 'Set': 556,
                      'Legendary': 92, 'Unclassified': 125}, tiers
     assert 'Magic' not in tiers, 'Magic is not a tier in this dataset'
     tid = [r for r in read_csv(os.path.join(CSV, 'items.csv'))

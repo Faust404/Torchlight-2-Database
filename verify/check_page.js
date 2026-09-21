@@ -81,12 +81,12 @@ async function go(hash) {
 (async () => {
   // --------------------------------------------------------------- initial
   ok('renders a first page of cards', cards().length === 500, `${cards().length}`);
-  // 6,051 of the 6,176 in items.json: the site hides the Unclassified tier,
+  // 6,048 of the 6,173 in items.json: the site hides the Unclassified tier,
   // which is what the pipeline calls an item it could not tier (dev, test and
-  // monster-only units). The db keeps all 6,176 -- see SITE_HIDDEN_TIERS.
-  ok('count line reports the rendered corpus', /6,051/.test(cnt()), cnt());
+  // monster-only units). The db keeps all 6,173 -- see SITE_HIDDEN_TIERS.
+  ok('count line reports the rendered corpus', /6,048/.test(cnt()), cnt());
   ok('truncation is disclosed, not silent',
-     /Showing the first 500 of 6,051/.test(d.getElementById('more').textContent));
+     /Showing the first 500 of 6,048/.test(d.getElementById('more').textContent));
   ok('offers a Show all escape hatch', !!d.getElementById('showall'));
 
   // ----------------------------------------------------------- tier palette
@@ -570,6 +570,20 @@ async function go(hash) {
      coin[0].lines.join(' | ') === '2% increase in the amount of gold found',
      showF(coin));
 
+  // The three Torchlight 1 fishing socketables are out of the database. They
+  // shipped inside the TL2 PAK, which is why TIDBI lists them -- so they were
+  // in the corpus, and on the site, until they were dropped at build time. See
+  // TL1_ITEMS in src/build.py for the whole argument. Read off the data rather
+  // than a rendered card, because the claim is that they are gone from the
+  // database, not that no card happens to be showing; the display name is
+  // checked alongside the id because the two differ on two of the three.
+  {
+    const gone = ['Devil Fish Eye', 'Lucky Fish Tooth', 'Shimmering Fish Scale'];
+    const still = w.DB.items.filter(o => gone.indexOf(o.n) >= 0 || gone.indexOf(o.id) >= 0);
+    ok('...and the Torchlight 1 fishing socketables are out of the database',
+       still.length === 0, still.map(o => o.id).join(', ') || '(none present)');
+  }
+
   // ---------------------------------------------------------------- set names
   // An item's SET field is a DAT token, and a token is not a name: SENTINAL is
   // misspelled, U_GRAND_ARCHITECT and BERSERKER_FINAL are not words the game
@@ -902,12 +916,12 @@ async function go(hash) {
      pills().map(p => p.className).join(' | '));
   // The counts are the ones build.py asserts against, read off the pills rather
   // than off the header -- a strip wired to the wrong facet, or reading its
-  // counts from the wrong place, would still show 6,051 in the count line. The
+  // counts from the wrong place, would still show 6,048 in the count line. The
   // 556 set items are counted inside Rare and Unique, not beside them: 210 +
-  // 346 = 556, and 2161+2061+1737+92 = 6,051, so nothing was lost or doubled.
+  // 346 = 556, and 2158+2061+1737+92 = 6,048, so nothing was lost or doubled.
   ok('each pill carries its own tier count, with the set pieces folded in',
      pills().map(p => +p.querySelector('.ct').textContent).join(',') ===
-       '2161,2061,1737,92',
+       '2158,2061,1737,92',
      pills().map(p => `${pval(p)}=${p.querySelector('.ct').textContent}`).join(' '));
   // The one place this facet deliberately parts company with the rail's others:
   // those start empty -- no box checked, nothing filtered -- but a strip of five
@@ -933,7 +947,7 @@ async function go(hash) {
        `${got} | data: ${Object.keys(want).map(k => `${k}=${want[k]}`).join(' ')}`);
   }
   ok('...and the four sum to the corpus, so nothing was dropped or double-counted',
-     [].reduce.call(pills(), (a, p) => a + (+p.querySelector('.ct').textContent), 0) === 6051,
+     [].reduce.call(pills(), (a, p) => a + (+p.querySelector('.ct').textContent), 0) === 6048,
      String([].reduce.call(pills(), (a, p) => a + (+p.querySelector('.ct').textContent), 0)));
   ok('a full tier selection is elided from the URL', !/tier=/.test(w.location.hash),
      w.location.hash || '(empty)');
@@ -974,7 +988,7 @@ async function go(hash) {
   flip('Normal', true);
   // The identity that catches a strip wired to the wrong facet, or a count read
   // from the wrong place: down and back up must land exactly where it started.
-  ok('checking it again restores the full corpus', /6,051/.test(cnt()), cnt());
+  ok('checking it again restores the full corpus', /6,048/.test(cnt()), cnt());
   ok('...and the tier facet is elided from the URL again', !/tier=/.test(w.location.hash),
      w.location.hash || '(empty)');
   ok('...and no pill is left dimmed',
@@ -1061,7 +1075,7 @@ async function go(hash) {
   // state rather than one flag wearing two faces. Same track as the reset above
   // leaves it: back to the whole corpus first.
   sbtn().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  ok('clicking it again restores the corpus', /6,051/.test(cnt()), cnt());
+  ok('clicking it again restores the corpus', /6,048/.test(cnt()), cnt());
   ok('...and drops setonly from the URL', !/setonly/.test(w.location.hash), w.location.hash);
   const zsel = ssel();
   zsel.value = 'Zeraphi Alchemy';
@@ -1088,8 +1102,8 @@ async function go(hash) {
   // S before its early return, so both controls come back to their defaults.
   d.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(30);
-  ok('#reset clears both set controls and the 6,051 behind them',
-     ssel().value === '' && !sbtn().classList.contains('on') && /6,051/.test(cnt()),
+  ok('#reset clears both set controls and the 6,048 behind them',
+     ssel().value === '' && !sbtn().classList.contains('on') && /6,048/.test(cnt()),
      `${ssel().value} / ${sbtn().className} / ${cnt()}`);
   await go('');
   await wait(30);
@@ -1132,8 +1146,8 @@ async function go(hash) {
      rl.join(',') === 'Strength,Dexterity,Focus,Vitality', rl.join(','));
 
   // ------------------------------------------- the grouped type rail
-  // The rail's counts are over the 6,051 the site shows, not items.json's
-  // 6,176 -- the Unclassified tier is dropped at build time, so a type with no
+  // The rail's counts are over the 6,048 the site shows, not items.json's
+  // 6,173 -- the Unclassified tier is dropped at build time, so a type with no
   // *visible* item renders no row at all. Dagger (1 item), Gold (6) and Armor
   // (1, a collar no source can place) are absent for exactly that reason, which
   // is why this is 36 rows and not the 39 the data emits.
@@ -1193,9 +1207,11 @@ async function go(hash) {
      gct('Weapons/One-Handed') === sumKids('Weapons/One-Handed') &&
      gct('Armor') === sumKids('Armor'),
      `${gct('Weapons')} vs ${sumKids('Weapons')}`);
+  // Misc is three lower than 828: the Torchlight 1 socketables were all Misc.
+  // See TL1_ITEMS. The four still sum to the visible 6,048.
   ok('the groups partition the visible corpus',
      gct('Armor') === 1827 && gct('Weapons') === 1354 &&
-     gct('Accessories') === 2042 && gct('Misc') === 828,
+     gct('Accessories') === 2042 && gct('Misc') === 825,
      [gct('Armor'), gct('Weapons'), gct('Accessories'), gct('Misc')].join('/'));
   ok('the weapons subgroups sum to the group',
      gct('Weapons/One-Handed') + gct('Weapons/Two-Handed') + gct('Weapons/Off-Hand') ===
@@ -1213,7 +1229,7 @@ async function go(hash) {
      !d.querySelector('.sec[data-sec="types"]').classList.contains('closed'));
   await wait(30);   // let jsdom's spurious hashchange settle
   click(hdr('Weapons/One-Handed'));
-  ok('clicking it again clears them', /6,051/.test(cnt()), cnt());
+  ok('clicking it again clears them', /6,048/.test(cnt()), cnt());
   ok('...and the facet is elided from the URL again', !/type=/.test(w.location.hash), w.location.hash);
 
   // a group header reaches through its subgroups; a subgroup does not reach out
@@ -1222,7 +1238,7 @@ async function go(hash) {
   ok('...including the off-hand', rb.querySelector('input[value="Shield"]').checked);
   await wait(30);
   click(hdr('Weapons'));
-  ok('and clears them again', /6,051/.test(cnt()), cnt());
+  ok('and clears them again', /6,048/.test(cnt()), cnt());
   await wait(30);
 
   // The four main categories fold, the way a section does, with the glyph in the
@@ -1252,7 +1268,7 @@ async function go(hash) {
     // Folding is a view preference, like a section's: it must not touch the
     // filter, the URL or the result count.
     ok('folding is not a filter',
-       /6,051/.test(cnt()) && !/type=/.test(w.location.hash), `${cnt()} ${w.location.hash}`);
+       /6,048/.test(cnt()) && !/type=/.test(w.location.hash), `${cnt()} ${w.location.hash}`);
     // The rail is rebuilt on every route change and the rebuild renders every
     // row, so a fold that is not re-applied springs silently open.
     await go('#q=fish');

@@ -377,8 +377,9 @@ kill`.
    set they belong to — and §7 has since made it the truth about weapon damage
    **and armor** too, both recovered from the pre-scale fields TIDBI renders for
    you. Stat and level requirements are still TIDBI's: the DAT has no field for
-   them at all. One of the 6,177 is then withheld as unreconcilable, so
-   **6,176** ship (§7).
+   them at all. One of the 6,177 is withheld as unreconcilable and three more
+   are Torchlight 1 content that shipped in the PAK without ever being wired
+   into TL2 (`TL1_ITEMS`), so **6,173** ship (§7).
 5. Names are English in `DISPLAYNAME`, Russian in `iTRANSLATION`.
 
 ---
@@ -515,8 +516,12 @@ Requirements
 That block is titled **Requirements**; it read "Requires" until the user asked
 for the rename.
 
-Across the 6,176 items: **5,036 have both branches**, 471 a level only, 98 stats
-only, and 571 neither.
+Across the 6,173 items: **5,036 have both branches**, 638 a level only, 98 stats
+only, and 401 neither. The level-only figure was 471 until the socketable curve
+landed: 167 socketables state a level and no stats, and they moved into this
+bucket rather than being counted here (§5). Three more left `neither` when the
+Torchlight 1 socketables were dropped — they stated neither branch, because they
+had no `LEVEL` to read.
 
 **The class line is not a third alternative.** It is a hard restriction layered
 on top of whichever branch you satisfy, so it is labelled `<Class> only` and kept
@@ -938,14 +943,14 @@ verify\            check_page.js — the regression suite the build has to pass
 test\              local scratch, gitignored: research, fixtures, third-party
 out\               generated
   index.html  7.30 MB, self-contained — open it straight off disk
-  items.json  2.31 MB, 6,176 items
+  items.json  2.31 MB, 6,173 items
   items.csv   flat table for Excel/pandas
   sets.json   the 80 set bonus ladders, shared by the 556 set pieces
   icons.webp  1,485x1,440 sprite of all 1,053 icons (lossless)
   icons.json  icon name -> [x, y, w, h]
 ```
 
-**6,176 items** ship. The 85 excluded templates are not obtainable and exist only
+**6,173 items** ship. The 85 excluded templates are not obtainable and exist only
 to be inherited *from*: 78 carry no `NAME` at all (`BASE_2HAXE`,
 `BASEARMOR_CHEST`), and 7 are named but still abstract (`base_cannon`,
 `base_fist`, `base_rifle_NOSKILL`). Every shipped row decodes from the PAK;
@@ -955,7 +960,7 @@ nothing is scraped or invented.
 
 3,257 items carry `DAMAGE_*`/`ARMOR_*` on their own fields. Of the 2,919 that
 don't, walking `BASEFILE` gets **armor onto 1,995 of them but damage onto only
-103**. Final coverage **5,355 / 6,176** with damage or armor. Chains are shallow
+103**. Final coverage **5,355 / 6,173** with damage or armor. Chains are shallow
 and never break — hop histogram `{0:14, 1:265, 3:1}`, zero cycles, zero unresolved
 paths.
 
@@ -991,7 +996,7 @@ and `ownTier(o)` returns `o.uq || o.q`. That single function drives the card's
 colour, the detail's name, the type line's first word **and the tier facet**, so
 each of the 556 is filed under the rarity it actually is — which is why the two
 rows above carry 2,061 and 1,737 rather than the builder's own 1,851 and 1,391,
-and why the four tiers still sum to 6,051. The game paints a set piece in the
+and why the four tiers still sum to 6,048. The game paints a set piece in the
 colour of what it
 actually is and prints **"Unique Set Belt"**, not "Set Belt".
 
@@ -1085,8 +1090,8 @@ of them still got tiered from `NAME` markers (`skeleton_greatsword_u03` →
 Unique via `_u03`, `petcollar_n13b` → Normal via `_n13b`).
 
 **The tier is kept in the db and withheld from the site.** `SITE_HIDDEN_TIERS`
-drops `Unclassified` when writing `index.html`, so the page shows **6,051** of the
-6,176 rows in `items.json` and says so. They stay in the JSON and the CSV —
+drops `Unclassified` when writing `index.html`, so the page shows **6,048** of the
+6,173 rows in `items.json` and says so. They stay in the JSON and the CSV —
 nothing here guesses a tier to make a number look tidier, and an item the sources
 cannot place is a fact about the item.
 
@@ -1260,7 +1265,7 @@ nothing on the card scales them.
 
 39 values. **The item's own DAT decides the type; TIDBI says what to call it.**
 
-The DAT states a `UNITTYPE` for 6,175 of the 6,176 items — the exception is
+The DAT states a `UNITTYPE` for 6,172 of the 6,173 items — the exception is
 `collar_unique_vampire_master10` — so that token is the game's own answer and is
 read first. It is not a display name, though: it is tier + slot, written in the
 engine's spelling. `UNIQUE PANTS` is Leggings, `1HMACE` is Mace, `NORMAL_STUD`
@@ -1417,18 +1422,20 @@ and all stay in `items.json` (none was ever a CSV column — that export carries
 `lv`, `ml` and `lr`):
 
 - **`xl` (`MAXLEVEL`)** — the level the item stops scaling at, a property of the
-  drop rather than of the item. Present on 2,666 of the 6,176 records, and
+  drop rather than of the item. Present on 2,663 of the 6,173 records, and
   **clamped to 999** on the way in (`MAX_LEVEL_CEILING` in `src/build.py`).
   Above 999 the field is a sentinel for "never stops dropping", and the files
   write it four different ways — `9999` (10 items), `99999` (4), `999999` (133),
   `9999999` (112) — all of them on things that never drop in a band at all
-  (potions, quest items, maps, the three fishing rewards); the one other
-  exception is `Map of the Wilds` at `1299`, whose ceiling is a *map* level on a
-  different scale. All 259 collapse to the `999` the rest of the corpus already
-  used for the same idea, taking the population at 999 from 1,068 to 1,327 and
-  the corpus maximum to 999. `MINLEVEL` is **not** clamped — it has sentinels of
-  its own (`777` marks monster-only gear, `998` the ember base templates) and
-  none of them is a ceiling.
+  (potions, quest items, maps); the one other exception is `Map of the Wilds` at
+  `1299`, whose ceiling is a *map* level on a different scale. They collapse to
+  the `999` the rest of the corpus already used for the same idea, taking the
+  population at 999 from 1,068 to **1,324** and the corpus maximum to 999. That
+  is 256 rows, three fewer than the 259 the files carry, because the three
+  Torchlight 1 socketables are dropped before the clamp runs — they were
+  `9999999` carriers themselves. `MINLEVEL` is **not** clamped — it has
+  sentinels of its own (`777` marks monster-only gear, `998` the ember base
+  templates) and none of them is a ceiling.
 - **`skm` (`MAX_SOCKETS`)** — **not** the item's own cap, which is why it is
   gone. It is the ceiling across the item's variants: `legendary2_sword05`
   (Cerulean Nightmare) declares `SOCKETS` 2 and `MAX_SOCKETS` 4, and the 4
@@ -1485,11 +1492,14 @@ sweeping in by level band cannot alternate like that; a botched column copy can.
 Skull of Whorlbarb carries the wiki's own doubt in the cell, `80 (45?)`, where 80
 is the rule and 45 is nothing.
 
-Three socketables have no requirement because they have **no `LEVEL` at all** —
-the fishing rewards Devil Fish, Unicorn Fish and Fish Bones (`MINLEVEL` 2,
-`MAXLEVEL` 9999999 in the file, `RARITY` 0). No curve entry exists to read,
-TIDBI's `iLEVEL` is empty for all three, and the wiki lists none of them, so `lr`
-is left unset rather than guessed.
+Three socketables used to have no requirement because they had **no `LEVEL` at
+all** — Devil Fish, Unicorn Fish and Fish Bones (`MINLEVEL` 2, `MAXLEVEL`
+9999999 in the file, `RARITY` 0). They are no longer in the database. They are
+Torchlight 1 content shipped inside the TL2 PAK, and they are dropped at build
+time by `TL1_ITEMS` in `src/build.py`; that constant carries the whole argument,
+including why their presence in the PAK and in TIDBI is not evidence they were
+ever obtainable here. Nothing is left without a requirement: every socketable on
+the card reads its `lr` off the game's curve.
 
 Damage and armor render as ranges. Weapons also show **Damage per Second** and
 the attack speed in the game's wording (`Very Fast Attack Speed (0.72 seconds)`).
@@ -1601,7 +1611,7 @@ assigning `location.hash`.
 
 A retired `#cat=` link is still accepted and expanded into the types of the
 group it names, so an old bookmark filters rather than silently doing nothing —
-silently showing all 6,051 items is the one failure mode worth avoiding here.
+silently showing all 6,048 items is the one failure mode worth avoiding here.
 It resolves to the group as the taxonomy defines it *today*: `#cat=Armor` is now
 1,827 items, not the 2,206 the old flat category held, because Belt and Shield
 have moved out. `Jewelry` is aliased to `Accessories`; nothing writes `cat=` any
@@ -1672,7 +1682,7 @@ the Icons section above is about.
 
 ### Verifying
 
-`build.py` self-checks: 6,262 decoded / 0 failures, 85 templates, 6,176 emitted,
+`build.py` self-checks: 6,262 decoded / 0 failures, 85 templates, 6,173 emitted,
 exact damage/armor totals, the dps and base-value counts, the Aenigma and Longfang
 rows against ground truth (theirs *and* alfgeir's — both dps figures are alfgeir's
 own), the `heavy_g_amulet_f_alt_b` row as a regression test for the three reported
@@ -1692,7 +1702,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 191
+`verify\check_page.js` goes further and drives the built page in a real DOM — 192
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
