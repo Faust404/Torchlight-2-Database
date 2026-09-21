@@ -25,8 +25,8 @@ import paths
 # site had to move with the tree: while the layout was settling these paths were
 # edited in nine places and got out of step twice.
 OUT = paths.OUT                    # what this writes, regenerated wholesale
-TIDBI = paths.TIDBI                # data/tidbi -- the CSVs and the icons
-ICON_DIR = paths.TIDBI_ICONS       # the 1,053 sprite PNGs
+CSV = paths.CSV_DIR                # data/csv -- the item tables this reads
+ICON_DIR = paths.ICON_DIR          # data/icons -- the 1,053 sprite PNGs
 ALFGEIR = paths.ALFGEIR            # optional; load_alfgeir() copes with {}
 
 sys.path.insert(0, paths.TL2_SRC)
@@ -1019,7 +1019,7 @@ def load_set_bonuses():
     perfectly well-formed ladder.
     """
     out = collections.OrderedDict()
-    for r in read_csv(os.path.join(TIDBI, 'csv', 'sets.csv')):
+    for r in read_csv(os.path.join(CSV, 'sets.csv')):
         tok = (r.get('item') or '').strip().upper()
         tx = (r.get('texteffect') or '').strip()
         try:
@@ -1055,14 +1055,14 @@ def _apos(s):
 
 
 def load_tidbi():
-    items = read_csv(os.path.join(TIDBI, 'csv', 'items.csv'))
+    items = read_csv(os.path.join(CSV, 'items.csv'))
     by_name = {}
     for r in items:
         k = _apos((r.get('ConsolNAME') or '').strip().upper())
         if k:
             by_name[k] = r
     effects = {}
-    for r in read_csv(os.path.join(TIDBI, 'csv', 'effects.csv')):
+    for r in read_csv(os.path.join(CSV, 'effects.csv')):
         it = _apos((r.get('item') or '').strip().upper())
         tx = (r.get('texteffect') or '').strip()
         if it and tx and tx.upper() != 'BLANK_NO_EFFECTS':
@@ -1735,7 +1735,7 @@ def main():
     # trusting the fit it was measured from: every weapon TIDBI also prices has
     # to land on the same seconds. Exactly one does not, and it is deliberate.
     tid_speed = {}
-    for r in read_csv(os.path.join(TIDBI, 'csv', 'items.csv')):
+    for r in read_csv(os.path.join(CSV, 'items.csv')):
         k = (r.get('ConsolNAME') or '').strip().upper()
         v = _num(r.get('SPEED'))
         if k and v:
@@ -1941,7 +1941,7 @@ def main():
     assert tiers == {'Normal': 2161, 'Rare': 1851, 'Unique': 1391, 'Set': 556,
                      'Legendary': 92, 'Unclassified': 125}, tiers
     assert 'Magic' not in tiers, 'Magic is not a tier in this dataset'
-    tid = [r for r in read_csv(os.path.join(TIDBI, 'csv', 'items.csv'))
+    tid = [r for r in read_csv(os.path.join(CSV, 'items.csv'))
            if (r.get('ConsolNAME') or '').upper() == 'LEGENDARY_AXE01']
     assert len(tid) == 1, 'TIDBI has %d rows for legendary_axe01' % len(tid)
 

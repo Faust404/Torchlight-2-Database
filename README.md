@@ -27,7 +27,7 @@ and `PAKS\`. Everything is in two containers:
 | `PAKS\DATA.PAK` | 869,065,014 | the payload |
 | `PAKS\DATA.PAK.MAN` | 5,309,883 | the index |
 
-Both formats are cracked; `data\tl2\index.tsv` holds **70,437 validated file paths**.
+Both formats are cracked; `data\index.tsv` holds **70,437 validated file paths**.
 
 ---
 
@@ -171,14 +171,14 @@ scanning in Python.
 |---|---|---|
 | `src\tl2\dat_decode.py` | **current** | Decodes a `.DAT` in full: header, string block and binary field section. `python dat_decode.py <file.dat\|path/in/pak> [--raw] [--strings]`. |
 | `src\tl2\dat_hash.py` | **current** | The DEK hash and the verified field-name table. `python dat_hash.py NAME` hashes a name; `--fields` prints the table. |
-| `src\tl2\parse_man.py` | **current** | Walks the MAN using the PAK as validator. `--dump data\tl2\index.tsv` regenerates the index. |
+| `src\tl2\parse_man.py` | **current** | Walks the MAN using the PAK as validator. `--dump data\index.tsv` regenerates the index. |
 | `src\tl2\extract.py` | **current** | `python extract.py <pak-path> [outdir]`; `--grep <substr>` lists matching paths. |
 | `test\tl2\dump_dat.py` | superseded | Decodes a `.DAT`'s header and string block only. Superseded by `dat_decode.py`. |
 | `src\build.py` | **current** | Builds the item database and browser into `out\` (§7). `--no-app` skips the page. |
 | `test\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
 | `test\tl2\scan_pak_blocks.py` | superseded | Early PAK walk; validated offsets but its chained walk drifts at a `comp=0` boundary. |
 | `test\tl2\probe_man.py`, `fit_man_layout.py`, `diag_man.py`, `parse_pak_man.py` | superseded | Layout probes that found the real tail sizes. Useful as a record of how the format was derived. |
-| `data\tl2\index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `src\tl2\parse_man.py --dump data\tl2\index.tsv`. |
+| `data\index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `src\tl2\parse_man.py --dump data\index.tsv`. |
 | `test\tl2\sample\` | extracted | `1X1_CLIFF_CONCAVE_S1E1_LM_A.LAYOUT`, `BOSS_BLOATFANG.DAT`, `CHAMPION_TREASURE.DAT`, `TREASURE_MONSTERLOOT_BOSS.DAT`, `FROSTEDHILLS_RULES.TEMPLATE`, `A3-OASIS.DAT`, `GLOBALS.DAT`. |
 
 ---
@@ -293,7 +293,7 @@ registered, so .NET's `System.Data.OleDb` reads it directly. `pip install
 pyodbc` would work through the same driver.
 
 `src\export_tidbi.ps1` dumps the tables to CSV. **Already run** — the output
-is in `data\tidbi\csv\` (UTF-8 with BOM, headers quoted):
+is in `data\csv\` (UTF-8 with BOM, headers quoted):
 
 | Table | Rows | |
 |---|---|---|
@@ -909,9 +909,9 @@ src\
   tl2\             the PAK reader: dat_decode, dat_hash, parse_man, extract
 web\               the browser's source: index.html, app.css, app.js, fonts\
 data\              the three inputs the build cannot run without
-  tl2\index.tsv    70,437 validated PAK paths
-  tidbi\csv\       TIDBI's tables
-  tidbi\icons\     1,053 sprite PNGs
+  index.tsv        70,437 validated PAK paths
+  csv\             the item tables, read at build time
+  icons\           1,053 sprite PNGs
 test\              non-production: the jsdom suite, the card studies, research
 out\               generated
   index.html  8.41 MB, self-contained — open it straight off disk

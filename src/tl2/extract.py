@@ -12,7 +12,7 @@ import paths
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 PAK = paths.PAK
-INDEX = paths.TL2_INDEX
+INDEX = paths.PAK_INDEX
 
 
 def load_index():

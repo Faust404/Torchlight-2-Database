@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 from dat_hash import dek
 
 idx = {}
-with open(paths.TL2_INDEX, encoding='utf-8') as fh:
+with open(paths.PAK_INDEX, encoding='utf-8') as fh:
     next(fh)
     for line in fh:
         o, u, p = line.rstrip('\n').split('\t'); idx[p] = (int(o), int(u))

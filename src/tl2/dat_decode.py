@@ -59,7 +59,7 @@ def pak_index():
     global _INDEX
     if _INDEX is None:
         idx = {}
-        with open(paths.TL2_INDEX, encoding='utf-8') as fh:
+        with open(paths.PAK_INDEX, encoding='utf-8') as fh:
             next(fh)
             for line in fh:
                 o, u, p = line.rstrip('\n').split('\t')

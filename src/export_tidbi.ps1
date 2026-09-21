@@ -18,12 +18,12 @@ Usage:
 
 Both defaults are relative to this script, not to the caller's directory: the
 database is research material under test/, and the CSVs it writes are a build
-input under data/. Neither reads the build; this only regenerates data/tidbi/csv
+input under data/. Neither reads the build; this only regenerates data/csv
 when the archive is re-exported.
 #>
 param(
     [string]$Mdb    = (Join-Path $PSScriptRoot "..\test\tidbi\base.mdb"),
-    [string]$OutDir = (Join-Path $PSScriptRoot "..\data\tidbi\csv")
+    [string]$OutDir = (Join-Path $PSScriptRoot "..\data\csv")
 )
 
 $ErrorActionPreference = "Stop"

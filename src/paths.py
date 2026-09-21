@@ -38,14 +38,20 @@ TEST = os.path.join(ROOT, 'test')
 TL2_SRC = os.path.join(SRC, 'tl2')
 
 # --- build inputs, committed -------------------------------------------------
-TL2_INDEX = os.path.join(DATA, 'tl2', 'index.tsv')   # 70,437 validated PAK paths
-TIDBI = os.path.join(DATA, 'tidbi')
-TIDBI_CSV = os.path.join(TIDBI, 'csv')               # display text, effects, sets
-TIDBI_ICONS = os.path.join(TIDBI, 'icons')           # the 1,053-file sprite source
+# Flat on purpose: these names say what the data is, not who published it.
+# index.tsv is the game's own archive index and the tables began as TIDBI's
+# export, but TIDBI is a cross-check now -- README.md §5 records its provenance,
+# and nothing in the build needs to know it.
+PAK_INDEX = os.path.join(DATA, 'index.tsv')   # 70,437 validated PAK paths
+CSV_DIR = os.path.join(DATA, 'csv')           # the item tables the build reads
+ICON_DIR = os.path.join(DATA, 'icons')        # the 1,053-file sprite source
 
-# alfgeir is deliberately NOT under data/: load_alfgeir() returns {} when this
-# file is missing and the build still runs. It is the *second* link in the name
-# chain (see build.py), so it is research material and lives in test/.
+# alfgeir is deliberately NOT under data/. load_alfgeir() returns {} when this
+# file is missing and the build still runs -- and measurably: built with the
+# file absent, alfgeir contributes 0 tags and every artifact hashes the same.
+# It is the *second* link in the name chain (build.py, item_name), so it is a
+# standing cross-check that could matter if that chain changes, not an input.
+# Research material, so test/.
 ALFGEIR = os.path.join(TEST, 'alfgeir', 'EN.json')
 
 # --- the game install, outside the repo --------------------------------------
