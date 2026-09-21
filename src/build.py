@@ -1021,7 +1021,7 @@ def load_set_bonuses():
     out = collections.OrderedDict()
     for r in read_csv(os.path.join(CSV, 'sets.csv')):
         tok = (r.get('item') or '').strip().upper()
-        tx = (r.get('texteffect') or '').strip()
+        tx = _decimal((r.get('texteffect') or '').strip())
         try:
             cnt = int(r.get('countset') or 0)
         except ValueError:
@@ -1054,6 +1054,31 @@ def _apos(s):
     return s.replace('`', "'")
 
 
+# A comma between two digits. See _decimal() for why that is a decimal point
+# and not a list separator; build() asserts on this same pattern at the end, so
+# the fold and the check cannot come to disagree about what they are looking for.
+DECIMAL_COMMA = re.compile(r'(?<=\d),(?=\d)')
+
+
+def _decimal(s):
+    """The same export writes decimals the way its locale does: `-1,1%` where
+    the game prints `-1.1%`. A reader sees `-7,5%` as a typo, and a spreadsheet
+    reads it as text, so it is folded here rather than left for the browser.
+
+    Four values are affected today -- 1,1 / 1,5 / 4,5 / 7,5, all of them
+    physical-damage-taken lines -- across 43 effect rows and 4 set rows. They
+    are also the whole of the problem: the corpus prints the same kind of value
+    both ways, so the page was showing "+3.5% Attack Speed" beside "-7,5%
+    Physical Damage Taken", the points arriving from the game's own DAT text and
+    the commas from TIDBI.
+
+    Digit-comma-digit, anchored on both sides. The digits are the whole of the
+    safety argument: no string in this corpus carries a thousands separator, so
+    a comma with digits on both sides is a decimal point in every case there is,
+    and a comma that separates a list never has one."""
+    return DECIMAL_COMMA.sub('.', s)
+
+
 def load_tidbi():
     items = read_csv(os.path.join(CSV, 'items.csv'))
     by_name = {}
@@ -1064,7 +1089,7 @@ def load_tidbi():
     effects = {}
     for r in read_csv(os.path.join(CSV, 'effects.csv')):
         it = _apos((r.get('item') or '').strip().upper())
-        tx = (r.get('texteffect') or '').strip()
+        tx = _decimal((r.get('texteffect') or '').strip())
         if it and tx and tx.upper() != 'BLANK_NO_EFFECTS':
             # the row id is carried through, not just the text: it is what
             # split_effects() uses to tell a block's own rows from the affixes
@@ -1566,6 +1591,19 @@ def build():
         'sets with an unreachable top rung drifted: %d' % len(_short)
     print('  SET BONUS: %d ladders, %d rungs, %d sets gate a rung they cannot reach'
           % (len(sets), sum(len(s['b']) for s in sets.values()), len(_short)))
+    # Every display string the page can print, checked for a decimal comma that
+    # survived. _decimal() folds TIDBI's on the way in, but the affix text also
+    # arrives from the DAT and that path is not wrapped -- the game ships
+    # localized archives, so a non-English install could supply "-1,5%" where
+    # the English one supplies "-1.5%". Checking the corpus at the end rather
+    # than trusting either source is the only version of this that holds.
+    _commas = [t for o in out
+               for t in [o.get('ds', '')] + list(o.get('fx', ()))
+                         + [l for a in o.get('aug', ()) for l in a['fx']]
+               if DECIMAL_COMMA.search(t)]
+    _commas += [t for s in sets.values() for _, ts in s['b'] for t in ts
+                if DECIMAL_COMMA.search(t)]
+    assert not _commas, 'comma decimals reached the output: %s' % _commas[:3]
     # And the other reading of the same question: `_short` counts the corpus, this
     # counts what a character can wear. The site dims a rung on _over, not on
     # _short, because a set may ship one record of a piece that fills two slots.
