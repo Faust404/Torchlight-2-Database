@@ -89,6 +89,17 @@ Two third-party sources fed the work and are credited in
 database was the shortcut around the `.DAT` binary section, and the **alfgeir**
 item-name mapping. Neither is redistributed here.
 
+## License
+
+The code — everything under `src\`, `web\` and `verify\` — is
+[GPL-3.0](LICENSE).
+
+That does not extend to the Torchlight II material this repo carries. The 1,053
+icons under `data\icons\` and the item stats derived from the game's files are
+Runic Games' property, committed because the build cannot run without them, and
+no license here can grant rights to them. The same goes for the third-party
+sources credited above: TIDBI's tables and alfgeir's name mapping remain theirs.
+
 ## More
 
 **[REFERENCE.md](REFERENCE.md)** is the full technical record — how both formats
