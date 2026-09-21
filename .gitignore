@@ -2,11 +2,25 @@ __pycache__/
 *.py[cod]
 node_modules/
 
-# Build output. `python db/build.py` regenerates all of it from the sources in
-# test/, and two of the files make it a bad thing to carry in history: icons.png
-# is cropped game art, and index.html is 8.3 MB rewritten on every build.
+# Build output. `python src/build.py` regenerates all of it from `data/`, and two
+# of the files make it a bad thing to carry in history: index.html is 8.4 MB
+# rewritten on every build, and icons.png is an atlas cut from the game's own art
+# -- the same art the source PNGs under data/tidbi/icons/ carry. Those are
+# tracked because the build cannot run without them; this is regenerated.
+out/
+
+# Pre-migration output path. Nothing writes here any more; this rule goes when
+# the directory does.
 db/out/
 
 # A scrape of grimtools.com kept for reference while designing the rail and the
 # card. Not ours, and not something this repo should republish.
 test/grimtools_ui_reference/
+
+# Third-party distributions, kept on disk for reference but not republished with
+# this repo: TIDBI shipped as a Windows installer, and the alfgeir site is
+# someone else's scrape. The one file each contributes to the build stays tracked.
+test/alfgeir/*
+!test/alfgeir/EN.json
+test/tidbi/base.mdb
+test/tidbi/TIDBI.exe
