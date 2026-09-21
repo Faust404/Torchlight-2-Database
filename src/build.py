@@ -1620,8 +1620,9 @@ def write_page(items, coords, png, size, sets):
     # The five element marks, a strip of five equal tiles. Its geometry is read
     # off the PNG instead of being written into app.css, so re-cutting the strip
     # cannot leave the sprite's offsets and the CSS disagreeing about the size
-    # of a tile. The app's copy is its own -- see app/fonts/README.md and
-    # test/card_mockups/README.md for why there is more than one.
+    # of a tile. The app's copy is its own -- see web/fonts/README.md, and the
+    # card studies under test/card_mockups/ (local only, untracked) for why
+    # there is more than one.
     with open(os.path.join(app, 'elements.png'), 'rb') as fh:
         strip = fh.read()
     with Image.open(io.BytesIO(strip)) as ei:

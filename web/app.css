@@ -43,7 +43,7 @@
   --body:#c9c2b6; --val:#d8cfc0; --dim:#8b837b; --faint:#6f6862; --magic:#7cc24a;
 
   /* Bitter, for the affix lines, the set ladder and the requirement chips. It is
-     embedded, not linked -- see app/fonts/README.md -- so the fallbacks are the
+     embedded, not linked -- see web/fonts/README.md -- so the fallbacks are the
      serifs the platform has rather than another webfont. */
   --doc:Bitter,Georgia,"Times New Roman",serif;
 
