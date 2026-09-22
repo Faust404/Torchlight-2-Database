@@ -1321,25 +1321,36 @@ Because the printed number follows the level, an item with `MAXLEVEL 9999999` �
 a cap rather than a missing field — prints a **different statline in each
 playthrough**. The game generates it at the level of whatever dropped it, which
 in Normal is the file's own `LEVEL` and in NG+n is higher. The eyes are the clean
-case — 35 in the files, 31 of them with a wiki table — because their values move
-with the level in *both* slots and each such table has four rows: **the Normal
-row equals the file's `LEVEL` on all 31**, and every row's `Req. Level` is
-`max(1, LEVEL - 8)` off the game's own `ITEM_LEVEL_REQUIREMENTS_SOCKETABLE` —
-42 rows of 42. The four rows are one item printed at four levels, not four
-items.
+case — 35 in the files, 31 with a wiki page — because their values move with the
+level in *both* slots. Sixteen of those pages carry a table, and on all 16 **the
+Normal row equals the file's `LEVEL`**, with every row's `Req. Level` the
+`max(1, LEVEL - 8)` off the game's own `ITEM_LEVEL_REQUIREMENTS_SOCKETABLE`
+curve. The rows are one item printed at several levels, not several items.
 
-**Every number in those 42 rows comes out of the files.** Applying the rule
-above to the eye's own affixes reproduces all 38 curved values on the rows that
-carry one, and the effects with no curve print the affix's own percentage, 28 in
-their own row and 19 more through a cell the wiki merged across rows
-(`rowspan`). The Eye of Winter Widow is the type specimen: `UNIQUE_MAGIC_BONUS3`
+Most tables give four — Normal, NG+1, NG+2, NG+3 — but not all, and the
+exceptions are the point:
+
+| table | rows | what it is |
+|---|---|---|
+| 13 eyes | 4 | the standard ladder |
+| The Eye of Gallo | 6 | NG+4 and NG+5 repeat NG+3's values; 100 is the cap |
+| The Eye of Ezrek Khan | 4 | labels its rows `0 / 1 / 2 / 3+` instead of Normal / NG+n |
+| The Eye of Prion-Kuru | 3 | NG+2 is **absent** — not `?`, no row at all |
+
+**Every number in those 42 rows comes out of the files.** The 42 are what a
+strict parse sees: the rows of the 15 standard tables that state a level, `?`
+cells and Ezrek Khan's separately-labelled table falling outside it. Applying
+the rule above to the eye's own affixes reproduces all 38 curved values on the
+rows that carry one, and the effects with no curve print the affix's own
+percentage, 28 in their own row and 19 more through a cell the wiki merged
+across rows (`rowspan`). The Eye of Winter Widow is the type specimen: `UNIQUE_MAGIC_BONUS3`
 (120) over `ATTRIBUTE_BONUS` gives 6, 24, 36, 42 at levels 11, 57, 85, 100, and
 `GEM_IRONEMBER_WEAPON_DEGRADEARMOR` (15) over `ARMOR_MONSTER_BYLEVEL` gives 6,
 67, 134, 180 — its four rows, both slots, the affix's own value, `ceil`. Five
 effect-rows stay unaccounted for across the whole set, and all five are the
 damage-over-time TYPE above: no other effect on any eye is unexplained.
 
-**The four levels are the only thing the files do not state.** No eye DAT, no
+**The NG levels are the only thing the files do not state.** No eye DAT, no
 spawn class and no monster unit carries them — the eyes' own
 `*_EYE_CHANCE` and treasure classes are level-less — and there are no per-NG
 item variants: `*NGP` names exist for monsters and skills, not for items. What
@@ -1353,14 +1364,25 @@ constants that fit every published NG level are
 
     NG+1 = 51 + (level - 1) x 29/49        NG+2 = 81 + (level - 1) x 18/49
 
-with NG+3 always 100 because 100 is the cap: 10 of 10, 7 of 7 and 6 of 6. Two
-free parameters fitted to 23 points is a **hypothesis with predictions**, not a
-rule, and it is worth stating which predictions are still untested — the wiki
-leaves NG+1 and NG+2 of most eyes as `?` and has no table at all for 16 of the
-31, so the eyes it does not cover (The Eye of Tiamat at `LEVEL` 54, say, which
-the formula sends to 82 / 100 / 100) are where it would be falsified. Nothing
-downstream needs it: the numbers on every row follow from the level, so the
-level is the whole of the transcription.
+with NG+3 always 100 because 100 is the cap. The wiki publishes a NG level on
+**30 rows**, and the formula reproduces **30 of 30** — 12, 9 and 9 per rung. Two
+free parameters fitted to 23 of them, with the other 7 out of sample, is still a
+**hypothesis with predictions**, not a rule, and it is worth stating which
+predictions are untested. The wiki leaves 16 NG cells as `?`, has no table at
+all for 15 of its 31 pages, and has no page for 4 of the 35 eyes; those are
+where it would be falsified. The Eye of Tiamat at `LEVEL` 54 is the first — the
+formula sends it to 82 / 100 / 100.
+
+**Prion-Kuru is the live one, because its missing row is already on a page.** Its
+table stops at NG+1 and resumes at an unlabelled 100, so its NG+2 has to be
+invented: `LEVEL` 16 gives **87**, which prints `+328 Health` and `+82 Electric
+Damage`. Both of its stated NG rows are confirmations — 60 and 100, the latter
+matching `+375` and `+94` to the digit — so the page is the one place a reader
+can already check three of the four rows against the files. The fourth is the
+prediction.
+
+Nothing downstream needs it: the numbers on every row follow from the level, so
+the level is the whole of the transcription.
 
 ### Type facet, and the rail's taxonomy
 
