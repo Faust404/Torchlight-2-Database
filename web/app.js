@@ -1055,13 +1055,26 @@
     S.tiers = new Set(allVals().tiers);
   }
 
+  // A hash is untrusted text: it arrives from a link, a bookmark, or a reader
+  // who typed it. `decodeURIComponent('50%')` throws URIError, and readHash is
+  // called from onRoute(), which is the last statement of this file -- so one
+  // bare `%` in the URL threw out of the whole script and the page rendered
+  // *nothing*: no grid, no count, no rail. `#q=frost` and `#q=50%25` both work;
+  // only the malformed spelling failed, which is exactly the one a person
+  // hand-editing a link produces. Undecodable text falls back to itself, so the
+  // worst case is a search for a literal "50%" that matches nothing, which is
+  // legible, rather than a blank page, which is not.
+  function dec(s) {
+    try { return decodeURIComponent(s); } catch (e) { return s; }
+  }
+
   function readHash() {
     var s = location.hash.replace(/^#/, '');
     resetState();
     if (!s || s === 'reset') return;
     s.split('&').forEach(function (kv) {
-      var i = kv.indexOf('='), k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i)),
-          v = i < 0 ? '' : decodeURIComponent(kv.slice(i + 1));
+      var i = kv.indexOf('='), k = dec(i < 0 ? kv : kv.slice(0, i)),
+          v = i < 0 ? '' : dec(kv.slice(i + 1));
       var list = v ? v.split(',') : [];
       // `cat=` was its own facet until the rail grouped types under category
       // headers. The old links are expanded rather than dropped, so a stale

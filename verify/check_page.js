@@ -532,6 +532,24 @@ async function go(hash) {
   const d4 = await deep('#q=aenigma');
   ok('deep link with a search term renders 1', d4.querySelectorAll('#grid .card').length === 1,
      `${d4.querySelectorAll('#grid .card').length}`);
+  // `decodeURIComponent('50%')` throws URIError, and readHash runs from onRoute,
+  // the last statement of app.js -- so one bare `%` in a hand-edited URL threw
+  // out of the script and the page drew *nothing*: no cards, no rail, and an
+  // empty count. The failed text now falls back to itself, which makes `50%` a
+  // literal search that matches nothing -- an empty grid, which is legible,
+  // rather than a blank page, which is not. So what is asserted is that the
+  // page finished rendering (the count is populated, which only paintGrid does)
+  // and that both spellings agree. Not asserted on a captured error: the
+  // suite's listener only sees the main window.
+  const pct = await deep('#q=50%');
+  const pctN = pct.getElementById('count').textContent;
+  ok('a hash with a bare percent renders the page instead of throwing',
+     /^0 items of 6,048$/.test(pctN) && pct.getElementById('railbody').children.length > 0,
+     `${pct.querySelectorAll('#grid .card').length} cards, count ${JSON.stringify(pctN)}`);
+  const pctOk = await deep('#q=50%25');
+  ok('...and the well-formed spelling of the same search reads the same way',
+     pctOk.getElementById('count').textContent === pctN,
+     `${pctOk.getElementById('count').textContent} vs ${pctN}`);
   // The two fields that are built but not rendered, checked on a record that
   // actually carries both -- legendary2_sword05 has xl=999 and skm=4. Aenigma
   // (above) has neither, so asserting their absence there would prove nothing.
