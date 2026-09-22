@@ -2132,6 +2132,14 @@ had to nominate an end the data does not have. An empty box is an open bound at
 that end; both empty is no constraint at all, which is also how the field is
 cleared.
 
+**The Name box is the toolbar's own field, and it is labelled the short way.**
+The panel's Name row writes `S.q`, which `matches()` tests against the item's
+name, its id **and** its type — one field, two surfaces, and the toolbar box
+still advertises "Search name or type…". The panel's placeholder says `name or
+id`, because the Type section is where a reader now goes to ask for a type by
+name; the predicate was deliberately left alone, since narrowing it would change
+what every existing `#q=` link means to save a reader nothing.
+
 **Sockets are five chips, 1–5.** A tick means "an item with this many sockets is
 a match", so 2 and 4 ticked answer the items with 2 sockets or with 4 — a pair
 of counts in one control, which the min–max pair it replaced could not express
@@ -2145,15 +2153,38 @@ chip, which is the panel's own way of clearing the field. The row says so in as
 many words underneath, because it is the one row whose empty state is *any*
 rather than *none*.
 
-**Rarity is four more chips** — Normal, Rare, Unique, Legendary, in `TIERORDER`'s
-order — over the same `S.tiers` the strip above the grid writes. One filter, two
+**Rarity is four controls the page already had** — Normal, Rare, Unique,
+Legendary, in `TIERORDER`'s order — over the same `S.tiers` the strip above the
+grid writes. They are not chips: they are `.tpill` itself, the strip's own
+control, wearing the same `.t-` ink class `tierInk()` derives for it, so a
+tier's colour is decided once for both surfaces and the dimmed `off` state is
+the same state. `advPills()` is a second renderer rather than a flag on
+`advChips()` for that reason: a chip needs `min-width` and a scoreboard font for
+one digit, a pill needs the tier's colour, and one renderer bent to both would
+have had to restate the colours where they could drift. One filter, two
 surfaces: a panel commit repaints the strip, and the suite reads the strip's own
 boxes back as the witness. Unclassified is not among them; none of those 125
-records reaches the page, so a fifth chip could never match — the same trade the
-socket row makes with zero.
+records reaches the page, so a fifth control could never match — the same trade
+the socket row makes with zero.
+
+**The pills carry no count.** `paintCounts()` fills every `[data-ct]` span in
+the page, which is the strip's whole readout and would throw on one outside the
+rail; and the count that would belong there is the count of a *draft*, which is
+not a thing the page can compute before Search. A pill showing the figures of a
+search nobody has run is worse than a pill showing none.
+
+**Three rules in the panel exist only because `.tpill` was built for `#tiers`**,
+and each was a visible defect before it: `.rng span` (a class plus a type)
+outranks a bare `.t-rare` and printed every tier in grey; `.rng input`'s padding
+and border survive `.tpill input`'s `width:0` under `box-sizing:border-box`,
+laying 14px of invisible box at the head of each pill; and `.tpill`'s own 6px
+gap — the space between a word and its count in the strip — had nothing left to
+separate, so it pushed each word 3px right of centre. Nothing of the sort is
+fixed in `.tpill`: the strip meets none of it. The suite asserts the three rules
+are present, since jsdom lays nothing out.
 
 **Two rows are allow-lists and open fully ticked.** The 36 type boxes and the 4
-rarity chips are on when the panel opens, because both answer "which of these do
+rarity pills are on when the panel opens, because both answer "which of these do
 you want": no filter means all of them, so all of them is what the control shows
 for it. The socket chips run the other way — their dark state *is* the absence of
 a filter — and the two hint lines under those rows are what keeps the difference
@@ -2191,6 +2222,18 @@ row look like it did not work. The rule cannot be asserted in jsdom — it
 computes a rule once and does not re-resolve after a click — so the suite asserts
 the rule itself and that the render-time class it replaced is gone.
 
+**The rarity pills are the exception, and only because they must be.** Their off
+state is `.tpill.off`, a class on the *label* whose colours derive from
+`currentColor` — no selector can reach an ancestor from the box inside it, so a
+`:checked` rule cannot draw it. The class is written twice, both times the way
+the strip's own is written: at render, and on `change` in the panel's listener —
+`change` and not `click`, because a click on the pill's label arrives *before*
+the browser has moved the box, and a click handler would read the old state. It
+is the one thing the panel does by hand instead of re-rendering, since
+`renderAdv()` would drop the reader back to the top of a much longer panel.
+`paintCounts()` writes the same class on the strip, so the two surfaces dim by
+one rule.
+
 **The panel's Type list is the whole corpus, always.** `advTypes()` reads its
 types from `ALLTYPES` — a set built once from every item in `DB.items` — rather
 than from the *filtered* facet the rail is built from. The rail drops a row when
@@ -2227,7 +2270,7 @@ onRoute();` — the route the search box's Enter takes.
 | item level | `lvlMin/Max` | the item's own level, either end open |
 | player level | `plrMin/Max` | **equippable in that band** — `LEVEL_REQUIRED` between the two, and an item naming no requirement passes |
 | type | `types` | a box per type in `ALLTYPES`; **or** across boxes; all (or none) ticked = no filter |
-| rarity | `tiers` | the four chips; the same `S.tiers` the strip above the grid writes; all ticked = no filter |
+| rarity | `tiers` | the four pills (the strip's own `.tpill`); the same `S.tiers` the strip above the grid writes; all ticked = no filter |
 | sockets | `sockSet` | a tick per count in `SOCKCHIPS`; **or** across ticks |
 | stat requirements | `req` | `{str\|dex\|mag\|def: [min, max]}`, either end open |
 | class | `cls` | **usable by** — an item with no `cls`, or `cls` in the set |
@@ -2501,7 +2544,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 302
+`verify\check_page.js` goes further and drives the built page in a real DOM — 306
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -2521,7 +2564,10 @@ group, every box ticked at rest and again after Reset, the type and rarity rows
 elided from the URL when they are full, an unticked rarity reaching the strip
 above the grid as the same member, the socket chips answering one count alone and
 two counts with a gap between them, a chip lit by its own checkbox rather than by
-a class a re-render wrote, both empty boxes meaning no constraint, a value-less
+a class a re-render wrote, the rarity row being the strip's own pill by class --
+one per rarity, each in its own tier ink, dimmed the moment it is unticked and
+before any Search, carrying no count for `paintCounts()` to fill, both empty
+boxes meaning no constraint, a value-less
 stat's boxes switched off, and a cold-loaded URL putting every control back where
 it was spelled),
 the set bonus

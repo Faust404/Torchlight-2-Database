@@ -1567,12 +1567,12 @@
       if (seen[i].checked) advS.types.add(seen[i].value);
       else advS.types.delete(seen[i].value);
     }
-    // The chip's number is its data-achip, not a `value` attribute: one
-    // spelling of it, and the same one advChips() renders from. Reading
-    // .value here would collect "on" from every chip -- a checkbox with no
-    // value attribute reports the browser's default -- and +"on" is NaN, which
-    // is a Set of one member that matches nothing and writes `sk=` as an empty
-    // list on the way out.
+    // The chip's number rides in the checkbox's own `value`, which is what
+    // advChips() writes it to; data-achip is only the marker naming this row.
+    // (The trap the marker keeps apart from the number: a checkbox with no value
+    // attribute reports the literal "on", and +"on" is NaN -- a Set of one
+    // member that matches nothing and writes `sk=` as an empty list on the way
+    // out.)
     advS.sockSet = new Set();
     var chips = root.querySelectorAll('[data-achip]');
     for (i = 0; i < chips.length; i++)
@@ -1747,16 +1747,39 @@
     }).join('') + '</div>';
   }
 
+  // The rarity row, which is *not* a chip row: it is the page's own tier pill --
+  // the same .tpill the strip above the grid renders, wearing the same ink class
+  // tierInk() derives, so the two controls that write S.tiers are one control
+  // twice over and a tier's colour cannot be right on one and wrong on the
+  // other. Hence a second renderer rather than a flag on advChips: a chip is a
+  // digit that wants a fixed min-width and a tabular figure, a pill is a tier's
+  // name wearing that tier's colour, and one renderer bent to both would have to
+  // restate .tpill's colours here, where they could drift.
+  //
+  // No count span either. paintCounts() fills every [data-ct] in the page and
+  // would throw on one outside the rail, and a count of the *draft* is not a
+  // thing the page can compute before Search -- the pills would be showing
+  // figures from a search nobody has run.
+  function advPills(attr, list, on) {
+    return '<div class="tgrid pills">' + list.map(function (c) {
+      var lit = on.has(c);
+      return '<label class="tpill ' + tierInk(c) + (lit ? '' : ' off') + '">' +
+        '<input type="checkbox" data-' + attr + ' value="' + esc(c) + '"' +
+        (lit ? ' checked' : '') + '>' +
+        '<span class="lbl">' + esc(c) + '</span></label>';
+    }).join('') + '</div>';
+  }
+
   function renderAdv() {
     var g = '<div class="rng"><span class="rl">Name</span>' +
       '<input type="text" data-a="q" value="' + esc(advS.q) +
-      '" placeholder="name, id or type"></div>';
+      '" placeholder="name or id"></div>';
     g += advRange('lvl', 'Item Level', advS.lvlMin, advS.lvlMax);
     g += advRange('plr', 'Player Level', advS.plrMin, advS.plrMax);
     // A row of its own rather than a pair: the label column is the same 84px
     // the rows above use, so the chips line up under the boxes they replace.
     //
-    // The hint is not padding. These chips start dark and the rarity chips below
+    // The hint is not padding. These chips start dark and the rarity pills below
     // start lit, because the two rows answer two different questions: sockets
     // asks "which counts do you want", so nothing ticked is any count, while
     // rarity is an allow-list whose everything-on state is no rarity filter.
@@ -1766,7 +1789,7 @@
     g += '<div class="rng"><span class="rl"></span><span>No chip ticked means' +
       ' any number of sockets.</span></div>';
     g += '<div class="rng"><span class="rl">Rarity</span>' +
-      advChips('atier', RARITYCHIPS, advS.tiers) + '</div>';
+      advPills('atier', RARITYCHIPS, advS.tiers) + '</div>';
 
     // "Stat Requirements", because that is what these four are: an item's
     // requirement is met either by its level or by its stats, and these rows
@@ -1980,7 +2003,21 @@
   // per keystroke, so this cannot fight the caret.
   document.getElementById('adv').addEventListener('change', function (e) {
     var t = e.target;
-    if (!t.getAttribute || t.getAttribute('data-aaff') == null) return;
+    if (!t.getAttribute) return;
+    // A rarity pill dims itself here rather than in CSS. .tpill's off state is a
+    // class on the label whose colours derive from currentColor, and no selector
+    // can reach an ancestor from the box inside it. This is the class
+    // paintCounts writes for the strip above the grid, and writing it by hand is
+    // the one thing this panel does instead of re-rendering -- renderAdv() would
+    // drop the reader back to the top of a much longer panel.
+    // `change`, not `click`: a click on the pill's label arrives before the
+    // browser has moved the box, so a click handler would read the old state.
+    if (t.getAttribute('data-atier') != null) {
+      var pill = t.closest && t.closest('.tpill');
+      if (pill) pill.classList.toggle('off', !t.checked);
+      return;
+    }
+    if (t.getAttribute('data-aaff') == null) return;
     advCollect();
     var i = +t.getAttribute('data-aaff'), c = advS.aff[i];
     if (!c) return;

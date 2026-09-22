@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 302
+ * view, provenance, the advanced-search panel and hash deep links -- 306
  * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
@@ -2130,14 +2130,57 @@ async function go(hash) {
     click(ad.getElementById('advgo'));
 
     // --- the rarity row ----------------------------------------------------
-    // Four chips over the same S.tiers the strip above the grid writes, which is
-    // the reason this is here and not in the strip: one filter, two surfaces,
+    // Four controls over the same S.tiers the strip above the grid writes, which
+    // is the reason this is here and not in the strip: one filter, two surfaces,
     // and a commit has to reach both or the reader is looking at two answers.
     // The row runs the other way from the socket chips -- all four on at rest,
     // because it is an allow-list and "no rarity filter" is every rarity -- so
     // unticking one is what asks for something.
     click(abtn);
-    click(rc()[3].closest('label').querySelector('span'));       // Legendary
+    // They are not chips: they are the page's own .tpill, wearing the same .t-
+    // ink class tierInk() gives the strip, so a tier's colour is decided once
+    // for both controls. Asserted as the class pair rather than as a colour,
+    // because a colour is what jsdom cannot resolve (see the suite's note on
+    // state-dependent CSS) and the class is what the colour is derived from.
+    const pills = () => [].slice.call(ad.querySelectorAll('#advb .tpill'));
+    ok('the rarity row is the page\'s own tier pill, one per rarity, in its own ink',
+       pills().length === 4 &&
+       pills().map(p => p.className).join('|') ===
+         'tpill t-normal|tpill t-rare|tpill t-unique|tpill t-legendary',
+       pills().map(p => `${p.textContent}:${p.className}`).join(' | '));
+    // The off state is a class on the label, so no `:checked` rule can reach it
+    // from the box inside; the panel writes it on `change` instead, the way
+    // paintCounts writes it for the strip. This is that write, and it has to
+    // happen before any Search -- the pill is drawn from the draft, and a
+    // control that only dims after a commit would be lying about the draft.
+    click(rc()[3].closest('label').querySelector('.lbl'));       // Legendary
+    ok('...and unticking one dims it there and then, with the strip\'s own off class',
+       pills().map(p => p.className).join('|') ===
+         'tpill t-normal|tpill t-rare|tpill t-unique|tpill t-legendary off' &&
+       !/tier=/.test(aw.location.hash),
+       `${pills().map(p => p.className).join(' | ')} / ${aw.location.hash || '(empty)'}`);
+    ok('...and the pills carry no count, which paintCounts would fill and throw on',
+       ad.querySelectorAll('#advb .tpill [data-ct]').length === 0,
+       `${ad.querySelectorAll('#advb .tpill [data-ct]').length} count spans`);
+    // Two rules, both quarantining the pill row from the `.rng` row it sits in.
+    // jsdom lays nothing out and substitutes no var(), so neither can be checked
+    // by its effect -- what is asserted is that the rules are in the page, the
+    // way the `:checked` chip rule is. Without the first, `.rng span` (a class
+    // plus a type) outranks a bare `.t-rare` and every tier prints grey; without
+    // the second, `.rng input`'s padding and border survive `.tpill input`'s
+    // width:0 under border-box and lay 14px of invisible box at the head of each
+    // pill, which is what pushed every word off-centre.
+    const pillCss = ad.querySelector('style').textContent;
+    // The third is the pill's own gap: 6px between the box and the word in the
+    // strip, where it sets the count off from the name -- and 3px of rightward
+    // drift in the panel, where the box is collapsed and the count is absent.
+    ok('...and the panel\'s own row rules are kept off the pills',
+       /#adv \.tgrid\.pills \.lbl\s*\{[^}]*color:inherit/.test(pillCss) &&
+       /#adv \.tgrid\.pills input\s*\{[^}]*padding:0/.test(pillCss) &&
+       /#adv \.tgrid\.pills \.tpill\s*\{[^}]*gap:0/.test(pillCss),
+       `label rule ${/#adv \.tgrid\.pills \.lbl/.test(pillCss)} / ` +
+       `input rule ${/#adv \.tgrid\.pills input/.test(pillCss)} / ` +
+       `gap rule ${/#adv \.tgrid\.pills \.tpill/.test(pillCss)}`);
     click(ad.getElementById('advgo'));
     ok('unticking a rarity narrows to the rest, and names them in the URL',
        aw.location.hash === '#tier=Normal%2CRare%2CUnique' && an() === '5,956 items of 6,048',
@@ -2149,7 +2192,7 @@ async function go(hash) {
        [].map.call(ad.querySelectorAll('#tiers input'),
          i => i.value + (i.checked ? '+' : '-')).join(' '));
     click(abtn);
-    click(rc()[3].closest('label').querySelector('span'));
+    click(rc()[3].closest('label').querySelector('.lbl'));
     click(ad.getElementById('advgo'));
     // The resting state is stored in its short form: every rarity ticked is no
     // rarity filter, which is the empty set S already means by it. A commit that

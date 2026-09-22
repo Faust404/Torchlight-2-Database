@@ -723,10 +723,11 @@ button,input,select{font:inherit; color:inherit}
 #adv .tgh.s{padding-left:10px; color:var(--label); letter-spacing:.11em}
 #adv .tgrid .f{padding:2px 0}
 
-/* A chip row: the socket counts and the rarities. A checkbox each, visually
-   reduced to its value: the box itself is clipped rather than hidden, so it
-   keeps its place in the tab order and the focus ring can be drawn on the span
-   beside it. */
+/* A chip row: the socket counts. A checkbox each, visually reduced to its
+   value: the box itself is clipped rather than hidden, so it keeps its place in
+   the tab order and the focus ring can be drawn on the span beside it. The
+   rarity row is deliberately *not* one of these -- it is .tpill, the same
+   control the strip above the grid uses; see #adv .tgrid.pills. */
 #adv .tgrid.chips{display:flex; flex:1 1 auto; gap:4px; padding:0}
 #adv .chip{position:relative; display:inline-flex}
 #adv .chip input{position:absolute; width:1px; height:1px; opacity:0; margin:0}
@@ -743,6 +744,32 @@ button,input,select{font:inherit; color:inherit}
    while its filter was live. */
 #adv .chip input:checked + span{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
 #adv .chip input:focus-visible + span{outline:2px solid var(--gold); outline-offset:1px}
+
+/* The rarity row wears .tpill itself, so its two states are the page's own:
+   the tier's colour from the .t- ink class, and the dimmed .off state a striped
+   rarity wears in the strip above the grid. Nothing is restated here, which is
+   the whole point -- these pills and those are one control on two surfaces, and
+   a colour written in this file could be right here and wrong there. Only the
+   row's own layout is set -- the strip's 6px gap in place of the chips' 4, and
+   wrapping, because four words need more room than five digits did. */
+#adv .tgrid.pills{display:flex; flex-wrap:wrap; flex:1 1 auto; gap:6px; padding:0}
+/* Two things this row inherits from the panel that the strip never meets. The
+   first is `.rng span`, the rule that greys the "any" placeholder and the en
+   dash between two boxes: a class plus a type, so it outranks a bare `.t-rare`.
+   Left alone, every pill would print its tier in grey while its border and fill
+   stayed tinted. */
+#adv .tgrid.pills .lbl{color:inherit}
+/* The second is `.rng input`, which gives every box in the panel 4px 6px of
+   padding and a border. `box-sizing:border-box` floors a zero width at
+   padding+border rather than shrinking past it, so `.tpill input`'s width:0
+   still laid out 14px of invisible box at the head of each pill -- the empty
+   space that pushed every word off-centre. Nothing to fix in .tpill itself: the
+   strip above the grid has no `.rng input` to fight. */
+#adv .tgrid.pills input{width:0; height:0; margin:0; padding:0; border:0}
+/* And .tpill's own 6px gap, which in the strip separates the word from its
+   count. Here the box is collapsed to nothing and there is no count, so the gap
+   has nothing to separate -- it only pushed the word 3px right of centre. */
+#adv .tgrid.pills .tpill{gap:0}
 
 /* --------------------------------------------------------------- empty/msg */
 .msg{padding:40px 6px; color:var(--label); text-align:center}
