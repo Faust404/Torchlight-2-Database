@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 186 assertions.
+ * view, provenance and hash deep links -- 206 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 verify/check_page.js
@@ -637,6 +637,91 @@ async function go(hash) {
      coin.length === 1 && coin[0].head === 'Armor / Trinket or Weapon' &&
      coin[0].lines.join(' | ') === '2% increase in the amount of gold found',
      showF(coin));
+
+  // The eyes are the one socketable family that does not print a flat block.
+  // An eye is one item file that prints four statlines -- Normal plus NG+1/2/3,
+  // because its DAT carries the "generated at the level of whatever dropped it"
+  // sentinel -- and TIDBI's export carries only the Normal row, so the card used
+  // to show one of the four. build.py derives the rest (src/eye_values.py) and
+  // the card prints them as a table whose Normal row IS the lines the flat block
+  // used to show, which is why showing both would double every effect.
+  //
+  // Read as cells rather than as text: the card's job is to put each number in
+  // the right column, and a page-wide search for "+328 Health" passes just as
+  // well when it sits in the Weapon column.
+  const ngRows = (doc) => {
+    const t = doc.querySelector('#detail table.ngt');
+    if (!t) return null;
+    return {
+      head: [].map.call(t.querySelectorAll('th'), h => h.textContent),
+      rows: [].map.call(t.querySelectorAll('tbody tr'), tr =>
+        [].map.call(tr.querySelectorAll('td'), td => td.textContent)),
+    };
+  };
+  const showN = (n) => n ? n.head.join(' | ') + '  >>  ' +
+    n.rows.map(r => r.join(' / ')).join('  ||  ') : '(no table)';
+  // Prion-Kuru is the flagship: the wiki publishes three of its four rows, so
+  // this is the one eye whose derivation can be checked against a source AND
+  // against a row that source does not have. Its id does not match its name --
+  // `tl2_eyeofelderkuru` is The Eye of Prion-Kuru, and TL2_EYEOFELDERKURU.DAT
+  // holds it -- which is why this is looked up by id.
+  //
+  // 16/60/87/100 and 8/52/79/92 are the band formula's, and +328 Health at
+  // NG +2 is the number no page carries: the wiki's table stops at NG +1 and
+  // NG +3 for this eye.
+  const kuru = ngRows(await deep('#item=tl2_eyeofelderkuru'));
+  ok('an eye prints its four levels as a table, not as flat affix lines',
+     kuru && kuru.head.join('|') === 'Lv|Req|Armor / Trinket|Weapon|NG' &&
+     kuru.rows.length === 4 && kuru.rows.every(r => r.length === 5) &&
+     kuru.rows.map(r => r[0]).join('/') === '16/60/87/100' &&
+     kuru.rows.map(r => r[1]).join('/') === '8/52/79/92' &&
+     kuru.rows.map(r => r[4]).join('/') === 'Normal/NG +1/NG +2/NG +3',
+     showN(kuru));
+  ok('...with the derived numbers in their own columns, NG +2 included',
+     kuru.rows.map(r => r[2]).join(' | ') ===
+       '+72 Health | +231 Health | +328 Health | +375 Health' &&
+     kuru.rows.map(r => r[3]).join(' | ') ===
+       '+18 Electric Damage | +58 Electric Damage | +82 Electric Damage | +94 Electric Damage',
+     showN(kuru));
+  const kuruDet = (await deep('#item=tl2_eyeofelderkuru')).getElementById('detail');
+  ok('...and the flat block it replaced is gone, not merely joined by a table',
+     kuruDet.querySelectorAll('.aff').length === 0 &&
+     kuruDet.querySelectorAll('.fxh').length === 0 &&
+     kuruDet.querySelectorAll('.ngt').length === 1);
+  // The Dark Alchemist carries both of this feature's corrections in one card.
+  // Its mana line is `2 Mana recovery per second` in TIDBI and 1.4 on the
+  // wiki's own table -- the one cell in the whole family where the card's number
+  // and the page's disagree, which build.py pins as an exact set. Its damage
+  // over time is the one column no graph explains, so it ships as the page's
+  // published transcription, and the levels it was published at are asserted
+  // against the band formula rather than assumed.
+  const alch = ngRows(await deep('#item=tl2_eyeofdarkalchemist'));
+  ok('the card takes the wiki\'s number where TIDBI\'s own number is wrong',
+     alch.rows.map(r => r[2]).join(' | ') ===
+       '1.4 Mana recovery per second | 1.9 Mana recovery per second | ' +
+       '2.2 Mana recovery per second | 2.2 Mana recovery per second',
+     showN(alch));
+  ok('...and the one column no curve explains carries the page\'s own numbers',
+     alch.rows.map(r => r[3]).join(' | ') ===
+       '480 Physical Damage over 5 sec. | 1370 Physical Damage over 5 sec. | ' +
+       '2260 Physical Damage over 5 sec. | 2375 Physical Damage over 5 sec.',
+     showN(alch));
+  // One eye does not scale. Tiamat's MAXLEVEL is 999 rather than the sentinel,
+  // so it has no NG ladder and build.py gives it a single Normal row -- which
+  // the shipped JSON cannot tell you, because the build clamps the sentinel to
+  // 999 before it reaches the record and every one of the 31 reads `xl: 999`.
+  // The table still prints: level and requirement are the two facts the card
+  // would otherwise lose along with the flat block.
+  const tiamat = ngRows(await deep('#item=tl2_eyeoftiamat'));
+  ok('the one capped eye prints a single Normal row and no ladder',
+     tiamat.rows.length === 1 && tiamat.rows[0][0] === '54' &&
+     tiamat.rows[0][1] === '46' && tiamat.rows[0][4] === 'Normal', showN(tiamat));
+  // ...and the other half of the same claim: a socketable that is not an eye
+  // keeps the flat block byte-for-byte. Flame Ember is asserted two ways above
+  // already, so this pins only the negative -- that the table did not leak out
+  // of the family it belongs to.
+  ok('a socketable that is not an eye keeps its flat affix block',
+     !(await deep('#item=tl2_flameember_rank1')).querySelector('#detail .ngt'));
 
   // The three Torchlight 1 fishing socketables are out of the database. They
   // shipped inside the TL2 PAK, which is why TIDBI lists them -- so they were
