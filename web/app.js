@@ -770,13 +770,19 @@
   }
 
   // ---- requirements ----
-  // One vocabulary for every item: a level requirement is a "Player Level" chip,
-  // whichever table it was read from. Socketables were the exception, printing a
-  // line of their own that read "Required Item Level to Socket" over MINLEVEL --
-  // but MINLEVEL is the drop band, not a gate, so the card stated a requirement
-  // the game does not have while hiding the one it does. The real requirement now
-  // arrives as `lr` like every other item's (src/build.py, read from the game's
-  // own ITEM_LEVEL_REQUIREMENTS_SOCKETABLE curve), and the special case is gone.
+  // One number, two vocabularies. The requirement is always `lr`, on the same
+  // curve the whole corpus reads (src/build.py) -- but what it gates is not the
+  // same thing on a socketable, so the card names it for its reader: "Player
+  // Level" on the things you wear, "Required Item Level to Socket" on a
+  // socketable.
+  //
+  // Socketables carried that second label once before, over MINLEVEL -- which is
+  // the drop band and not a gate, so the card stated a requirement the game does
+  // not have while hiding the one it does. The label went out with the wrong
+  // number. It is back over the right one, and the number is what matters: for a
+  // socketable `lr` is not a table field at all but the game's own
+  // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE curve, 105 points of max(1, level - 8)
+  // indexed by the socketable's own level.
   //
   // The chips make the either/or structural. Requirements are alternatives, not
   // a conjunction: the game grants equip once you meet the player level OR all
@@ -785,7 +791,9 @@
   function requirements(o) {
     var req = o.rq || {}, rows = [];
     var level = n(o.lr)
-      ? '<span class="rchip">Player Level <b>' + n(o.lr) + '</b></span>' : '';
+      ? '<span class="rchip">' + (o.t === 'Socketable'
+          ? 'Required Item Level to Socket' : 'Player Level') +
+        ' <b>' + n(o.lr) + '</b></span>' : '';
     var stats = ['str', 'dex', 'mag', 'def'].filter(function (k) { return req[k]; })
       .map(function (k) {
         return '<span class="rchip">' + REQLABEL[k] + ' <b>' + esc(req[k]) + '</b></span>';

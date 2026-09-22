@@ -477,14 +477,19 @@ async function go(hash) {
   // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT -- 105 points, every one of them
   // max(1, level - 8) -- which build.py reads into the same `lr` field every
   // other item's requirement arrives in. Blood Ember Shard is rank 3: level 36
-  // gives 28. The old card printed MINLEVEL here instead, under the label
-  // "Required Item Level to Socket", which stated a requirement the game does
-  // not have over a field that means something else entirely.
+  // gives 28. The old card printed MINLEVEL here instead, and that was the
+  // wrong *number* over a field that means something else entirely.
+  //
+  // The wording is the socketing vocabulary rather than the player-level one:
+  // "Player Level" is the label for a thing you wear, and nothing about a gem
+  // is worn at a level. The two labels are mutually exclusive by construction,
+  // so the negative below is half the test -- a card that printed both would
+  // otherwise pass.
   const gem = await deep('#item=tl2_bloodember_rank3');
   const gemt = gem.getElementById('detail').textContent;
-  ok('a socketable states the player level the game curve gives it',
-     /Player Level\s*28(?!\d)/.test(gemt) &&
-     !/Required Item Level to Socket/.test(gemt), gemt.slice(0, 240));
+  ok('a socketable states the game curve\'s number as the socketing requirement',
+     /Required Item Level to Socket\s*28(?!\d)/.test(gemt) &&
+     !/Player Level/.test(gemt), gemt.slice(0, 240));
 
   // ...and shows its spawn band like every other item. It was suppressed here
   // only because the same field was being printed above as the socketing gate;
@@ -494,15 +499,15 @@ async function go(hash) {
      /Level\s*36(?!\d)/.test(gemt), gemt.slice(0, 240));
 
   // The case that prompted the change. Every eye carries the placeholder
-  // MINLEVEL 1, so the card used to read "Required Item Level to Socket: 1";
-  // the game's curve gives level 15 -> 7, which is the number the wiki's column
-  // shows for it too.
+  // MINLEVEL 1, so the card read "Required Item Level to Socket: 1" -- the
+  // right label over the wrong number, which is the half that was wrong. The
+  // game's curve gives level 15 -> 7, which is the number the wiki's column
+  // shows for it too, and the label stays.
   const pogg = await deep('#item=tl2_eyeofkingpogg');
   const poggt = pogg.getElementById('detail').textContent;
   ok('an eye states its real requirement, not MINLEVEL\'s placeholder 1',
-     /Player Level\s*7(?!\d)/.test(poggt) &&
-     !/Player Level\s*1(?!\d)/.test(poggt) &&
-     !/Required Item Level to Socket/.test(poggt), poggt.slice(0, 240));
+     /Required Item Level to Socket\s*7(?!\d)/.test(poggt) &&
+     !/Required Item Level to Socket\s*1(?!\d)/.test(poggt), poggt.slice(0, 240));
   // The same card carries the clamp's own case: the file's MAXLEVEL for this eye
   // is 9999999, and the card must read the clamped 999 rather than the raw run of
   // nines. The negative is what makes it a clamp test rather than a substring
@@ -520,8 +525,8 @@ async function go(hash) {
   const tib = await deep('#item=tl2_skull040');
   const tibt = tib.getElementById('detail').textContent;
   ok('a skull takes the game curve, not the wiki\'s bad cell',
-     /Player Level\s*73(?!\d)/.test(tibt) && !/Player Level\s*40(?!\d)/.test(tibt),
-     tibt.slice(0, 240));
+     /Required Item Level to Socket\s*73(?!\d)/.test(tibt) &&
+     !/Required Item Level to Socket\s*40(?!\d)/.test(tibt), tibt.slice(0, 240));
 
   // ----------------------------------------------------------- the ember pool
   // The four rare ember families are the only socketables whose two bonuses are
