@@ -1204,9 +1204,31 @@
     }
   });
 
+  // A search is a question about the whole corpus, so it replaces whatever is on
+  // screen rather than narrowing inside it -- the same clear the set-name link
+  // performs, through the same resetState(), so the two cannot drift.
+  //
+  // Without the clear this was not merely a narrow search: it did nothing at
+  // all. apply() reaches paintGrid(), which branches on S.item and renders the
+  // detail view instead of the grid, and S.item was never cleared here -- so
+  // render() was never reached and Enter could not change the page.
+  //
+  // Escape clears through the same path. It is not a new search, but leaving it
+  // able to empty the box while the card it was narrowing stays up is the same
+  // bug from the other side, and one handler keeps the two keys together.
   document.getElementById('q').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { S.q = this.value.trim().toLowerCase(); apply(); }
-    if (e.key === 'Escape') { this.value = ''; S.q = ''; apply(); }
+    if (e.key !== 'Enter' && e.key !== 'Escape') return;
+    var v = e.key === 'Enter' ? this.value.trim().toLowerCase() : '';
+    resetState();
+    S.q = v;            // after resetState(), which clears it
+    showAll = false;
+    writeHash();
+    // onRoute() returns early when the state matches the last paint, and a
+    // search that lands on the grid already showing would be swallowed. The
+    // hash also cannot do the routing for us: writeHash uses replaceState
+    // wherever the page is served, so no hashchange follows.
+    lastSig = null;
+    onRoute();
   });
 
   document.getElementById('sort').addEventListener('change', function () {

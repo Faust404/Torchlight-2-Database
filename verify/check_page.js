@@ -319,6 +319,36 @@ async function go(hash) {
   ok('search on Enter narrows to Aenigma', cards().length === 1, `${cards().length}`);
   ok('search state lands in the hash', /q=aenigma/.test(w.location.hash), w.location.hash);
 
+  // The case that motivated the reset, and the one the assertions above cannot
+  // see: a search entered while a card is open. It used to do nothing at all --
+  // apply() reached paintGrid(), which saw S.item still set and rendered the
+  // detail view again, so render() was never reached and the grid never moved.
+  // A search is a question about the whole corpus, so it takes the item and
+  // every filter with it, exactly as the set-name link does.
+  await go('#dmg=fire&lvl=20-&item=Zeraphi_01_shoulders_alt_set');
+  ok('an item opens over a filtered grid', d.getElementById('app').classList.contains('item'),
+     d.getElementById('app').className);
+  q.value = 'aenigma';
+  q.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  ok('...a search entered over it lands on the grid, not on the card',
+     cards().length === 1 && !d.getElementById('app').classList.contains('item'),
+     `${cards().length} cards, class=${d.getElementById('app').className}`);
+  ok('...and it took the other filters and the item out of the hash',
+     w.location.hash === '#q=aenigma', w.location.hash);
+  ok('...and the controls agree with the state it left behind',
+     d.getElementById('lvmin').value === '' && q.value === 'aenigma',
+     `lvmin=${d.getElementById('lvmin').value} q=${q.value}`);
+
+  // Escape clears through the same path, so it cannot leave a card standing
+  // over a search box it just emptied.
+  await go('#dmg=fire&item=Zeraphi_01_shoulders_alt_set');
+  q.value = 'aenigma';
+  q.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('Escape over an open card returns to the grid too',
+     cards().length === 500 && !d.getElementById('app').classList.contains('item') &&
+     q.value === '' && w.location.hash === '',
+     `${cards().length} cards / ${w.location.hash}`);
+
   // ------------------------------------------------- numeric filter floors
   // The level and stat-requirement boxes are counts and their floor is 0. The
   // markup states that to the browser with min="0", which is what limits the
