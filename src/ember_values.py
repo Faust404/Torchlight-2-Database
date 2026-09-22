@@ -19,6 +19,12 @@ share one factor, but Iron's Armor (20 at file, 5 shown at ilvl 8) and Iron's
 Ranged bonus (10 at file, 6 shown) do not.
 
 So these 42 numbers are transcribed, and the game files cannot check them.
+Two of the ladders are not smooth, and a reader checking them against a formula
+will think they are typos: Iron's degrade-armor runs 8, 29, 31, 54, 81, 115,
+155, and Void's Mana Steal 2, 4, 5, 7, 8, 10, 11. Both are the wiki's values.
+One of the two turns out to be exact at every rank and the other is a
+deliberate exception to the curve -- see below.
+
 The source is the wiki's rare-gems table:
 
     https://torchlight.fandom.com/wiki/Gems_(T2)   (retrieved 2026-09-20)
@@ -40,12 +46,36 @@ is also what the site prints for every other item: "12 Health stolen on hit",
 Damage bonus", "18 Physical Damage Reflected", "35 Physical Damage over 5 sec.".
 Nothing is dropped or rounded -- the ladder of numbers is the wiki's.
 
-Two ladders are worth flagging because they are not smooth, and a reader
-checking them against a formula will think they are typos: Iron's degrade-armor
-runs 8, 29, 31, 54, 81, 115, 155, and Void's Mana Steal 2, 4, 5, 7, 8, 10, 11.
-Both are the wiki's values, and the files' shape (one 1-999 affix per option
-against Chaos's one-file-per-band) means there is no file-held ladder to check
-them against.
+THE SCALING LAW NOW EXISTS, AND SIX OF THESE NUMBERS ARE EXCEPTIONS TO IT.
+`ceil(pct * CURVE(level) / 100)`, with the curve per stat in
+`MEDIA/GRAPHS/STATS/` and the level taken from the carrier item, reproduces
+nine of these thirteen ladders exactly, and a tenth at six of seven ranks. One
+fits nothing at all. The remaining two disagree with the transcription in six
+cells, and those six are kept as the wiki has them:
+
+    Iron degrade-armor   wiki 8, 29, 31, 54, 81, 115, 155
+                         curve 4, 15, 31, 54, 81, 115, 155     ranks 1-2
+    Blood health-regen   wiki 7.2, 15.6, 24, 33, 41, 50, 58
+                         curve 7.2, 15.6, 24, 32.4, 40.8, 49.2, 57.6   ranks 4-7
+
+The wiki wins because it is the source of record for these 42 numbers: they are
+transcribed, not derived, and the curve is a reconstruction that could be wrong
+at a cell without anything else noticing. There is also no third source to break
+the tie -- TIDBI's export carries no tooltip text for any rare ember, which is
+exactly why these were transcribed in the first place. What makes the wiki worth
+following is checkable elsewhere: its Normal-gems table covers the four varying
+families and all 56 of its values match TIDBI's own effect lines to the
+character. Ranks 3+ of Iron's degrade-armor agree, so the divergence is in two
+cells and not a different reading of the ladder.
+
+If the curve is ever shown to be right at these six cells, that reverses this
+decision and the numbers below change -- nothing else in the file depends on
+which way it goes.
+
+Of the two unsmooth ladders flagged above, this settles them in opposite
+directions: Void's Mana Steal is exact at all seven ranks, and Iron's
+degrade-armor is one of the two that diverge, at exactly the two ranks that
+looked wrong.
 """
 
 # The seven ranks in order, with the item level each ships at. All four rare

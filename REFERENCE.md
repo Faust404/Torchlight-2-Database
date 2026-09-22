@@ -419,8 +419,10 @@ and items are built from it (§7). What remains:
    and the game prints `ceil(pct x CURVE(level) / 100)` against a graph in
    `MEDIA\GRAPHS\STATS\`, evaluated at the **carrier item's own** `LEVEL`. Nine of
    the thirteen rare-ember ladders now come out of the files exactly, one to six
-   of seven, and two carry a transcription error (§7, *Rare embers*). Nothing
-   here needs `MEDIA\STATS\`'s reference section after all.
+   of seven. The two that do not are **settled as decisions, not as errors**:
+   six cells where the curve and the wiki disagree ship the wiki's number, that
+   page being the source of record for the 42 transcribed values (§7, *Rare
+   embers*). Nothing here needs `MEDIA\STATS\`'s reference section after all.
 7. **Drop weights and the 64 unnamed field hashes** stay the real blockers —
    nothing about the above touches them.
 
@@ -1261,15 +1263,34 @@ against the transcriptions in `src\ember_values.py`:
 | Void Mana Steal | `MANA STEAL` | 50 | 2 … 11 | 7/7 exact |
 
 **Nine of the thirteen are exact**, which is what makes the other four readable
-as findings rather than as noise. Two are transcription errors: Iron's Degrade
-Armor opens 8, 29 where the files say 4, 15 — and 29 is not reachable from any
-level in rank 2's band, whose own ceiling is 26 — while Blood's Health
-Regeneration prints 33, 41, 50, 58 where the curve gives 32.4, 40.8, 49.2, 57.6,
-whole numbers above the third rank in a ladder whose first three ranks are
-decimals. The two "not smooth" ladders `ember_values.py`'s docstring flags as
-possibly typos are now settled in opposite directions: Void's Mana Steal is
-exact at every rank, and Iron's Degrade Armor is wrong at exactly the two ranks
-that looked wrong.
+as findings rather than as noise.
+
+**Two of the four are kept as the wiki has them, by decision (2026-09-22).**
+These are the six cells where the recovered curve and the transcription disagree:
+
+| ladder | ranks | the wiki, and what ships | the curve |
+|---|---|---|---|
+| Iron Degrade Armor | 1-2 | 8, 29 | 4, 15 |
+| Blood Health Regeneration | 4-7 | 33, 41, 50, 58 | 32.4, 40.8, 49.2, 57.6 |
+
+Iron's ranks 3-7 agree exactly (31, 54, 81, 115, 155), so this is two cells and
+not a different reading of the ladder — and 29 is not reachable from any level in
+rank 2's band, whose own ceiling is 26. Blood's divergence starts at rank 4,
+where the ladder stops printing decimals.
+
+**The wiki wins because it is the source of record for these 42 numbers.** They
+are transcribed rather than derived, and the curve is a reconstruction that could
+be wrong at a cell with nothing else noticing. There is no third source to break
+the tie: **TIDBI's export carries no tooltip text for any rare ember**, which is
+precisely why they were transcribed. What makes the wiki worth following on
+numbers is checkable elsewhere — its Normal-gems table covers the four varying
+families, and all 56 of its values match TIDBI's own effect lines to the
+character. Reversing this decision would change six cells and nothing else.
+
+The two "not smooth" ladders `ember_values.py`'s docstring flags as possibly
+typos are now settled in opposite directions: Void's Mana Steal is exact at every
+rank, and Iron's Degrade Armor diverges at exactly the two ranks that looked
+wrong.
 
 The other two are genuinely unsolved. Iron's Thorns reproduces six of seven
 ranks at 33% of `BASE_WEAPON_DAMAGE`, and no graph in the directory reproduces
