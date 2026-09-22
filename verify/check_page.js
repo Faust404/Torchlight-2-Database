@@ -413,9 +413,72 @@ async function go(hash) {
   {
     const nums = [].slice.call(d.querySelectorAll('#railbody input[type=number]'));
     ok('every numeric filter field declares the same floor to the browser',
-       nums.length === 6 && nums.every(i => i.min === '0'),
+       nums.length === 8 && nums.every(i => i.min === '0'),
        nums.map(i => `${i.id || i.getAttribute('data-req')}=${i.min}`).join(' '));
+    ok('...and the two new ones are the socket range, not a leftover toggle',
+       !!d.getElementById('skmin') && !!d.getElementById('skmax') &&
+       !d.querySelector('#railbody input[type=checkbox][id=sock]'),
+       nums.map(i => i.id || i.getAttribute('data-req')).join(' '));
   }
+
+  // ------------------------------------------------------------ socket range
+  // The control that replaced the "Has sockets" toggle. A boolean could only
+  // ask "any at all", which is the bottom of this range and the least useful
+  // answer in it -- the question is "2 or more", and sk=1- is exactly the set
+  // the old toggle produced, which is what makes it the compatibility check.
+  //
+  // `sk` is omitted from a record with no sockets at all (build.py's nonzero()),
+  // so n() reads those as 0. That is what lets sk=1- exclude them and sk=0-0
+  // find them, and it is asserted rather than assumed.
+  await go('#sk=1-');
+  ok('sk=1- reproduces the old Has sockets toggle exactly', /1,703/.test(cnt()), cnt());
+  await go('#sk=2-');
+  ok('sk=2- narrows past it, which is the question the toggle could not ask',
+     /269/.test(cnt()), cnt());
+  await go('#sk=0-0');
+  ok('sk=0-0 is the other end, and finds the socket-less items', /4,345/.test(cnt()), cnt());
+  await go('#sk=1-4');
+  ok('a range closed at both ends', /1,692/.test(cnt()), cnt());
+  await go('#sk=-4');
+  ok('...while an empty floor means no floor, not a floor of one',
+     /6,037/.test(cnt()), cnt());
+  await go('#sk=3-2');
+  ok('a range the wrong way round matches nothing rather than everything',
+     /0 items/.test(cnt()), cnt());
+  // Flooring, both paths. The deep link cannot carry a negative for the reason
+  // the level box records -- '-' is the delimiter, so `sk=-5-` reads as "no
+  // floor, ceiling 5" -- while typing is the one path that can produce one, and
+  // it is floored in the state as well as in the field.
+  await go('#sk=-5-');
+  ok('the socket deep link cannot carry a negative at all',
+     d.getElementById('skmin').value === '' && d.getElementById('skmax').value === '5',
+     `min=${d.getElementById('skmin').value} max=${d.getElementById('skmax').value}`);
+  await go('');
+  {
+    const lo = d.getElementById('skmin');
+    lo.value = '-5';
+    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('a typed negative socket bound floors the state, not just the field',
+       lo.value === '0' && w.location.hash === '#sk=0-', `${lo.value} / ${w.location.hash}`);
+  }
+  // The legacy key, tested for its own sake rather than left to the set-link
+  // assertion below, which still happens to carry `sock=1` on its way past.
+  await go('#sock=1');
+  ok('a legacy #sock=1 bookmark still filters', /1,703/.test(cnt()), cnt());
+  ok('...and arrives as a floor in the new control',
+     d.getElementById('skmin').value === '1', d.getElementById('skmin').value);
+  // The URL is deliberately not rewritten on load -- writeHash runs on
+  // interaction, not on a hashchange -- so the old key survives until the
+  // control is touched and is replaced then. That is the documented behaviour
+  // for a floored state too, asserted at the level box above.
+  {
+    const skm = d.getElementById('skmin');
+    skm.value = '2';
+    skm.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('...and the old key is not carried forward once the control is touched',
+       w.location.hash === '#sk=2-', w.location.hash);
+  }
+  await go('');
 
   // ----------------------------------------------------------------- sort
   // The default order, asserted before anything touches the select: rarity
@@ -1351,7 +1414,8 @@ async function go(hash) {
     // select sitting on the set that was just named
     ok('...and the search box, the rail and the set controls all say so',
        d.getElementById('q').value === '' && ssel().value === 'Zeraphi Alchemy' &&
-       !sbtn().classList.contains('on') && !d.getElementById('sock').checked &&
+       !sbtn().classList.contains('on') &&
+       d.getElementById('skmin').value === '' && d.getElementById('skmax').value === '' &&
        [].every.call(d.querySelectorAll('#railbody input[type=checkbox]'), b => !b.checked),
        `${ssel().value} / ${d.getElementById('q').value}`);
     await go('');

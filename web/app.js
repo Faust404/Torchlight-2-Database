@@ -97,7 +97,8 @@
   // #cat= link is expanded to its types on read; see readHash.
   var S = {
     q: '', types: new Set(), tiers: new Set(), dmg: new Set(),
-    set: '', setOnly: false, sock: false, lvlMin: null, lvlMax: null,
+    set: '', setOnly: false, sockMin: null, sockMax: null,
+    lvlMin: null, lvlMax: null,
     req: { str: null, dex: null, mag: null, def: null },
     sort: DEFAULT_SORT, dir: 1, item: ''
   };
@@ -219,7 +220,11 @@
       S.dmg.forEach(function (d) { if (o.dmg[d]) hit = true; });
       if (!hit) return false;
     }
-    if (S.sock && !n(o.sk)) return false;
+    // `sk` is omitted from the record entirely when an item has no sockets
+    // (see nonzero() in build.py), so n() reads a socket-less item as 0 -- which
+    // is what makes "1 or more" exclude them and "exactly 0" a way to find them.
+    if (S.sockMin != null && n(o.sk) < S.sockMin) return false;
+    if (S.sockMax != null && n(o.sk) > S.sockMax) return false;
     // Two independent narrowings: the toggle asks "is it in any set at all",
     // the select asks "which one". Picking a set implies the first, but they
     // are separate state so that clearing the select does not silently drop
@@ -469,9 +474,15 @@
         (S.req[k] == null ? '' : S.req[k]) + '"></div>';
     }).join(''));
 
-    h += section('misc', 'Other',
-      '<label class="f' + (S.sock ? '' : ' off') + '"><input type="checkbox" id="sock"' +
-      (S.sock ? ' checked' : '') + '><span class="lbl">Has sockets</span></label>');
+    // A count range, not the "Has sockets" toggle it replaces. The toggle could
+    // only ask "any at all", which is one of the six answers here and the least
+    // useful of them -- the question is "2 or more", not "at least one". Same
+    // `.rng` pair as Item Level above, and for the same reasons.
+    h += section('sk', 'Sockets', '<div class="rng">' +
+      '<input type="number" min="0" id="skmin" placeholder="min" value="' + (S.sockMin == null ? '' : S.sockMin) + '">' +
+      '<span>&ndash;</span>' +
+      '<input type="number" min="0" id="skmax" placeholder="max" value="' + (S.sockMax == null ? '' : S.sockMax) + '">' +
+      '</div>');
 
     var rb = document.getElementById('railbody');
     rb.innerHTML = h;
@@ -570,7 +581,7 @@
     // silently yields [] and every facet would look unchanged.
     var s = function (set) { return Array.from(set).sort(); };
     return JSON.stringify([S.q, s(S.types), s(S.tiers), s(S.dmg),
-      S.set, S.setOnly, S.sock, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
+      S.set, S.setOnly, S.sockMin, S.sockMax, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
       ['str', 'dex', 'mag', 'def'].map(function (k) { return S.req[k]; })]);
   }
 
@@ -1020,7 +1031,8 @@
   // would answer a different question than the one that was asked.
   function resetState() {
     S.types = new Set(); S.tiers = new Set(); S.dmg = new Set();
-    S.set = ''; S.setOnly = false; S.sock = false; S.lvlMin = S.lvlMax = null; S.item = '';
+    S.set = ''; S.setOnly = false; S.sockMin = S.sockMax = null;
+    S.lvlMin = S.lvlMax = null; S.item = '';
     S.req = { str: null, dex: null, mag: null, def: null };
     S.q = ''; S.sort = DEFAULT_SORT; S.dir = 1;
     // The tier facet starts fully selected, unlike the rail's other facets,
@@ -1067,13 +1079,20 @@
       else if (k === 'dmg') S.dmg = new Set(list);
       else if (k === 'set') S.set = v;
       else if (k === 'setonly') S.setOnly = v === '1';
-      else if (k === 'sock') S.sock = v === '1';
+      // `sock=1` was the "Has sockets" toggle's key until that became a count
+      // range. Expanded rather than dropped, the way `cat=` is above: an old
+      // bookmark should still filter instead of quietly doing nothing. It is
+      // read-only -- the control writes `sk=` and never this, so the two spellings
+      // can never both appear in one hash.
+      else if (k === 'sock') { if (v === '1') S.sockMin = 1; }
       else if (k === 'q') S.q = v.toLowerCase();
       else if (k === 'item') S.item = v;
       else if (k === 'sort') S.sort = v || DEFAULT_SORT;
       else if (k === 'dir') S.dir = v === 'desc' ? -1 : 1;
       else if (k === 'lvl') { var p = v.split('-'); S.lvlMin = floor0(p[0]);
                               S.lvlMax = floor0(p[1]); }
+      else if (k === 'sk') { var sp = v.split('-'); S.sockMin = floor0(sp[0]);
+                             S.sockMax = floor0(sp[1]); }
       else if (k === 'req') list.forEach(function (r) {
         var q = r.split(':'); if (q[0]) S.req[q[0]] = floor0(q[1]); });
     });
@@ -1109,7 +1128,8 @@
     });
     if (S.set) p.push('set=' + encodeURIComponent(S.set));
     if (S.setOnly) p.push('setonly=1');
-    if (S.sock) p.push('sock=1');
+    if (S.sockMin != null || S.sockMax != null)
+      p.push('sk=' + (S.sockMin == null ? '' : S.sockMin) + '-' + (S.sockMax == null ? '' : S.sockMax));
     if (S.lvlMin != null || S.lvlMax != null)
       p.push('lvl=' + (S.lvlMin == null ? '' : S.lvlMin) + '-' + (S.lvlMax == null ? '' : S.lvlMax));
     var rq = ['str', 'dex', 'mag', 'def'].filter(function (k) { return S.req[k] != null; })
@@ -1181,7 +1201,14 @@
       // them all would look like the filter had been thrown away
       showAll = false; writeHash(); render(); paintCounts();
     } else if (t.id === 'setsel') { S.set = t.value; showAll = false; writeHash(); render(); paintCounts(); }
-    else if (t.id === 'sock') { S.sock = t.checked; showAll = false; writeHash(); render(); paintCounts(); }
+    else if (t.id === 'skmin' || t.id === 'skmax') {
+      var skmin = document.getElementById('skmin'), skmax = document.getElementById('skmax');
+      S.sockMin = floor0(skmin.value);
+      S.sockMax = floor0(skmax.value);
+      skmin.value = S.sockMin == null ? '' : S.sockMin;   // see the stat box above
+      skmax.value = S.sockMax == null ? '' : S.sockMax;
+      showAll = false; writeHash(); render(); paintCounts();
+    }
     else if (t.id === 'sort') { S.sort = t.value; apply(); }
     else if (t.getAttribute && t.getAttribute('data-req')) {
       var k = t.getAttribute('data-req');
