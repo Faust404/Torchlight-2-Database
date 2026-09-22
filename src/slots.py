@@ -115,6 +115,16 @@ def affixes(path):
     return []
 
 
+def affix_path(name):
+    """The PAK path of an affix DAT, by the bare name an item's list uses, or
+    None. `_index` is keyed by basename because that is how the list spells it;
+    an affix can sit in MEDIA/AFFIXES/ITEMS/ or MEDIA/AFFIXES/GEMS/."""
+    global _BY
+    if _BY is None:
+        _BY = _index()
+    return _BY.get(name.upper())
+
+
 def affix_slot(name):
     """'a', 'w', 'b' (either slot) or '?' -- where one affix may sit.
 
@@ -129,11 +139,8 @@ def affix_slot(name):
     both, so the file wins and the divergence is recorded in REFERENCE.md with
     the others.
     """
-    global _BY
     if name not in _affix_cache:
-        if _BY is None:
-            _BY = _index()
-        p = _BY.get(name.upper())
+        p = affix_path(name)
         if not p:
             _affix_cache[name] = '?'
         else:
