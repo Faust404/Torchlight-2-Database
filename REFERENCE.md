@@ -2085,6 +2085,100 @@ stripping the three fields back out of the built page and re-compressing both
 halves rather than extrapolating — **0.52%** of the 7.82 MB page, on a site
 whose icon sheet is 92% of the payload.
 
+### Advanced search
+
+The toolbar's **Advanced Search** button opens a modal over the whole viewport —
+the page's only dialog. The reader sets filters in it and presses **Search**;
+the dialog closes and the filtered grid renders. Nothing filters while it is
+open, which is the interaction that was asked for and the reason the panel is
+built the way it is.
+
+**The panel edits a draft, never `S`.** Opening copies the fields into a
+module-level `advS`; `+ Add stat` and the per-row `×` re-render from that draft;
+Search reads the panel back into `S` and closes; **Reset** empties the draft;
+Escape, the `✕` and the scrim throw it away. Two consequences, both wanted: `S`
+stays the single source of filter truth — the panel owns no second copy of
+anything, and its item-level and socket boxes write the very members the rail's
+boxes do — and a half-typed value in a box that re-renders is never a problem,
+because nothing is read until commit. It is also why opening the panel shows the
+rail's current numbers: they are read out of `S`.
+
+**Search commits through `onRoute()`, not `apply()`**, for two reasons the file
+already documents elsewhere. `apply()` ends in `paintGrid()`, which branches on
+`S.item` and renders the detail view — so a panel opened over an item card would
+close and leave the card exactly where it was. And only `onRoute()` rebuilds the
+rail, which is where the item-level and socket boxes the panel just wrote live;
+committing through `apply()` would filter by 100 while the rail went on showing
+the reader's old number. So: `S.item = ''`, then `writeHash(); lastSig = null;
+onRoute();` — the route the search box's Enter takes.
+
+**The filters it adds:**
+
+| filter | `S` field | reading |
+|---|---|---|
+| item level, sockets | `lvlMin/Max`, `sockMin/Max` | the rail's own fields, edited from the panel |
+| player level | `plr` | **equippable at N** — `LEVEL_REQUIRED <= N`, and an item naming no requirement passes |
+| class | `cls` | **usable by** — an item with no `cls`, or `cls` in the set |
+| damage / armor type and value | `dmgv`, `armv` | per-type `[min, max]`, either end open |
+| stats | `aff` | `[{text, stat, lo, hi}]`, **ANDed** |
+| set bonuses | `setfx` | `false` by default; the box widens the stat pool |
+
+Type and value are compared **range against range, overlapping** — a weapon
+rolling 14–28 satisfies "at least 20" at its top end, and nominating one end as
+the real one would reject it. This is `ends()`, beside `avg()`, which cannot be
+used for it: `avg` reports the midpoint and would fail the same test. A type
+named with **no bounds** is a *presence* test, not a dropped clause — `#dmgv=fire`
+asks "deals fire" and answers 230 — because a URL that looks like a filter while
+showing the whole corpus is the one outcome this page keeps designing against.
+The panel cannot express that spelling (two empty boxes mean *no constraint*, its
+only reading), but a URL can.
+
+**Set bonuses are off by default.** The requirement was written both ways — "a
+separate checkbox, disabled by default" and "set bonus affixes included by
+default" — and was resolved as the checkbox opting them *in*. The two stats that
+exist only on a set ladder are the measurement: `#aff=x-mana-stolen::` is 0 alone
+and 65 with `setfx=1`; `x-health-stolen` is 0 and 63. That is the assertion pair
+pinning the default.
+
+**A stat the vocabulary does not know is kept, not dropped.** It resolves to
+id `-1`, which no effect line carries, so the row is unsatisfiable and the panel
+draws it in red rather than showing a filter that quietly does nothing. The
+alternative — silently discarding the clause — would turn a URL that looks like a
+filter into a URL showing all 6,048 items.
+
+**Hash grammar**, following the file's preference for legible `key=value`:
+`plr=50`, `cls=Embermage,Outlander` (elided when all four are on), `setfx=1`,
+`dmgv=fire:10:20,physical::`, `armv=…`, `aff=x-attack-speed:10:,x-health::`.
+A stat row is `slug:lo:hi`, split on `:` so a negative bound needs no escaping
+(`x-all-armor-per-hit:-4:5`) and an empty side is an open bound. Rows keep the
+reader's order and are never sorted. **A known stat is written as its slug**, not
+as the label the panel hands back: a label carries spaces and `%` that arrive
+percent-encoded, and the two resolve to the same row on the way in. A row the
+vocabulary does not know has no slug and is written back verbatim.
+
+**No new dependency and no new interaction model.** The stat picker is an
+`<input list="advstats">` over a `<datalist>` filled once from `window.DB.aff` —
+native typeahead, no library. The panel reuses the rail's own `.sec`, `.f` and
+`.rng`, so the two cannot drift in look any more than in state, and the collapse
+glyph is one shared `toggleSec()`. `#adv` is a sibling of `#rail`, not a child:
+below 769px the rail is an off-canvas drawer under `transform`, and a transformed
+ancestor becomes the containing block for its fixed descendants, so a panel
+nested inside would be trapped in a 220px column. Opening the panel closes the
+drawer — two full-height overlays at once is not a stacking the page has.
+
+**Traps the suite now pins:** Enter in the panel commits, but Enter *on a button*
+does not (otherwise Enter on Reset would reset and immediately commit the
+reset). A value-less stat has its two bound boxes switched off, and its bounds
+are cleared in `advCollect()` rather than only on the label's change event —
+Enter in the text box commits *before* `change` fires, so a row edited from
+`X Health 9–9` to `Identify Item` would otherwise reach `pairOK` carrying bounds
+and match nothing. `advCollect` reads the DOM instead of reacting per keystroke
+for the same reason.
+
+**What it costs:** **+26,954 bytes raw and +7,313 served — 0.18%** of the
+7.85 MB page, measured by reconstructing the previous page from `HEAD`'s three
+source files and compressing both halves at brotli quality 11, not extrapolated.
+
 ### The socketables page
 
 `out\socketables.html` — 209 KB, built by `src\socket_page.py`, served at

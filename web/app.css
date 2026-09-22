@@ -603,6 +603,87 @@ button,input,select{font:inherit; color:inherit}
 .tag{display:inline-block; padding:1px 5px; border:1px solid var(--div);
   border-radius:3px; color:var(--label); font-size:9.5px; margin-left:6px}
 
+/* --------------------------------------------------------- the advanced panel
+   The page's only overlay, and its only dialog. It is fixed rather than
+   absolute because it belongs to the viewport and not to #app: at ≤768px the
+   rail is an off-canvas drawer under `transform`, and a transformed ancestor
+   becomes the containing block for its fixed descendants -- so a panel nested
+   in the rail would be clipped into a 220px column. It is a sibling of the rail
+   instead (see index.html), stacked over it.
+
+   Everything inside it reuses the rail's own vocabulary -- .sec for the
+   collapsible groups, .f for a checkbox row, .rng for a `label | min | max`
+   row -- so the panel and the rail cannot drift apart in look any more than
+   they can in state. Only the parts the rail has no equivalent of are new. */
+#advscrim{display:none; position:fixed; inset:0; z-index:39; background:rgba(0,0,0,.6)}
+#advscrim.on{display:block}
+#adv{
+  display:none; position:fixed; z-index:40; left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  width:min(620px,calc(100vw - 32px)); max-height:88vh;
+  background:var(--panel); border:1px solid var(--div); border-radius:4px;
+  box-shadow:0 20px 60px #000;
+}
+#adv.on{display:flex; flex-direction:column}
+#advhead{
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  padding:10px 12px; border-bottom:1px solid var(--line);
+  color:var(--head); font-size:14px;
+}
+#advhead .t{flex:1 1 auto}
+/* The body is the scroller and the footer is outside it, so Search stays put
+   however long the affix list grows. */
+#advb{flex:1 1 auto; overflow-y:auto; padding:2px 0 8px}
+#advf{display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  padding:9px 12px; border-top:1px solid var(--line)}
+#advf .sp{flex:1 1 auto}
+/* #bar button's chrome, restated: that selector cannot reach a button outside
+   the toolbar, and a dialog that wore the platform's default buttons would read
+   as a different page's. */
+#adv button{
+  background:#22201d; border:1px solid var(--div); border-radius:3px;
+  padding:5px 11px; cursor:pointer; color:inherit; font:inherit;
+}
+#adv button:hover{border-color:var(--label); color:var(--gold)}
+/* Search is the panel's primary action and wears the toolbar's active gold.
+   Two ids deep for the same reason #bar #onlyset is: `#adv button` is (1,1,1),
+   so a bare `#advgo` at (1,0,0) would lose to it. */
+#adv #advgo{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+#adv #advx{padding:1px 7px 2px; line-height:1.3}
+/* The requirement caps and the class boxes are short enough to pair up; the
+   panel is already tall without every one of them taking a row of its own. */
+#adv .agrid{display:grid; grid-template-columns:1fr 1fr; gap:0 10px}
+/* .rng .rl is 60px, sized for "Dexterity" in the rail. These rows carry longer
+   labels -- "Item Level", "Player Level", "Sockets" -- and the panel has the
+   width to give them. */
+#adv .rng .rl{flex:0 0 84px}
+/* The one control that widens the affix search rather than narrowing it, so it
+   is set apart from the rows above it. Deliberately NOT .off when unchecked:
+   the rail's .off dims an unchecked facet because it means "excluded", and an
+   opt-in that looks excluded reads as broken. */
+#adv .aset{border-top:1px solid var(--line); margin-top:7px; padding-top:8px}
+
+/* An affix condition: the stat, its bounds, and a way to drop the row. .rng
+   input's chrome, restated -- a three-column row cannot wear .rng's two. */
+#adv .arow{display:flex; align-items:center; gap:6px; padding:3px 10px}
+#adv .arow input{
+  min-width:0; padding:4px 6px; background:#0e0d0c;
+  border:1px solid var(--div); border-radius:3px; outline:none;
+}
+#adv .arow input:focus{border-color:var(--label)}
+#adv .arow input[type=text]{flex:1 1 auto}
+#adv .arow input[type=number]{flex:0 0 78px}
+/* A value-less stat has no range to enter, so its boxes are off rather than
+   empty-and-ignored. */
+#adv .arow input:disabled{opacity:.35}
+#adv .arow span{flex:0 0 auto; color:var(--muted)}
+#adv .arow .adel{padding:2px 8px; line-height:1.2}
+/* Text the vocabulary does not know. The row is kept rather than dropped -- a
+   filter that silently does nothing is the one outcome this page keeps
+   designing against -- so it has to look like the problem it is. */
+#adv .arow.bad input[type=text]{border-color:var(--t-legendary); color:var(--t-legendary)}
+#adv .aadd{margin:6px 10px 2px}
+
 /* --------------------------------------------------------------- empty/msg */
 .msg{padding:40px 6px; color:var(--label); text-align:center}
 
@@ -618,6 +699,14 @@ button,input,select{font:inherit; color:inherit}
   #railbtn{display:inline-block}
   #railscrim{display:none; position:absolute; inset:0; z-index:19; background:rgba(0,0,0,.5)}
   #railscrim.on{display:block}
+  /* The panel goes full-screen on a phone, the same breakpoint the rail becomes
+     a drawer at: a centred 620px dialog on a 360px screen is a 328px dialog
+     with a backdrop nobody can see past, which is worse than no backdrop. */
+  #adv{
+    left:0; top:0; transform:none; width:100%; height:100%; max-height:none;
+    border:0; border-radius:0;
+  }
+  #adv .agrid{grid-template-columns:1fr}
   .card{flex:1 1 auto; width:auto; min-width:0}
   /* the group headers are controls now, not just captions -- give them a
      finger-sized target on the drawer */

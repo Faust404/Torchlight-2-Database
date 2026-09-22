@@ -29,6 +29,11 @@
   // --esprite, one per entry in DMGTYPES and in that order. Built by build.py
   // from the PNG's own width, so the strip and these offsets cannot disagree.
   var ELEM = window.DB.elem || {};
+  // The stat vocabulary the build derives: [slug, label, hasValue] per entry,
+  // sorted by label. A stat's *identity* in the URL and in a filter row is its
+  // index into this list, which is what the per-item index stores -- so the
+  // picker and the predicate can never disagree about what a slug means.
+  var AFF = window.DB.aff || [];
   // The rail's taxonomy, injected by build.py from TYPE_GROUPS -- the same list
   // that decides the CSV's category column. Each entry is {g: group,
   // s: subgroup or null, t: [types]}, already in render order.
@@ -100,6 +105,13 @@
     set: '', setOnly: false, sockMin: null, sockMax: null,
     lvlMin: null, lvlMax: null,
     req: { str: null, dex: null, mag: null, def: null },
+    // The advanced panel's own state, kept apart from the rail's two
+    // near-neighbours on purpose. `plr` is "equippable at this level", which
+    // reads `lr` -- the same field the item's own level range reads, so the two
+    // narrow from opposite ends. `dmg` above is a *facet*: a set of types the
+    // item has. `dmgv` carries a bound per type, and an empty object means no
+    // filter -- which is why it is not a Set.
+    plr: null, cls: new Set(), dmgv: {}, armv: {}, aff: [], setfx: false,
     sort: DEFAULT_SORT, dir: 1, item: ''
   };
 
@@ -140,6 +152,28 @@
     return ((+s.slice(0, i) || 0) + (+s.slice(i + 1) || 0)) / 2;
   }
   function total(o) { var t = 0, k; for (k in o) t += avg(o[k]); return t; }
+  // `avg`'s two ends without the halving: '140-174' -> [140, 174], '140' ->
+  // [140, 140]. A range filter compares ranges, so it cannot use the midpoint:
+  // a sword that rolls 14-28 does overlap a request for 20-30, and avg() reports
+  // 21 for it and would then fail a "at least 22" test the item satisfies.
+  function ends(v) {
+    var s = String(v == null ? '' : v), i = s.indexOf('-');
+    if (i < 0) { var x = +s || 0; return [x, x]; }
+    return [+s.slice(0, i) || 0, +s.slice(i + 1) || 0];
+  }
+  // A *signed* bound, where floor0 is deliberately not one. floor0's floor is 0
+  // because no level and no stat requirement is negative; an affix value is --
+  // 489 index pairs carry a negative low end, `-4~5 to All Armor per hit` among
+  // them. A non-numeric bound reads as no bound, the same choice floor0 makes.
+  function num(v) {
+    if (v == null || v === '') return null;
+    var x = +v;
+    return isFinite(x) ? x : null;
+  }
+  function slugify(s) {
+    return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
 
   // Seconds per swing -> the game's wording. Bands derived from alfgeir's own
   // tooltips, which cover all 29 distinct speed values with zero ambiguity.
@@ -236,7 +270,87 @@
     for (var k in S.req) {
       if (S.req[k] != null && n(o.rq && o.rq[k]) > S.req[k]) return false;
     }
+    // "Equippable at level N": a ceiling, and an item naming no requirement
+    // passes it, which is what n() gives -- the 374 shown items with no `lr` at
+    // all are usable at any level, so they survive every setting.
+    if (S.plr != null && n(o.lr) > S.plr) return false;
+    // A class gate is a restriction rather than a property, so the four boxes
+    // are asymmetric on purpose: an item that names no class is usable by all
+    // four and survives every selection. 767 items are restricted, and the
+    // other 5,281 fail no class test.
+    if (S.cls.size && o.cls && !S.cls.has(o.cls)) return false;
+    if (!typeHit(o.dmg, S.dmgv) || !typeHit(o.arm, S.armv)) return false;
+    if (S.aff.length && !affHit(o)) return false;
     return true;
+  }
+
+  // One damage or armor type's bounds. Range against range, overlapping rather
+  // than containing -- neither end has to be nominated as the real one, and it
+  // is the same rule an affix row uses. A type named with no bound is a
+  // *presence* test and never a dropped clause: `#dmgv=fire` asks "deals fire",
+  // and a URL that looks like a filter while showing the whole corpus is the
+  // one outcome this page keeps designing against. A for-in over an empty
+  // object is a no-op, so "no rows" needs no guard of its own.
+  function typeHit(map, want) {
+    for (var t in want) {
+      if (!map || !map[t]) return false;         // the item does not have it
+      var e = ends(map[t]), b = want[t];
+      if (b[0] != null && e[1] < b[0]) return false;
+      if (b[1] != null && e[0] > b[1]) return false;
+    }
+    return true;
+  }
+
+  // o.af is the build's own index: [statId], [statId, v] or [statId, lo, hi] per
+  // effect line, in the card's own line order, with its length already asserted
+  // against `fx` + `aug` at build time. o.sf is the same shape for the item's
+  // set ladder, reachable rungs only.
+  function pairOK(p, c) {
+    if (c.lo == null && c.hi == null) return true;   // "has this stat"
+    if (p.length < 2) return false;                  // the line carries no value
+    var lo = p[1], hi = p.length > 2 ? p[2] : p[1];
+    return (c.lo == null || hi >= c.lo) && (c.hi == null || lo <= c.hi);
+  }
+  function poolHit(pool, c) {
+    for (var j = 0; pool && j < pool.length; j++) {
+      if (pool[j][0] !== c.stat) continue;
+      if (pairOK(pool[j], c)) return true;
+    }
+    return false;
+  }
+  // `setfx` widens the pool rather than adding a clause: a set bonus is not a
+  // second thing to match, it is the other place this item's stats can come
+  // from. Off by default, which is why `x-mana-stolen` matches nothing at all
+  // until it is ticked -- those two stats exist only on ladders.
+  function affHit(o) {
+    for (var i = 0; i < S.aff.length; i++) {
+      var c = S.aff[i];
+      if (!poolHit(o.af, c) && !(S.setfx && poolHit(o.sf, c))) return false;
+    }
+    return true;
+  }
+
+  // The vocabulary as a lookup, by slug and by label -- the two things the
+  // picker can hand back. Built once; a label is what the datalist offers and a
+  // slug is what a hand-written hash carries, and both have to resolve.
+  var AFFLOOK = (function () {
+    var m = Object.create(null);
+    for (var i = 0; i < AFF.length; i++) {
+      m[AFF[i][0]] = i;
+      m[AFF[i][1].toLowerCase()] = i;
+    }
+    return m;
+  })();
+  // A row's text may be a slug, a label, or neither. -1 means the vocabulary has
+  // no such stat; no effect line carries id -1, so the row can never be
+  // satisfied. Filtering to nothing *and showing the row that did it* beats
+  // dropping the clause, which would leave a URL that looks like a filter and
+  // quietly shows everything.
+  function affLookup(text) {
+    var t = String(text == null ? '' : text).trim().toLowerCase();
+    if (t in AFFLOOK) return AFFLOOK[t];
+    var s = slugify(t);
+    return (s in AFFLOOK) ? AFFLOOK[s] : -1;
   }
 
   function filtered() {
@@ -582,7 +696,21 @@
     var s = function (set) { return Array.from(set).sort(); };
     return JSON.stringify([S.q, s(S.types), s(S.tiers), s(S.dmg),
       S.set, S.setOnly, S.sockMin, S.sockMax, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
-      ['str', 'dex', 'mag', 'def'].map(function (k) { return S.req[k]; })]);
+      ['str', 'dex', 'mag', 'def'].map(function (k) { return S.req[k]; }),
+      S.plr, s(S.cls), typeSig(S.dmgv), typeSig(S.armv), S.setfx,
+      S.aff.map(function (c) { return [c.stat, c.lo, c.hi]; })]);
+  }
+
+  // A bound map's fingerprint, sorted. JSON.stringify keeps insertion order, so
+  // without this `#dmgv=physical:,fire:` and `#dmgv=fire:,physical:` would look
+  // like two different selections to the route check -- and writeHash sorts for
+  // exactly that reason. Affix rows are deliberately *not* sorted: their order
+  // is the reader's, it is visible in the dialog, and two rows naming the same
+  // stat are legal.
+  function typeSig(m) {
+    var out = [];
+    for (var t in m) out.push([t, m[t][0], m[t][1]]);
+    return out.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
   }
 
   function render() {
@@ -1041,6 +1169,8 @@
     S.set = ''; S.setOnly = false; S.sockMin = S.sockMax = null;
     S.lvlMin = S.lvlMax = null; S.item = '';
     S.req = { str: null, dex: null, mag: null, def: null };
+    S.plr = null; S.cls = new Set(); S.dmgv = {}; S.armv = {};
+    S.aff = []; S.setfx = false;
     S.q = ''; S.sort = DEFAULT_SORT; S.dir = 1;
     // The tier facet starts fully selected, unlike the rail's other facets,
     // which start empty. An empty set and a full one filter identically --
@@ -1115,7 +1245,53 @@
                              S.sockMax = floor0(sp[1]); }
       else if (k === 'req') list.forEach(function (r) {
         var q = r.split(':'); if (q[0]) S.req[q[0]] = floor0(q[1]); });
+      // The advanced panel's keys. Every one is read with the same tolerance the
+      // rail's are: an empty or unreadable bound is *no* bound, never NaN.
+      else if (k === 'plr') S.plr = floor0(v);
+      else if (k === 'cls') list.forEach(function (c) { if (c) S.cls.add(c); });
+      else if (k === 'setfx') S.setfx = v === '1';
+      else if (k === 'dmgv') parseBounds(v, S.dmgv);
+      else if (k === 'armv') parseBounds(v, S.armv);
+      // A row's three parts are `slug`, `slug:lo` or `slug:lo:hi` -- split on
+      // `:`, so a negative bound needs no escaping and `x-health:-4:5` reads
+      // the way it looks. An empty side is an open bound. Row order is kept,
+      // because the dialog shows the rows in this order.
+      else if (k === 'aff') list.forEach(function (r) {
+        var q = r.split(':');
+        if (!q[0]) return;
+        S.aff.push({ text: q[0], stat: affLookup(q[0]),
+                     lo: num(q[1]), hi: num(q[2]) });
+      });
     });
+  }
+
+  // `fire:10:20,physical` -> {fire: [10, 20], physical: [null, null]}. A type
+  // named with no bound is a presence test, which is why its entry exists at
+  // all rather than being skipped -- `typeHit` reads a null pair as "has it".
+  function parseBounds(v, into) {
+    if (!v) return;
+    v.split(',').forEach(function (r) {
+      var q = r.split(':');
+      if (!q[0]) return;
+      into[q[0]] = [num(q[1]), num(q[2])];
+    });
+  }
+
+  // parseBounds' inverse, and written beside it so the two spellings stay one
+  // spelling. An absent bound is an empty field, so a presence test -- which a
+  // URL can carry and the panel cannot -- round-trips as `physical::` instead
+  // of being flattened into "no bound" on the way out. Order is DMGTYPES'
+  // first, then any type this page does not name, sorted: a filter's URL must
+  // not depend on which box the reader happened to fill in first.
+  function boundsStr(m) {
+    var keys = DMGTYPES.filter(function (t) { return t in m; });
+    Object.keys(m).sort().forEach(function (t) {
+      if (keys.indexOf(t) < 0) keys.push(t);
+    });
+    return keys.map(function (t) {
+      var b = m[t];
+      return t + ':' + (b[0] == null ? '' : b[0]) + ':' + (b[1] == null ? '' : b[1]);
+    }).join(',');
   }
 
   // Every distinct value each facet can take, computed once. Used to elide a
@@ -1155,6 +1331,31 @@
     var rq = ['str', 'dex', 'mag', 'def'].filter(function (k) { return S.req[k] != null; })
       .map(function (k) { return k + ':' + S.req[k]; });
     if (rq.length) p.push('req=' + rq.join(','));
+    if (S.plr != null) p.push('plr=' + S.plr);
+    // Elided when all four are on, for the same reason a facet is elided when
+    // all of its boxes are: no item fails a test every class passes. `all`
+    // order first, so the URL is stable whatever order the boxes were ticked.
+    if (S.cls.size && S.cls.size < ALLCLASSES.length)
+      p.push('cls=' + encodeURIComponent(Array.from(S.cls).sort().join(',')));
+    if (S.setfx) p.push('setfx=1');
+    var dv = boundsStr(S.dmgv), av = boundsStr(S.armv);
+    if (dv) p.push('dmgv=' + dv);
+    if (av) p.push('armv=' + av);
+    // Rows in the reader's own order, and never sorted: two rows may name the
+    // same stat with different bounds, and reordering them would make a URL the
+    // reader did not write.
+    //
+    // A known stat is written as its slug. The panel hands back whatever the
+    // reader typed -- a label off the datalist, most of the time -- and a label
+    // carries spaces and `%` that would arrive percent-encoded and unreadable.
+    // The slug is the vocabulary's own spelling and needs no encoding; the two
+    // resolve to the same row on the way back in, so nothing is lost. A row the
+    // vocabulary does *not* know has no slug, so it is written back verbatim:
+    // it still filters, so it still belongs in the URL.
+    if (S.aff.length) p.push('aff=' + S.aff.map(function (c) {
+      return (c.stat >= 0 ? AFF[c.stat][0] : c.text) + ':' +
+             (c.lo == null ? '' : c.lo) + ':' + (c.hi == null ? '' : c.hi);
+    }).join(','));
     if (S.q) p.push('q=' + encodeURIComponent(S.q));
     if (S.sort !== DEFAULT_SORT) p.push('sort=' + S.sort);
     if (S.dir === -1) p.push('dir=desc');
@@ -1171,6 +1372,328 @@
       location.hash = h;
     }
   }
+
+  // -------------------------------------------------------- the advanced panel
+  // The panel edits a *draft*, never S. Opening copies the fields it owns into
+  // `advS`; Add and ✕ re-render from that draft; Search reads the panel back
+  // into S and closes; Reset empties the draft; Escape, the ✕ and the scrim
+  // throw it away. Two things fall out of that, and both are the point:
+  //
+  //   * S stays the single source of filter truth. The panel writes lvlMin and
+  //     sockMin exactly where the rail does -- it does not own a second copy of
+  //     them, and the two controls cannot disagree, because opening the panel
+  //     reads the rail's numbers out of S and Search writes them back.
+  //   * nothing filters while the panel is open, which is the interaction that
+  //     was asked for: set the filters, hit Search, see the results.
+  //
+  // It also sidesteps the trap the rail documents for its own inputs. A control
+  // that re-renders on every keystroke cannot hold a half-typed value; a draft
+  // that is read once, at commit, never has to.
+  var advS = null;
+  var advOn = false;
+
+  // The four class names, read off the corpus rather than written down here: a
+  // fifth would otherwise be unselectable without a code change, and `cls` is
+  // the build's own field for this. Sorted, so the boxes hold still.
+  var ALLCLASSES = (function () {
+    var seen = Object.create(null), out = [];
+    for (var i = 0; i < ITEMS.length; i++) {
+      var c = ITEMS[i].cls;
+      if (c && !seen[c]) { seen[c] = 1; out.push(c); }
+    }
+    return out.sort();
+  })();
+
+  // One `label | min | max` row, the shape the rail's level and socket fields
+  // already use. `hi` left undefined gives a single box -- a ceiling, which is
+  // what a requirement cap and the player level both are. `attr` is the draft
+  // path the boxes write to, so collecting them needs no table of field names.
+  function advRange(attr, label, lo, hi) {
+    var h = hi === undefined;
+    return '<div class="rng"><span class="rl">' + esc(label) + '</span>' +
+      '<input type="number" min="0" data-a="' + attr + '" data-end="lo" value="' +
+      (lo == null ? '' : lo) + '" placeholder="any">' +
+      (h ? '' : '<span>&ndash;</span><input type="number" min="0" data-a="' + attr +
+        '" data-end="hi" value="' + (hi == null ? '' : hi) + '" placeholder="any">') +
+      '</div>';
+  }
+
+  // A fresh draft off S. Everything is copied, not shared -- the panel mutates
+  // its draft freely and a discarded draft must not have reached S on the way.
+  function advCopy() {
+    var d = {}, a = {}, r = {}, k;
+    for (k in S.dmgv) d[k] = S.dmgv[k].slice();
+    for (k in S.armv) a[k] = S.armv[k].slice();
+    for (k in S.req) r[k] = S.req[k];
+    return {
+      q: S.q, lvlMin: S.lvlMin, lvlMax: S.lvlMax, plr: S.plr,
+      sockMin: S.sockMin, sockMax: S.sockMax, req: r,
+      cls: new Set(S.cls), dmgv: d, armv: a, setfx: S.setfx,
+      aff: S.aff.map(function (c) {
+        return { text: c.text, stat: c.stat, lo: c.lo, hi: c.hi };
+      })
+    };
+  }
+
+  // Reads the panel's DOM back into the draft. Done once, at commit, rather
+  // than per keystroke: the reader may hit Search straight out of a text box,
+  // where no change event has fired yet, and nothing is listening to the draft
+  // anyway.
+  function advCollect() {
+    var root = document.getElementById('advb'), i, el;
+    var boxes = root.querySelectorAll('[data-a]');
+    for (i = 0; i < boxes.length; i++) {
+      el = boxes[i];
+      var p = el.getAttribute('data-a').split('.');
+      var end = el.getAttribute('data-end');
+      // Lower-cased here and not at the comparison, which is where the rail's
+      // own box does it (see #q's keydown): matches() indexes the name with
+      // S.q as typed, so a `Fire` that reached it unfolded would match nothing.
+      if (p[0] === 'q') advS.q = el.value.trim().toLowerCase();
+      // floor0 throughout, because these are the same S members the rail's
+      // boxes write: a floor on one side and not the other would make one typed
+      // value mean two things depending on which control it went through.
+      else if (p[0] === 'plr') advS.plr = floor0(el.value);
+      else if (p[0] === 'req') advS.req[p[1]] = floor0(el.value);
+      else if (p[0] === 'lvl' || p[0] === 'sock')
+        advS[p[0] + (end === 'lo' ? 'Min' : 'Max')] = floor0(el.value);
+    }
+    // Rebuilt rather than merged, so a type whose two boxes were both cleared
+    // drops out of the filter. Two empty boxes are the only way the panel can
+    // say "no constraint" -- there is no third state to confuse it with.
+    advS.dmgv = {}; advS.armv = {};
+    for (i = 0; i < boxes.length; i++) {
+      el = boxes[i];
+      var q = el.getAttribute('data-a').split('.');
+      if (q[0] !== 'dmgv' && q[0] !== 'armv') continue;
+      var b = advS[q[0]][q[1]] || [null, null];
+      b[el.getAttribute('data-end') === 'lo' ? 0 : 1] = num(el.value);
+      if (b[0] != null || b[1] != null) advS[q[0]][q[1]] = b;
+    }
+    advS.cls = new Set();
+    var cls = root.querySelectorAll('[data-acls]');
+    for (i = 0; i < cls.length; i++) if (cls[i].checked) advS.cls.add(cls[i].value);
+    var fx = root.querySelector('[data-asetfx]');
+    advS.setfx = !!(fx && fx.checked);
+
+    advS.aff = [];
+    var rows = root.querySelectorAll('[data-arow]');
+    for (i = 0; i < rows.length; i++) {
+      var row = rows[i], txt = row.querySelector('[data-aaff]').value.trim();
+      if (!txt) continue;
+      var stat = affLookup(txt);
+      var lo = num(row.querySelector('[data-afend="lo"]').value);
+      var hi = num(row.querySelector('[data-afend="hi"]').value);
+      // A value-less stat cannot carry a range: pairOK rejects every pair whose
+      // condition has a bound and whose line holds no number, so leaving the
+      // two boxes live would give a row that displays bounds and matches
+      // nothing. Cleared here and not only on the label's change event, because
+      // Enter in the text box commits *before* change fires.
+      if (!(stat >= 0 && AFF[stat][2])) { lo = null; hi = null; }
+      advS.aff.push({ text: txt, stat: stat, lo: lo, hi: hi });
+    }
+    return advS;
+  }
+
+  // One collapsible group, shared by the rail and the panel so the two cannot
+  // drift: SEC is one dictionary and the keys are disjoint by construction.
+  function toggleSec(h) {
+    var sec = h.parentNode, k = sec.getAttribute('data-sec');
+    SEC[k] = SEC[k] === false;
+    sec.classList.toggle('closed', SEC[k] === false);
+    h.querySelector('.tog').textContent = SEC[k] === false ? '+' : '−';
+  }
+
+  function renderAdv() {
+    var g = '<div class="rng"><span class="rl">Name</span>' +
+      '<input type="text" data-a="q" value="' + esc(advS.q) +
+      '" placeholder="name, id or type"></div>';
+    g += advRange('lvl', 'Item Level', advS.lvlMin, advS.lvlMax);
+    g += advRange('plr', 'Player Level', advS.plr);
+    g += advRange('sock', 'Sockets', advS.sockMin, advS.sockMax);
+
+    var rq = '<div class="agrid">';
+    ['str', 'dex', 'mag', 'def'].forEach(function (k) {
+      rq += advRange('req.' + k, REQLABEL[k], advS.req[k]);
+    });
+    rq += '</div>';
+    rq += '<div class="agrid">' + ALLCLASSES.map(function (c) {
+      var on = advS.cls.has(c);
+      // No data-ct: paintCounts() writes a count into every [data-ct] span and
+      // would throw on one outside the rail. No data-f either -- the document's
+      // change handler owns that name and would write into S.
+      return '<label class="f"><input type="checkbox" data-acls value="' + esc(c) +
+        '"' + (on ? ' checked' : '') + '><span class="lbl">' + esc(c) + '</span></label>';
+    }).join('') + '</div>';
+
+    var body = section('advgen', 'General', g) +
+      section('advreq', 'Requirements & Class', rq);
+    body += section('advdmg', 'Damage', DMGTYPES.map(function (t) {
+      return advRange('dmgv.' + t, cap(t), (advS.dmgv[t] || [])[0], (advS.dmgv[t] || [])[1]);
+    }).join(''));
+    body += section('advarm', 'Armor', DMGTYPES.map(function (t) {
+      return advRange('armv.' + t, cap(t), (advS.armv[t] || [])[0], (advS.armv[t] || [])[1]);
+    }).join(''));
+
+    var rows = advS.aff.map(function (c, i) {
+      var known = c.stat >= 0 && AFF[c.stat];
+      // A stat the vocabulary marks value-less is a presence test, so its two
+      // boxes are off rather than empty-and-ignored.
+      var hz = known && !AFF[c.stat][2];
+      // A known stat is shown under the vocabulary's own name and not under
+      // whatever the draft carries. A row that arrived in a URL carries the
+      // slug -- `x-attack-speed` -- and a panel showing that would look like it
+      // held a different stat from the one its own datalist offers.
+      var shown = known ? AFF[c.stat][1] : c.text;
+      return '<div class="arow' + (known ? '' : ' bad') + '" data-arow="' + i + '"' +
+        (known ? '' : ' title="Not a stat this database knows. The row filters' +
+          ' out everything until you pick one from the list."') + '>' +
+        '<input type="text" list="advstats" data-aaff="' + i + '" value="' + esc(shown) +
+          '" placeholder="stat" autocomplete="off">' +
+        '<input type="number" data-afend="lo" value="' + (c.lo == null ? '' : c.lo) +
+          '" placeholder="any"' + (hz ? ' disabled' : '') + '>' +
+        '<span>&ndash;</span>' +
+        '<input type="number" data-afend="hi" value="' + (c.hi == null ? '' : c.hi) +
+          '" placeholder="any"' + (hz ? ' disabled' : '') + '>' +
+        '<button class="adel" data-adel="' + i + '" title="Remove this stat" ' +
+          'aria-label="Remove this stat">&times;</button></div>';
+    }).join('');
+    var af = rows + (rows ? '' : '<div class="rng"><span class="rl"></span>' +
+      '<span>No stat filters yet.</span></div>') +
+      '<button class="aadd" id="advadd">+ Add stat</button>' +
+      '<label class="f aset"><input type="checkbox" data-asetfx' +
+        (advS.setfx ? ' checked' : '') +
+        '><span class="lbl">Include set bonuses</span></label>' +
+      '<div class="rng"><span class="rl"></span><span>Set-bonus lines are not' +
+        ' searched unless this is ticked.</span></div>';
+    body += section('advaff', 'Stats', af);
+
+    document.getElementById('advb').innerHTML = body;
+  }
+
+  function advShow(on) {
+    advOn = on;
+    document.getElementById('adv').classList.toggle('on', on);
+    document.getElementById('advscrim').classList.toggle('on', on);
+    var b = document.getElementById('advbtn');
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (!on) return;
+    // The rail drawer and this panel are both full-height overlays, and the
+    // drawer is inside a transform at ≤768px rather than above the page -- so
+    // two of them at once is not a stacking the page has. Closing it is also
+    // just right: the panel covers everything the drawer would.
+    document.getElementById('rail').classList.remove('floating');
+    document.getElementById('railscrim').classList.remove('on');
+  }
+
+  // Reset empties the *draft*. It is a form reset, not an undo of the page's
+  // filters: nothing has been applied yet, so there is nothing to take back
+  // until Search.
+  function advReset() {
+    advS = {
+      q: '', lvlMin: null, lvlMax: null, plr: null, sockMin: null, sockMax: null,
+      req: { str: null, dex: null, mag: null, def: null },
+      cls: new Set(), dmgv: {}, armv: {}, setfx: false, aff: []
+    };
+    renderAdv();
+  }
+
+  function advCommit() {
+    advCollect();
+    S.q = advS.q; S.lvlMin = advS.lvlMin; S.lvlMax = advS.lvlMax;
+    S.plr = advS.plr; S.sockMin = advS.sockMin; S.sockMax = advS.sockMax;
+    S.setfx = advS.setfx;
+    // The draft is built fresh by advCopy() on every open and never touched
+    // again after this line, so handing S its members outright shares nothing
+    // that can move.
+    S.req = advS.req; S.cls = advS.cls; S.dmgv = advS.dmgv; S.armv = advS.armv;
+    S.aff = advS.aff;
+    advShow(false);
+    // The text box's route, for the two reasons its comment gives.
+    //
+    // S.item first: apply() reaches paintGrid(), which branches on S.item and
+    // renders the detail view instead of the grid -- so a panel opened over an
+    // item card would close and leave the card exactly where it was.
+    //
+    // Then onRoute() rather than apply(): only onRoute() rebuilds the rail, and
+    // the rail is where the item-level and socket boxes the panel just wrote
+    // live. Without it they would keep showing the old numbers beside a grid
+    // filtered by the new ones.
+    S.item = '';
+    showAll = false;
+    writeHash();
+    lastSig = null;
+    onRoute();
+  }
+
+  // The datalist, filled once. Labels, not slugs: the slug is what a URL
+  // carries and never what a reader types.
+  (function () {
+    var h = '';
+    for (var i = 0; i < AFF.length; i++) h += '<option value="' + esc(AFF[i][1]) + '">';
+    document.getElementById('advstats').innerHTML = h;
+  })();
+
+  document.getElementById('advbtn').addEventListener('click', function () {
+    if (advOn) { advShow(false); return; }
+    advS = advCopy();
+    renderAdv();
+    advShow(true);
+    var f = document.querySelector('#advb [data-a="q"]');
+    if (f) f.focus();
+  });
+  document.getElementById('advx').addEventListener('click', function () { advShow(false); });
+  document.getElementById('advscrim').addEventListener('click', function () { advShow(false); });
+  document.getElementById('advrst').addEventListener('click', advReset);
+  document.getElementById('advgo').addEventListener('click', advCommit);
+
+  document.getElementById('adv').addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.id === 'advadd') {
+      advCollect();
+      advS.aff.push({ text: '', stat: -1, lo: null, hi: null });
+      renderAdv();
+      var rows = document.querySelectorAll('#advb [data-aaff]');
+      if (rows.length) rows[rows.length - 1].focus();
+      return;
+    }
+    var del = t.getAttribute && t.getAttribute('data-adel');
+    if (del != null) {
+      advCollect();          // read the other rows before this one renumbers them
+      advS.aff.splice(+del, 1);
+      renderAdv();
+      return;
+    }
+    var h = t.closest ? t.closest('.sec-h') : null;
+    if (h) toggleSec(h);
+  });
+
+  // A stat's name decides whether its bounds mean anything, so the row is
+  // redrawn the moment the name settles. change fires on blur or Enter, never
+  // per keystroke, so this cannot fight the caret.
+  document.getElementById('adv').addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t.getAttribute || t.getAttribute('data-aaff') == null) return;
+    advCollect();
+    var i = +t.getAttribute('data-aaff'), c = advS.aff[i];
+    if (!c) return;
+    renderAdv();
+    var again = document.querySelector('#advb [data-aaff="' + i + '"]');
+    if (again) again.focus();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (!advOn) return;
+    if (e.key === 'Escape') { e.preventDefault(); advShow(false); }
+    // Enter searches from anywhere in the panel except on a button, where it is
+    // that button's own activation -- otherwise Enter on Reset would reset and
+    // then immediately commit the reset.
+    else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+      e.preventDefault();
+      advCommit();
+    }
+  });
 
   // ------------------------------------------------------------------ events
   function syncControls() {
@@ -1404,11 +1927,7 @@
       toggleGroup(g); return;
     }
     var h = e.target.closest ? e.target.closest('.sec-h') : null;
-    if (!h) return;
-    var sec = h.parentNode, k = sec.getAttribute('data-sec');
-    SEC[k] = SEC[k] === false;
-    sec.classList.toggle('closed', SEC[k] === false);
-    h.querySelector('.tog').textContent = SEC[k] === false ? '+' : '−';
+    if (h) toggleSec(h);
   });
 
   window.addEventListener('hashchange', onRoute);

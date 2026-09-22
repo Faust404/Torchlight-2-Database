@@ -32,10 +32,38 @@
   </aside>
   <div id="railscrim"></div>
 
+  <!-- The advanced panel. It is a sibling of #rail rather than a child of it:
+       below 769px the rail is a drawer under `transform`, and a transformed
+       ancestor becomes the containing block for a fixed child -- so a panel
+       nested in the rail would be trapped inside the 220px drawer. Both scrim
+       and panel are out here, above the rail's own z-index. -->
+  <div id="advscrim"></div>
+  <div id="adv" role="dialog" aria-modal="true" aria-labelledby="advh">
+    <div id="advhead">
+      <span class="t" id="advh">Advanced Search</span>
+      <button id="advx" title="Close without searching" aria-label="Close">&#10005;</button>
+    </div>
+    <!-- The stat picker's vocabulary, filled once at startup from window.DB.aff
+         so the <input list> typeahead is the corpus's own list and not a second
+         copy of it. Native: no library, and it works from file://. -->
+    <datalist id="advstats"></datalist>
+    <div id="advb"></div>
+    <div id="advf">
+      <button id="advrst">Reset</button>
+      <span class="sp"></span>
+      <button id="advgo">Search</button>
+    </div>
+  </div>
+
   <main id="main">
     <div id="grid-wrap">
       <div id="bar">
         <button id="railbtn" title="Filters">&#9776;</button>
+        <!-- First in the bar on purpose: it is the one control that changes
+             *which* items match, where everything beside it decides which of
+             the matches are shown. -->
+        <button id="advbtn" aria-expanded="false" aria-controls="adv"
+                title="Search by stats, affixes and properties">Advanced Search</button>
         <span class="count" id="count"></span>
         <button id="onlyset" aria-pressed="false" title="Show only set items">Only Sets</button>
         <select id="setsel" title="Show one set"><option value="">any set</option></select>

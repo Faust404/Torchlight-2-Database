@@ -1,6 +1,7 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 207 assertions.
+ * view, provenance, the advanced-search panel and hash deep links -- 274
+ * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 verify/check_page.js
@@ -1831,6 +1832,193 @@ async function go(hash) {
          .test(css) && !/var\(--sprite\)/.test(css),
        'a 4.8 MB data URI does not survive a custom property');
   }
+
+  // ------------------------------------------------------ the advanced panel
+  //
+  // Driven on its own DOM rather than the shared one: these checks open a
+  // dialog and commit filters through it, and doing that to the window every
+  // assertion above has been reading would leave the rest of the suite
+  // asserting against a page the panel had already rewritten.
+  //
+  // The counts are the plan's own measured figures, pinned the way the rest of
+  // this suite pins counts: 6,048 of the 6,173 records are shown.
+  {
+    const ad = await deep('');
+    const aw = ad.defaultView;
+    const adv = ad.getElementById('adv'), abtn = ad.getElementById('advbtn');
+    const an = () => ad.getElementById('count').textContent.trim();
+    const arows = () => [].slice.call(ad.querySelectorAll('#advb [data-arow]'));
+    const click = (el) => el.dispatchEvent(new aw.MouseEvent('click', { bubbles: true }));
+    const fire = (el, type) => el.dispatchEvent(new aw.Event(type, { bubbles: true }));
+    const box = (sel) => ad.querySelector('#advb ' + sel);
+
+    ok('the advanced panel starts closed, behind an unlit button',
+       !adv.classList.contains('on') && !abtn.classList.contains('on') &&
+       !ad.getElementById('advscrim').classList.contains('on'));
+
+    click(abtn);
+    ok('the toolbar button opens it, scrim and all',
+       adv.classList.contains('on') && abtn.classList.contains('on') &&
+       ad.getElementById('advscrim').classList.contains('on') &&
+       abtn.getAttribute('aria-expanded') === 'true',
+       `panel ${adv.className} btn ${abtn.className}`);
+    ok('it opens on the five groups the plan named, in order',
+       [].map.call(ad.querySelectorAll('#advb .sec'), s => s.getAttribute('data-sec'))
+         .join(' ') === 'advgen advreq advdmg advarm advaff');
+    ok('the stat picker is the build\'s own vocabulary, offered as a datalist',
+       ad.querySelectorAll('#advstats option').length === 154,
+       `${ad.querySelectorAll('#advstats option').length}`);
+    ok('the class boxes are read off the corpus, not written down',
+       [].map.call(ad.querySelectorAll('#advb [data-acls]'), i => i.value)
+         .join(',') === 'Berserker,Embermage,Engineer,Outlander');
+    ok('it opens with no stat rows, and says so',
+       arows().length === 0 && /No stat filters yet/.test(ad.getElementById('advb').textContent));
+
+    // The panel and the rail share two fields -- item level and sockets -- and
+    // write the same S members. So a number set on the rail has to be in the
+    // panel the moment it opens: a panel keeping its own copy would show `any`
+    // here and then silently overwrite the reader's filter on Search.
+    click(ad.getElementById('advx'));                  // close, to reopen it
+    const rlvl = ad.getElementById('lvmin');
+    rlvl.value = '60';
+    fire(rlvl, 'change');
+    click(abtn);
+    ok('a filter already on the page is in the panel when it opens',
+       box('[data-a="lvl"][data-end="lo"]').value === '60',
+       `panel shows ${JSON.stringify(box('[data-a="lvl"][data-end="lo"]').value)}`);
+    box('[data-a="lvl"][data-end="lo"]').value = '';   // put it back
+    click(ad.getElementById('advgo'));
+
+    // --- Search commits, closes, and repaints in the same turn -------------
+    click(abtn);
+    click(ad.getElementById('advadd'));
+    ok('Add stat appends a row', arows().length === 1);
+    box('[data-aaff]').value = 'X Attack Speed';
+    fire(box('[data-aaff]'), 'change');
+    ok('naming a stat redraws its row without closing the panel',
+       arows().length === 1 && adv.classList.contains('on'));
+    ok('a stat the vocabulary knows is not flagged', !/bad/.test(arows()[0].className));
+    ok('...and its value boxes are live, because it carries a value',
+       !arows()[0].querySelector('[data-afend="lo"]').disabled);
+    arows()[0].querySelector('[data-afend="lo"]').value = '10';
+    click(ad.getElementById('advgo'));
+    ok('Search closes the panel and repaints the grid on the same click',
+       !adv.classList.contains('on') && !abtn.classList.contains('on') &&
+       an() === '33 items of 6,048',
+       `${an()} / panel ${adv.className}`);
+
+    // --- the panel's numbers reach the rail -------------------------------
+    // This is the trap the commit path was chosen for. apply() repaints the
+    // grid in place and leaves the rail alone; only onRoute() rebuilds it, and
+    // the rail is where the item-level and socket boxes live. So a panel
+    // committing through apply() would filter by 100 while the rail went on
+    // showing the reader's old number.
+    click(abtn);
+    box('[data-a="lvl"][data-end="lo"]').value = '100';
+    click(ad.getElementById('advgo'));
+    ok('a number typed in the panel lands in the rail\'s own box, not beside it',
+       ad.getElementById('lvmin').value === '100' &&
+       /lvl=100-/.test(aw.location.hash),
+       `rail ${JSON.stringify(ad.getElementById('lvmin').value)} hash ${aw.location.hash}`);
+
+    // --- a draft is discarded, three ways --------------------------------
+    click(abtn);
+    ok('re-opening shows the committed state',
+       arows().length === 1 && box('[data-aaff]').value === 'X Attack Speed',
+       `${arows().length} rows`);
+    click(ad.getElementById('advadd'));
+    box('[data-arow="1"] [data-aaff]').value = 'X Health';
+    ad.dispatchEvent(new aw.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    ok('Escape closes it and throws the draft away',
+       !adv.classList.contains('on') && /lvl=100-/.test(aw.location.hash));
+    click(abtn);
+    ok('...the discarded row is not there when it reopens', arows().length === 1,
+       `${arows().length} rows`);
+    box('[data-aaff]').value = 'X Health';
+    click(ad.getElementById('advx'));
+    ok('the ✕ throws it away too', !adv.classList.contains('on'));
+    click(abtn);
+    ok('...and again the row is the committed one',
+       arows().length === 1 && box('[data-aaff]').value === 'X Attack Speed');
+    click(ad.getElementById('advscrim'));
+    ok('the scrim closes it', !adv.classList.contains('on'));
+
+    // --- Reset -----------------------------------------------------------
+    click(abtn);
+    click(ad.getElementById('advrst'));
+    ok('Reset empties the draft and leaves the page alone until Search',
+       arows().length === 0 && box('[data-a="q"]').value === '' &&
+       adv.classList.contains('on') && /lvl=100-/.test(aw.location.hash),
+       `hash ${aw.location.hash}`);
+
+    // --- a value-less stat is a presence test, not a broken range ---------
+    click(ad.getElementById('advadd'));
+    box('[data-aaff]').value = 'X Health';
+    box('[data-afend="lo"]').value = '9';
+    box('[data-afend="hi"]').value = '9';
+    box('[data-aaff]').value = 'Identify Item';
+    fire(box('[data-aaff]'), 'change');
+    ok('a stat that carries no value has its range boxes switched off',
+       arows()[0].querySelector('[data-afend="lo"]').disabled &&
+       arows()[0].querySelector('[data-afend="lo"]').value === '');
+    click(ad.getElementById('advx'));
+  }
+
+  // --- the hash grammar, measured -----------------------------------------
+  {
+    const eq = async (h, want) => {
+      const got = (await deep('#' + h)).getElementById('count').textContent.trim();
+      ok(`#${h} is ${want}`, got === want, got);
+    };
+    // Level 50 and 10: the plan's own figures, and the pair that shows the
+    // ceiling moving rather than a count that happens to look right.
+    await eq('plr=50', '3,376 items of 6,048');
+    await eq('plr=10', '915 items of 6,048');
+    // Usable-by, not restricted-to. 5,475 of 6,048, so the 573 excluded are the
+    // items restricted to another class -- an implementation reading `cls` as
+    // "restricted to" would answer 194, the count of Embermage-only items.
+    await eq('cls=Embermage', '5,475 items of 6,048');
+    await eq('dmgv=physical:100:', '835 items of 6,048');
+    await eq('armv=physical:100:', '251 items of 6,048');
+    await eq('aff=x-attack-speed:10:', '33 items of 6,048');
+    await eq('aff=x-to-fire-damage:20:', '30 items of 6,048');
+    // Range against range, overlapping rather than containing: a weapon rolling
+    // 14-28 satisfies "at least 20" at its top end. And `dmgv=fire::` -- a type
+    // named with no bounds at all -- is a presence test, not a no-op, which is
+    // why it is a fourth of the corpus rather than all of it.
+    await eq('dmgv=fire::', '230 items of 6,048');
+    await eq('dmgv=physical:100:,fire::', '97 items of 6,048');
+    // Set bonuses off by default, and the two stats that exist *only* on a set
+    // ladder are the proof: 0 until the box is ticked, 65 and 63 after. The
+    // requirement was written as "disabled by default, included by default"; it
+    // was resolved the other way, and this is the measurement that says so.
+    await eq('aff=x-mana-stolen::', '0 items of 6,048');
+    await eq('aff=x-mana-stolen::&setfx=1', '65 items of 6,048');
+    await eq('aff=x-health-stolen::', '0 items of 6,048');
+    await eq('aff=x-health-stolen::&setfx=1', '63 items of 6,048');
+    // Two conditions AND rather than OR: 33 and 30 are the single counts, and
+    // no item carries both, so an OR would answer 63.
+    await eq('aff=x-attack-speed:10:,x-to-fire-damage:20:', '0 items of 6,048');
+    // A stat the vocabulary does not know is *kept*, not dropped: it matches
+    // nothing, which is legible, where dropping it would leave a URL that looks
+    // like a filter and shows the whole corpus.
+    await eq('aff=nonsense::', '0 items of 6,048');
+
+    // A cold load leaves the panel closed. Opening it there is the only path
+    // where the draft is born from readHash rather than from the panel's own
+    // last state, so it is the one that has to be checked for it.
+    const c = await deep('#plr=50&cls=Embermage&aff=x-attack-speed:10:&setfx=1');
+    c.getElementById('advbtn').dispatchEvent(
+      new c.defaultView.MouseEvent('click', { bubbles: true }));
+    ok('a panel opened over a deep link shows the link\'s own filters',
+       c.querySelector('#advb [data-a="plr"][data-end="lo"]').value === '50' &&
+       c.querySelector('#advb [data-acls][value="Embermage"]').checked &&
+       c.querySelector('#advb [data-asetfx]').checked &&
+       c.querySelectorAll('#advb [data-arow]').length === 1 &&
+       c.querySelector('#advb [data-arow] [data-aaff]').value === 'X Attack Speed',
+       c.getElementById('advb').textContent.replace(/\s+/g, ' ').slice(0, 100));
+  }
+
 
   ok('no uncaught errors in the page', errors.length === 0, errors.join(' | '));
 
