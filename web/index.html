@@ -50,6 +50,12 @@
           <option value="armor">Armor</option>
         </select>
         <button id="dir" title="Reverse order">&#8595;</button>
+        <!-- The way to the socketables page, and the only outbound link on this
+             page. It lives in the bar because the bar is the one piece of
+             chrome no breakpoint hides: below 769px the rail goes off-canvas
+             behind #railbtn and .brand goes with it, so a link up there would
+             be unreachable without opening the drawer first. -->
+        <a class="bar-nav" href="socketables.html">Socketables &rsaquo;</a>
       </div>
       <div id="tiers"></div>
       <div id="scroll"><div id="grid"></div><div id="more"></div></div>

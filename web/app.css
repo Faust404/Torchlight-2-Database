@@ -201,6 +201,16 @@ button,input,select{font:inherit; color:inherit}
 #bar button.on{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
 #bar select{background:#22201d; border:1px solid var(--div); border-radius:3px; padding:5px 7px}
 #bar label{color:var(--label)}
+/* The link to the socketables page, wearing the toolbar's button chrome. It is
+   an <a> and not a <button> because it navigates: a button would lose the
+   middle-click and open-in-new-tab that a reader expects of a link out. The
+   declarations are #bar button's, restated because that selector cannot reach
+   an anchor. */
+#bar .bar-nav{
+  background:#22201d; border:1px solid var(--div); border-radius:3px;
+  padding:5px 11px; color:var(--label); white-space:nowrap;
+}
+#bar .bar-nav:hover{border-color:var(--label); color:var(--gold)}
 /* The set toggle carries the count of set items, the way the tier pills and
    the rail's rows do -- .ct is scoped per container everywhere else, so it
    needs naming here too. */
