@@ -1350,6 +1350,19 @@ across rows (`rowspan`). The Eye of Winter Widow is the type specimen: `UNIQUE_M
 effect-rows stay unaccounted for across the whole set, and all five are the
 damage-over-time TYPE above: no other effect on any eye is unexplained.
 
+**Which column moves is a property of the TYPE, not of the item.** Read every
+eye table by TYPE and the two sets never overlap: the effects whose TYPE has a
+curve change on every row they appear on (**47 instances, not one of them
+constant**), and the effects whose TYPE has no curve are constant on every row
+(**50 instances, not one of them changing**). So one item can carry one of each,
+and The Eye of Aleera does. Its armor affix, `UNIQUE_STRENGTH_BONUS2` (80% of
+`ATTRIBUTE_BONUS`), prints 14 / 22 / 28 at levels 49 / 79 / 99; its weapon
+affix, `UNIQUE_PROC_GLACIALSPIKE_5` (`CAST SKILL ON STRIKE FROM TARGET`, value
+5), prints a flat `5% chance to cast Glacial Spike from target` at every level,
+because a proc chance is not a scaled stat and no graph exists for that TYPE.
+The wiki renders exactly that — the weapon cell is one `rowspan="4"` spanning
+the whole column, while the armor cell is written out per row.
+
 **The NG levels are the only thing the files do not state.** No eye DAT, no
 spawn class and no monster unit carries them — the eyes' own
 `*_EYE_CHANCE` and treasure classes are level-less — and there are no per-NG
