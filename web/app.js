@@ -1456,6 +1456,10 @@
   //     so a filter set by a URL shows up in the fields that would set it.
   //   * nothing filters while the panel is open, which is the interaction that
   //     was asked for: set the filters, hit Search, see the results.
+  //   * Search *replaces* the filter rather than adding to it. The panel is a
+  //     form over the whole search, so the two fields it has no control for are
+  //     cleared with the commit -- see advCommit for why that is the only way
+  //     the grid and the form can be said to agree.
   //
   // It also sidesteps the trap the rail documents for its own inputs. A control
   // that re-renders on every keystroke cannot hold a half-typed value; a draft
@@ -1915,6 +1919,20 @@
 
   function advCommit() {
     advCollect();
+    // The form is the whole filter, not a patch onto one. Every field S carries
+    // is written from this draft except two, and those two narrow the grid:
+    // `set` is the toolbar's set list, which the set link on an item card also
+    // writes, and `setOnly` is the toggle beside it. Neither has a control on
+    // this panel, so a reader who browsed to a set and then came back to search
+    // by name was answering both questions at once with only one of them on
+    // screen -- "Arch-Magus" came back as two of its three items, and nothing in
+    // the dialog said why. Cleared with the commit, so the results are what the
+    // form says and nothing else.
+    //
+    // Sort is deliberately not in that list. It orders the grid rather than
+    // narrowing it, and it is not this panel's business to undo the order a
+    // reader picked.
+    S.set = ''; S.setOnly = false;
     S.q = advS.q; S.lvlMin = advS.lvlMin; S.lvlMax = advS.lvlMax;
     S.plrMin = advS.plrMin; S.plrMax = advS.plrMax;
     S.sockSet = advS.sockSet;

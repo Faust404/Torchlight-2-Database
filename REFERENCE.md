@@ -2375,6 +2375,22 @@ committing through `apply()` would filter by 100 while the rail went on showing
 the reader's old number. So: `S.item = ''`, then `writeHash(); lastSig = null;
 onRoute();` — the route the search box's Enter takes.
 
+**Search replaces the filter rather than adding to it**, which is the property
+that makes the form and the grid answerable to each other. Every field `S`
+carries has a control on this panel and is written from the draft — except two,
+and both of them narrow: `set`, which the toolbar's set list *and* the set link
+on an item card write, and `setOnly` beside it. `advCommit()` clears those two
+along with everything else, so the results are what the form says and nothing
+else. The reported case, in the reporter's steps: search *Arch-Magus* (3 items),
+open one of them, follow **Set: Storm** (10 items), then come back to the panel
+and search the same name — 2 of the 3, with a set filter narrowing from a
+control the dialog has none of and nothing on screen to say so. **Sort** is
+deliberately not cleared: it orders the grid rather than narrowing it, and it is
+not this panel's business to undo the order a reader picked. The suite pins the
+rule as a comparison against the bare name search rather than against a
+written-down 3, so it states "same name, same answer" rather than one corpus
+count that would have to be re-measured.
+
 **The filters it adds:**
 
 | filter | `S` field | reading |
@@ -2656,7 +2672,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 314
+`verify\check_page.js` goes further and drives the built page in a real DOM — 317
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance

@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 314
+ * view, provenance, the advanced-search panel and hash deep links -- 317
  * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
@@ -2425,6 +2425,45 @@ async function go(hash) {
        arows()[0].querySelector('[data-afend="lo"]').disabled &&
        arows()[0].querySelector('[data-afend="lo"]').value === '');
     click(ad.getElementById('advx'));
+
+    // --- Search is the whole filter, not a patch onto one ------------------
+    // The reported bug, in the reporter's own steps: search a name (3 items),
+    // open one of them, follow "Set: Storm" (10 items), then come back to the
+    // panel and search the same name -- and get 2 of the 3. The set was still
+    // narrowing, from a control the dialog has none of, so the form on screen
+    // did not account for the grid behind it.
+    //
+    // Written as a comparison against the bare search rather than against a
+    // written-down 3, so the assertion states the *rule* -- same name, same
+    // answer -- and not one corpus count that would have to be re-measured.
+    click(abtn);
+    click(ad.getElementById('advrst'));      // the affix rows from above
+    click(ad.getElementById('advgo'));
+    click(abtn);
+    box('[data-a="q"]').value = 'arch-magus';
+    click(ad.getElementById('advgo'));
+    const archBare = an();
+    ok('a name search through the panel finds all three Arch-Magus items',
+       archBare === '3 items of 6,048', archBare);
+
+    // Narrow to the set the way the reader did -- through a control that is
+    // *not* on the panel -- and check it really did narrow, or the assertion
+    // below would pass on a set filter that never took.
+    const sel = ad.getElementById('setsel');
+    sel.value = 'Storm';
+    fire(sel, 'change');
+    const stormN = an();
+    ok('...and picking a set alongside that name narrows the three to two',
+       stormN === '2 items of 6,048', stormN);
+
+    click(abtn);
+    box('[data-a="q"]').value = 'arch-magus';
+    click(ad.getElementById('advgo'));
+    ok('Search clears the set filter its form has no control for',
+       an() === '3 items of 6,048' && !ad.getElementById('setsel').value &&
+       !ad.getElementById('onlyset').classList.contains('on'),
+       `${an()} after ${archBare}; setsel="${ad.getElementById('setsel').value}", ` +
+       `onlyset ${ad.getElementById('onlyset').className}`);
   }
 
   // --- the hash grammar, measured -----------------------------------------
