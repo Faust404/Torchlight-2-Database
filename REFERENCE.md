@@ -2028,9 +2028,10 @@ Damage", not "who has it in this exact spelling":
   118 lines carry a real negative (`-17 to All Armor per hit`, `All Damage Taken
   is reduced by -5%`), and a pattern that swallowed the minus would index every
   one of them as a positive. Masking is unaffected either way — `sub()` replaces
-  the whole match. The trailing `%` goes with them, which is a merge and not an
-  oversight: `+16% to Fire Damage` and a flat `+16 to Fire Damage` are one stat,
-  and no label carries a percent sign.
+  the whole match. The trailing `%` goes with them too: `+16% to Fire Damage` and
+  a flat `+16 to Fire Damage` are one stat, because the question the filter
+  answers is "who has Fire Damage", not "who has it as a percentage". The unit is
+  put back on the *label*, never on the identity — see below.
 - **A roll is folded into the flat form.** `+4~6% Attack Speed` and `+3% Attack
   Speed` are one stat; the range survives in the *value*, never in the label.
 - **A trailing duration is dropped**, so `+20% to Fire Damage` and `+20% to Fire
@@ -2072,12 +2073,50 @@ aff [[slug, label, hasValue], ...]   the vocabulary the picker reads
   *has this effect*, not ranges, and the flag is what lets the page draw a
   checkbox instead of two boxes.
 
-The **slug is the label lower-cased**, so it keeps the value slot's `x`:
-`X to Fire Damage` is `x-to-fire-damage`, and `to-fire-damage` matches no entry.
-Over the 154, the longest slug is 58 characters and one label carries commas
-(`Xm to Bow, Crossbow, Pistol and Wand range`) — which is why a hash carries
-slugs and never labels, and why `,` and `:` are safe separators: `AFFIX_SLUG`
-maps every other character to `-`.
+**The label is dressed where the corpus agrees; the slug never is.** Masking
+takes the unit and the sign along with the number, which is right for identity
+and wrong for reading: the picker offered `X Attack Speed` for a stat **all 133
+of whose lines write a percent**, and `X to All Armor per hit` for one the game
+writes as a minus on all 128. So where every line under a shape agrees, the slot
+is dressed back up. `affix_slot_mark()` reads the unit and the sign off the raw
+line — the masker has thrown both away by the time a shape exists, so there is
+nothing on the shape to ask — and the vocabulary pass keeps `_pct`/`_neg`
+counters of the percent and negative lines against `_use`'s count of *all* of
+them. Equality is the whole test, and the reason the dressing is decided in the
+pass and not in `affix_label()`: "every line agrees" is a property of the whole
+corpus, not of a shape.
+
+**84 of the 154 are dressed — 82 percent, 11 negative, 9 of them both**
+(`-X% All Damage Taken for each monster within Xm`). Only the **first** slot is
+dressed: it is the one the index carries and the one the row's min/max edits, so
+a shape with a second number keeps the `X` the page has always printed there
+(`X Health recovery over X sec.`) rather than claiming a unit for a duration the
+filter never reads.
+
+**Three shapes stay bare because their own lines disagree** — `X to Physical
+Armor` is 131 percent to 244 flat, `X Health` 20 to 258, `X Mana` 21 to 181. A
+unit printed over one of those would be wrong on the majority of the lines it
+claims to describe, so all three are pinned in `build.py` as bare: a corpus
+change that made one of them uniform fails the build rather than silently
+dressing a label nobody re-measured. The same assertion pins two dressed labels
+outright (`-X to All Armor per hit`, `X% Attack Speed`) and the five commonest
+labels by their use counts, read from `AFFIX_STATS` rather than re-derived, so
+they pin the string a reader actually sees.
+
+**The dressing is display and nothing else.** `affix_slug()` is handed the
+undressed shape, so `-X to All Armor per hit` is still
+`x-to-all-armor-per-hit` and no `#aff=` link moves; `affLookup()` still falls
+back to `slugify()`, so a reader who typed the bare spelling before this change
+names the same stat. The vocabulary is sorted on the undressed label too, so the
+11 negatives stay filed under their first letter instead of collecting at the top
+of a list that is scanned by name.
+
+The **slug is the *undressed* label lower-cased**, so it keeps the value slot's
+`x`: `X to Fire Damage` is `x-to-fire-damage`, and `to-fire-damage` matches no
+entry. Over the 154, the longest slug is 58 characters and one label carries
+commas (`Xm to Bow, Crossbow, Pistol and Wand range`) — which is why a hash
+carries slugs and never labels, and why `,` and `:` are safe separators:
+`AFFIX_SLUG` maps every other character to `-`.
 
 **`hasValue` is read off the real line, never off the shape.** A shape has had
 its numbers masked away, so asking it whether it carries one answers *no* for
@@ -2088,9 +2127,19 @@ that shares a shape agrees about whether a number stood there.
 The sign capture and the fold were both found by running the thing, not by
 reading it: the first build to reach the assertion failed with 10 colliding
 slugs. The measured pins in `build.py` — 154 entries, 152 + 2, 15 without a
-value, 7,293 pairs on 2,314 items, 2,878 on 556, and the five commonest labels
-with their use counts — are there because a corpus change that reshaped the
-picker would otherwise pass every size check while listing different stats.
+value, 7,293 pairs on 2,314 items, 2,878 on 556, 82 percent and 11 negative
+labels, and the five commonest labels with their use counts — are there because a
+corpus change that reshaped the picker would otherwise pass every size check
+while listing different stats.
+
+The dressing was derived the same way. A first probe asked the shape whether its
+slot was percent and answered *no* for every shape in the corpus: `AFFIX_NUM`'s
+trailing `%?` sits **inside** the match, so `sub()` consumes the unit with the
+number and the shape never sees it — the same shape-level blind spot as
+`hasValue`, above, in a second place. The unit has to be read off the raw line,
+which is what `affix_slot_mark()` does and why it searches `AFFIX_ROLL` first:
+a roll spells its unit once, after the pair (`+4~6% to Fire Damage`), so the
+character after `m.end()` is the only place it appears.
 
 **What it costs:** +100,789 bytes raw and **+21,859 served**, measured by
 stripping the three fields back out of the built page and re-compressing both
@@ -2544,7 +2593,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 306
+`verify\check_page.js` goes further and drives the built page in a real DOM — 310
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -2567,7 +2616,9 @@ two counts with a gap between them, a chip lit by its own checkbox rather than b
 a class a re-render wrote, the rarity row being the strip's own pill by class --
 one per rarity, each in its own tier ink, dimmed the moment it is unticked and
 before any Search, carrying no count for `paintCounts()` to fill, both empty
-boxes meaning no constraint, a value-less
+boxes meaning no constraint, the stat list dressing the unit and the sign its own
+lines agree on and leaving a mixed stat bare, the older undressed spelling of a
+dressed stat still resolving to the same row, a value-less
 stat's boxes switched off, and a cold-loaded URL putting every control back where
 it was spelled),
 the set bonus

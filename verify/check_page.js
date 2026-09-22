@@ -2037,6 +2037,24 @@ async function go(hash) {
     ok('the stat picker is the build\'s own vocabulary, offered as a datalist',
        ad.querySelectorAll('#advstats option').length === 154,
        `${ad.querySelectorAll('#advstats option').length}`);
+    // What the list *says*. A shape has its numbers masked away, which takes the
+    // unit and the sign with them -- so a reader was offered `X Attack Speed` for
+    // a stat every one of whose 133 lines writes a percent, and `X to All Armor
+    // per hit` for one the game writes as a minus on all 128. The build dresses
+    // the slot back up when the whole shape agrees, and these three assertions are
+    // the whole rule: dressed, dressed, and deliberately left alone.
+    const opts = () => [].map.call(ad.querySelectorAll('#advstats option'), o => o.value);
+    ok('a stat whose every line writes a percent is listed with its unit',
+       opts().indexOf('X% Attack Speed') >= 0 && opts().indexOf('X Attack Speed') < 0,
+       opts().filter(v => /Attack Speed/.test(v)).join(' | '));
+    ok('...and one the game writes as a minus is listed with its minus',
+       opts().indexOf('-X to All Armor per hit') >= 0 &&
+       opts().indexOf('X to All Armor per hit') < 0,
+       opts().filter(v => /Armor per hit/.test(v)).join(' | '));
+    ok('...and a stat whose own lines disagree is listed bare, not dressed',
+       opts().indexOf('X to Physical Armor') >= 0 &&
+       opts().indexOf('X% to Physical Armor') < 0,
+       opts().filter(v => /Physical Armor/.test(v)).join(' | '));
     ok('the class boxes are read off the corpus, not written down',
        [].map.call(ad.querySelectorAll('#advb [data-acls]'), i => i.value)
          .join(',') === 'Berserker,Embermage,Engineer,Outlander');
@@ -2223,11 +2241,23 @@ async function go(hash) {
     click(abtn);
     click(ad.getElementById('advadd'));
     ok('Add stat appends a row', arows().length === 1);
-    box('[data-aaff]').value = 'X Attack Speed';
+    box('[data-aaff]').value = 'X% Attack Speed';
     fire(box('[data-aaff]'), 'change');
     ok('naming a stat redraws its row without closing the panel',
        arows().length === 1 && adv.classList.contains('on'));
     ok('a stat the vocabulary knows is not flagged', !/bad/.test(arows()[0].className));
+    // The dressing is on the *shape*, not on the stat's identity: the slug is cut
+    // from the undressed shape, so the bare spelling a reader may have used
+    // before this change still names the same stat -- as does the `#aff=` link
+    // asserted below, which is built from that slug. Both are checked because a
+    // dressed label that quietly split one stat into two would be worse than the
+    // bare one it replaced.
+    box('[data-aaff]').value = 'X Attack Speed';
+    fire(box('[data-aaff]'), 'change');
+    ok('...and the stat\'s older, undressed spelling still resolves to it',
+       !/bad/.test(arows()[0].className) &&
+       box('[data-aaff]').value === 'X% Attack Speed',
+       box('[data-aaff]').value);
     ok('...and its value boxes are live, because it carries a value',
        !arows()[0].querySelector('[data-afend="lo"]').disabled);
     arows()[0].querySelector('[data-afend="lo"]').value = '10';
@@ -2293,8 +2323,8 @@ async function go(hash) {
     // --- a draft is discarded, three ways --------------------------------
     click(abtn);
     ok('re-opening shows the committed state',
-       arows().length === 1 && box('[data-aaff]').value === 'X Attack Speed',
-       `${arows().length} rows`);
+       arows().length === 1 && box('[data-aaff]').value === 'X% Attack Speed',
+       `${arows().length} rows, ${box('[data-aaff]').value}`);
     click(ad.getElementById('advadd'));
     box('[data-arow="1"] [data-aaff]').value = 'X Health';
     // A selection thrown away with the draft too, and on controls the commit path
@@ -2322,7 +2352,7 @@ async function go(hash) {
     ok('the ✕ throws it away too', !adv.classList.contains('on'));
     click(abtn);
     ok('...and again the row is the committed one',
-       arows().length === 1 && box('[data-aaff]').value === 'X Attack Speed');
+       arows().length === 1 && box('[data-aaff]').value === 'X% Attack Speed');
     click(ad.getElementById('advscrim'));
     ok('the scrim closes it', !adv.classList.contains('on'));
 
@@ -2414,7 +2444,7 @@ async function go(hash) {
          c.querySelector('#advb [data-acls][value="Embermage"]').checked &&
          c.querySelector('#advb [data-asetfx]').checked &&
          c.querySelectorAll('#advb [data-arow]').length === 1 &&
-         c.querySelector('#advb [data-arow] [data-aaff]').value === 'X Attack Speed',
+         c.querySelector('#advb [data-arow] [data-aaff]').value === 'X% Attack Speed',
          c.getElementById('advb').textContent.replace(/\s+/g, ' ').slice(0, 100));
       // The socket chips are the link's own two, and the type grid is the link's
       // own one box -- the other thirty-five read as unticked, not as the

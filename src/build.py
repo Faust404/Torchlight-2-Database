@@ -1327,8 +1327,29 @@ def affix_shape(line):
 
 
 def affix_slug(shape):
-    """`+#% to Fire Damage` -> `to-fire-damage`. Readable, and pinned unique."""
+    """`+#% to Fire Damage` -> `x-to-fire-damage`. Readable, and pinned unique.
+
+    Cut from the undressed shape on purpose: the label below is dressed for
+    reading, and a link that moved every time a unit was added to a label would
+    be the one thing a reader cannot re-derive.
+    """
     return AFFIX_SLUG.sub('-', shape.replace('#', 'x').lower()).strip('-')
+
+
+def affix_label(shape, pct, neg):
+    """The shape as the picker prints it: `X% Health stolen`, `-X to All Armor per hit`.
+
+    Only the first slot is dressed. It is the one the index carries and the one
+    the row's min/max edits, so a shape with a second number keeps the bare `X`
+    the page has always shown there (`X Health recovery over X sec.`) rather than
+    claiming a unit for a duration the filter never reads.
+
+    The dressing is display and nothing else: `affix_slug()` above is handed the
+    undressed shape, so no `#aff=` link moves.
+    """
+    slot = ('-' if neg else '') + 'X' + ('%' if pct else '')
+    head, sep, tail = shape.partition('#')
+    return head + (slot if sep else '') + tail.replace('#', 'X')
 
 
 def affix_slot(line):
@@ -1349,6 +1370,30 @@ def affix_slot(line):
         v = float(m.group(1).replace(',', '.'))
         return v, v
     return None
+
+
+def affix_slot_mark(line):
+    """(is_percent, is_negative) for the line's value slot, as the game wrote it.
+
+    The masker throws both away -- AFFIX_NUM's trailing `%?` sits inside the
+    match, so sub() consumes the unit along with the number -- which is right for
+    the shape, because `20% Health stolen` and `34 Health stolen on hit` are two
+    different stats and folding them into one would merge a percentage with a
+    flat value. It is wrong for the label, where the unit is the one thing a
+    reader needs and cannot infer. So both are read off the raw line here.
+
+    The sign comes from the slot's first group, the same number `affix_slot()`
+    indexes by, so a rolled `-1~-2%` counts as negative on the strength of the
+    end the filter actually reads.
+    """
+    m = AFFIX_ROLL.search(line)
+    if m:
+        # A roll spells its unit once, after the pair: `+4~6% to Fire Damage`.
+        return line[m.end():].lstrip().startswith('%'), m.group(1).startswith('-')
+    m = AFFIX_NUM.search(line)
+    if m:
+        return m.group(0).endswith('%'), m.group(1).startswith('-')
+    return False, False
 
 
 def affix_pairs(lines):
@@ -1919,14 +1964,25 @@ def build():
     # had its numbers masked away, so asking it whether it carries one answers
     # no for every entry in the vocabulary. Masking is positional, so every line
     # that shares a shape agrees about whether a number stood there.
+    #
+    # `_pct`/`_neg` count the lines whose slot carries a `%` and a minus, against
+    # `_use`'s count of lines. A shape is dressed only when the two agree, so the
+    # question "does this stat print a unit" is answered by the corpus rather
+    # than guessed per shape -- and it is a question only the whole corpus can
+    # answer, which is why the dressing is decided here and not in affix_label().
     _shapes = {}
     _use = collections.Counter()
+    _pct = collections.Counter()
+    _neg = collections.Counter()
     for o in out:
         for ln in list(o.get('fx', ())) + [l for a in o.get('aug', ())
                                            for l in a['fx']]:
             sh = affix_shape(ln)
             _shapes[sh] = _shapes.get(sh, False) or affix_slot(ln) is not None
             _use[sh] += 1
+            _p, _n = affix_slot_mark(ln)
+            _pct[sh] += _p
+            _neg[sh] += _n
     # Every rung is read, not only the reachable ones: a stat that just one
     # unreachable rung prints is still a stat the game names, and dropping it
     # would tie the vocabulary's size to this corpus's 15 short ladders.
@@ -1938,7 +1994,13 @@ def build():
                 _use[sh] += 1
                 _laddered[sh] = _laddered.get(sh, False) \
                     or affix_slot(ln) is not None
+                _p, _n = affix_slot_mark(ln)
+                _pct[sh] += _p
+                _neg[sh] += _n
     _set_only = {sh: v for sh, v in _laddered.items() if sh not in _shapes}
+    # Sorted on the UNDRESSED label, so the 11 stats that print a leading minus
+    # stay filed under their first letter instead of collecting at the top of a
+    # list a reader scans by name.
     _vocab = sorted(set(_shapes) | set(_set_only),
                     key=lambda sh: sh.replace('#', 'X'))
     # A slug collision would merge two stats in the URL and in the picker while
@@ -1949,7 +2011,8 @@ def build():
         'two stats share a slug: %s' % [s for s, c in _slugs.items() if c > 1]
     AFFIX_ID.clear()
     AFFIX_ID.update({sh: i for i, sh in enumerate(_vocab)})
-    AFFIX_STATS[:] = [[affix_slug(sh), sh.replace('#', 'X'),
+    AFFIX_STATS[:] = [[affix_slug(sh),
+                       affix_label(sh, _pct[sh] == _use[sh], _neg[sh] == _use[sh]),
                        1 if (_shapes.get(sh) or _set_only.get(sh)) else 0]
                       for sh in _vocab]
 
@@ -2005,23 +2068,57 @@ def build():
                                       in sets[o['setid']]['b'] if thr <=
                                       sets[o['setid']]['cap'])]
     assert not _sdrift, 'the set-bonus index does not line up: %s' % _sdrift[:3]
+    # The label each shape actually reaches the page under. Read from
+    # AFFIX_STATS rather than re-derived, so every assertion below pins the
+    # string a reader sees in the picker and not a string that looks like it.
+    _lab = dict(zip(_vocab, (s[1] for s in AFFIX_STATS)))
     # The five commonest labels, pinned with their use counts, and the two
     # set-only ones. The counts above all survive a corpus change that reshaped
     # which stats exist -- 164 entries could still be 164 different entries --
     # so these are the assertions that make the picker's contents, not just its
     # size, a property the build checks.
-    _top = [(sh.replace('#', 'X'), c) for sh, c in _use.most_common(5)]
+    _top = [(_lab[sh], c) for sh, c in _use.most_common(5)]
     assert _top == [('X to Physical Armor', 375), ('X Knockback', 289),
-                    ('X increase in magic-finding Luck', 286),
+                    ('X% increase in magic-finding Luck', 286),
                     ('X Health', 278), ('X Ice Armor', 253)], \
         'the commonest stats moved: %s' % _top
-    _only = sorted((sh.replace('#', 'X'), _use[sh]) for sh in _set_only)
-    assert _only == [('X Health stolen', 9), ('X Mana stolen', 12)], \
+    _only = sorted((_lab[sh], _use[sh]) for sh in _set_only)
+    assert _only == [('X% Health stolen', 9), ('X% Mana stolen', 12)], \
         'the set-only stats moved: %s' % _only
-    print('  AFFIX: %d stats (%d item, %d set-only, %d without a value), '
-          '%d pairs on %d items, %d set-bonus pairs on %d'
+    # The dressing itself. 82 of the 154 stats print a unit on every line that
+    # uses them and 11 print a minus on every one; the two the reader is most
+    # likely to go looking for are named outright.
+    _npct = sum(1 for sh in _vocab if _pct[sh] == _use[sh])
+    _nneg = sum(1 for sh in _vocab if _neg[sh] == _use[sh])
+    assert _npct == 82 and _nneg == 11, \
+        'the slot dressing moved: %d percent, %d negative' % (_npct, _nneg)
+    assert _lab['# to All Armor per hit'] == '-X to All Armor per hit' \
+        and _lab['# Attack Speed'] == 'X% Attack Speed' \
+        and _lab['# Health stolen on hit'] == 'X Health stolen on hit', \
+        'the dressed labels moved: %s' % [_lab['# to All Armor per hit'],
+            _lab['# Attack Speed'], _lab['# Health stolen on hit']]
+    # And the three that must stay bare, because their lines disagree: `X to
+    # Physical Armor` is 131 percent to 244 flat, `X Health` 20 to 258 and
+    # `X Mana` 21 to 181. A unit printed over one of these would be wrong on the
+    # majority of the lines it claims to describe, so the build fails here if a
+    # corpus change ever makes them uniform and someone forgets to re-measure.
+    assert _lab['# to Physical Armor'] == 'X to Physical Armor' \
+        and _lab['# Health'] == 'X Health' and _lab['# Mana'] == 'X Mana', \
+        'a mixed stat was dressed: %s' % [_lab['# to Physical Armor'],
+            _lab['# Health'], _lab['# Mana']]
+    # Two failures the dressing could plausibly introduce: a `#` left in a label
+    # is a placeholder the reader cannot type into the box, and a duplicate puts
+    # one string in the datalist twice with the two resolving to different stats.
+    _masked = [s[1] for s in AFFIX_STATS if '#' in s[1]]
+    _dupl = [l for l, c in
+             collections.Counter(s[1] for s in AFFIX_STATS).items() if c > 1]
+    assert not _masked and not _dupl, \
+        'a label is unprintable or duplicated: masked %s, duplicated %s' \
+        % (_masked[:3], _dupl[:3])
+    print('  AFFIX: %d stats (%d item, %d set-only, %d without a value, '
+          '%d percent, %d negative), %d pairs on %d items, %d set-bonus pairs on %d'
           % (len(AFFIX_STATS), len(_shapes), len(_set_only), len(_noval),
-             _pairs, len(_idx), _setpairs, len(_setidx)))
+             _npct, _nneg, _pairs, len(_idx), _setpairs, len(_setidx)))
     # Every display string the page can print, checked for a decimal comma that
     # survived. _decimal() folds TIDBI's on the way in, but the affix text also
     # arrives from the DAT and that path is not wrapped -- the game ships
