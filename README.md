@@ -33,14 +33,15 @@ $env:TL2_GAME_DIR = 'D:\Games\Torchlight II'; python src/build.py   # PowerShell
 ```
 
 Python 3 with [Pillow](https://pypi.org/project/Pillow/) — `pip install Pillow`.
-That is the only dependency. `--no-app` stops after the data and skips the page.
+That is the only dependency. `--no-app` stops after the data and skips both pages.
 
 ## What comes out
 
 | File | What it is |
 |---|---|
 | `out/index.html` | the whole site, 7.30 MB, self-contained — open it straight off disk |
-| `out/items.json` | 6,176 items, 2.31 MB |
+| `out/socketables.html` | the socketables table, 213 KB — linked from the toolbar |
+| `out/items.json` | 6,173 items, 2.32 MB |
 | `out/items.csv` | the same rows as a flat table, for Excel or pandas |
 | `out/sets.json` | the 80 set bonus ladders |
 | `out/icons.webp` | all 1,053 icons as one 1,485×1,440 lossless sprite |
@@ -69,7 +70,7 @@ only ever one canonical URL.
 src\      the pipeline: PAK/MAN extraction and the builder
 data\     the three inputs the build cannot run without
 web\      the browser's source, inlined by the build
-verify\   check_page.js — the regression suite
+verify\   the two regression suites, one per built page
 out\      what the build writes (gitignored)
 test\     local scratch (gitignored)
 ```

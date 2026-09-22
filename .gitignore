@@ -18,7 +18,8 @@ out/
 # the alfgeir scrape, a scrape of grimtools.com. None of it is read by the build
 # and none of it is needed to render the site, so it stays on disk and out of git.
 #
-# One file used to live here and no longer does. The regression suite is
-# verify/check_page.js: it is the check the build has to pass, not scratch, so it
-# is tracked beside src/ and web/ where a fresh clone can still run it.
+# Two files used to live here and no longer do. The regression suites --
+# verify/check_page.js and verify/check_socketables.js, one per built page -- are
+# the check the build has to pass, not scratch, so they are tracked beside src/
+# and web/ where a fresh clone can still run them.
 test/

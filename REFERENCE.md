@@ -17,7 +17,7 @@ work; section 7 is the site built on top of it.
 src\      the pipeline: PAK/MAN extraction and the builder
 data\     the three inputs the build cannot run without
 web\      the browser's source, inlined by the build
-verify\   check_page.js — the regression suite
+verify\   the two regression suites, one per built page
 out\      what the build writes (gitignored)
 test\     local scratch (gitignored)
 ```
@@ -183,8 +183,10 @@ scanning in Python.
 | `src\tl2\parse_man.py` | **current** | Walks the MAN using the PAK as validator. `--dump data\index.tsv` regenerates the index. |
 | `src\tl2\extract.py` | **current** | `python extract.py <pak-path> [outdir]`; `--grep <substr>` lists matching paths. |
 | `test\tl2\dump_dat.py` | superseded | Decodes a `.DAT`'s header and string block only. Superseded by `dat_decode.py`. |
-| `src\build.py` | **current** | Builds the item database and browser into `out\` (§7). `--no-app` skips the page. |
-| `verify\check_page.js` | **current** | Drives the built page in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom`; optional. |
+| `src\build.py` | **current** | Builds the item database and browser into `out\` (§7). `--no-app` skips both pages. |
+| `src\socket_page.py` | **current** | Builds `out\socketables.html`, the socketables table (§7), called from `build.py`'s `main()`. |
+| `verify\check_page.js` | **current** | Drives `out\index.html` in a real DOM and asserts the behaviour (§7). Needs `npm i jsdom` and the heap flag. |
+| `verify\check_socketables.js` | **current** | Drives `out\socketables.html` the same way (§7). Needs `npm i jsdom`; no heap flag. |
 | `test\tl2\scan_pak_blocks.py` | superseded | Early PAK walk; validated offsets but its chained walk drifts at a `comp=0` boundary. |
 | `test\tl2\probe_man.py`, `fit_man_layout.py`, `diag_man.py`, `parse_pak_man.py` | superseded | Layout probes that found the real tail sizes. Useful as a record of how the format was derived. |
 | `data\index.tsv` | generated | 5.1 MB, 70,437 rows: `pak_offset \t size \t path`. Delete freely; regenerate with `src\tl2\parse_man.py --dump data\index.tsv`. |
@@ -939,10 +941,11 @@ data\              the three inputs the build cannot run without
   index.tsv        70,437 validated PAK paths
   csv\             the item tables, read at build time
   icons\           1,053 sprite PNGs
-verify\            check_page.js — the regression suite the build has to pass
+verify\            check_page.js and check_socketables.js — the two suites
 test\              local scratch, gitignored: research, fixtures, third-party
 out\               generated
   index.html  7.30 MB, self-contained — open it straight off disk
+  socketables.html  213 KB, the socketables table — also opens straight off disk
   items.json  2.31 MB, 6,173 items
   items.csv   flat table for Excel/pandas
   sets.json   the 80 set bonus ladders, shared by the 556 set pieces
@@ -1907,6 +1910,97 @@ It resolves to the group as the taxonomy defines it *today*: `#cat=Armor` is now
 have moved out. `Jewelry` is aliased to `Accessories`; nothing writes `cat=` any
 more, so the URL normalises to `type=…` on the first checkbox touch.
 
+### The socketables page
+
+`out\socketables.html` — 213 KB, built by `src\socket_page.py`, served at
+`/socketables`, linked from the toolbar's right end. It is a **second document
+and not a route in the app**, because it is a different shape of answer: the
+site shows everything as a card, and a card is the wrong instrument for a
+socketable. There are only five facts about one, and the useful question is
+comparative — what does a level 40 gem give me, and what did the level 30 one
+give — which is read *down a column*, not across a card. The wiki's own
+`Gems (T2)` page is a table for the same reason.
+
+**The two effect columns are the point.** A socketable grants one thing in armor
+or a trinket and a different thing in a weapon; the game files them separately,
+and a card that prints both in one block makes them read as one effect. The page
+therefore shows *Armor / Trinket* and *Weapon* side by side, and a line that
+applies to either is printed in both and tagged `either` (24 tags on 12 rows —
+the six Lucky Coins and the six Lucky Dice).
+
+That split is **re-derived from the game files rather than copied from the
+card**. `slots.py` reads it out of each item's ordered `AFFIXES` list and each
+affix's own applicability list (§7, "Every socketable's slot split"), which is
+stricter than it sounds: it independently confirms TIDBI on 121 of the 162 rows.
+On the other 41 it does not, and the page says so instead of quietly repairing
+it:
+
+| mark | rows | meaning |
+|---|---|---|
+| `heading lost` | 3 | TIDBI merged two blocks, so the boundary *inside* it was inferred |
+| `sources differ` | 3 | TIDBI printed a heading the files contradict |
+| `rolled` | 28 | the rare embers — the effect is a roll, and there is no affix list to split |
+| *(no mark)* | 7 | the files could not decide, so TIDBI's headings stand as they are |
+
+The corpus's fourth conflict, `Quest_ManaVent_Acquire`, is not among them: it is
+a Quest Item rather than a Socketable, which is why this page counts 3 where the
+build's own `SLOT` line counts 4.
+
+**Six items never reach the table, out of 175.** Five are
+`TL2_PARTS_WEAPON1-5`, a Transmuter recipe input rather than a family a player
+shops by — the only file in the corpus that names any of them is
+`MEDIA/SPAWNCLASSES/RECIPE_COMPONENT.DAT`, a sibling of the other `RECIPE_*`
+files. The sixth is the one worth knowing about: **`tl2_bloodember_BASE`** is a
+template with no level and no effects, but its tier is **Rare** and its display
+name is **"Blood Ember"**, so the site's Unclassified rule does not catch it and
+the page's tier gate does not either. Without an explicit drop it would put a
+phantom "Blood Ember", em-dashes down every column, between Giant and the rest of
+the Embers. The other seven `_BASE` files *are* caught, by the tier rule, because
+their display names end in `NOSPAWN`.
+
+Row order is **family-major, tier-minor** — the seven Flames Speck to Giant, then
+the seven Ices, and so on — which gives two things for free: the four common
+families (flame, ice, spark, venom) sort above the four rare ones (blood, chaos,
+iron, void) because that is the order the list is written in, and each family
+reads top-to-bottom as its own ladder. The rank comes from the DAT's own rank
+number, **not the display name**, which spells it three ways around the word
+Ember: `Flame Ember Speck`, bare `Flame Ember`, `Giant Flame Ember`.
+
+The 28 pooled rows render as a **collapsed disclosure** — `one of N` — rather
+than an open list, because 56 open lists would swamp a 162-row table. One of
+them reads **"one of 1"**: the Void Embers' weapon column rolls from a pool with
+a single member at every rank. It reads oddly and is still the honest rendering —
+printing the line flat would say the bonus is fixed, which is not what the files
+say.
+
+Two assets, and each had to go the opposite way. The **font is inlined** as a
+base64 `@font-face` (Bitter, with the load-bearing `font-weight: 400 600` — it is
+a variable font whose `wght` defaults to 100, so a range that does not say so
+renders every line at its thinnest weight). The **icon sheet is referenced
+relatively**, as `url(icons.webp)`, because `out/icons.webp` is already served
+and uploading it twice would be 3.63 MB of waste. This is also why the page needs
+its own size cap in the build — a much tighter one than `index.html`'s 12 MB —
+since inlining the sprite here the way the main page does is the one change that
+would blow the page up 20×, and the cap is what says so rather than a slow page
+nobody traces.
+
+The entry point sits at the **right end of the toolbar**, and the bar specifically
+because it is the one piece of chrome no breakpoint hides: below 769px the rail
+goes off-canvas behind `#railbtn` and `.brand` goes with it, so a link up there
+would be unreachable without opening the drawer first. It is an `<a>`, not a
+`<button>`, because it navigates — a button would lose the middle-click and
+open-in-new-tab a reader expects of a link out. **It is the page's only outbound
+link**; before it, `reset` was the only `<a>` on the site.
+
+Note that the public URL is `/socketables` and not `/socketables.html`:
+`wrangler.jsonc` sets no `html_handling`, so Cloudflare's default
+`auto-trailing-slash` 307s the extension away. The links spell it
+`socketables.html` anyway, because these documents must also open straight off
+disk from `file://`, which is the case the site is designed around.
+
+Each row's **name links to that item's card** on the main page, in a new tab so
+the table's filter, sort and scroll survive the trip.
+
 ### Publishing
 
 **Live at <https://tl2db.hreddy.in>**, on Cloudflare Workers with Static Assets.
@@ -1992,7 +2086,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 199
+`verify\check_page.js` goes further and drives the built page in a real DOM — 207
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -2026,9 +2120,35 @@ which is not a project dependency:
 ```
 npm i jsdom          # anywhere on NODE_PATH
 node --max-old-space-size=6144 verify\check_page.js
+node verify\check_socketables.js
 ```
 
-The heap flag is not optional. Twenty of the assertions build a fresh JSDOM over
-the whole built page, so the suite holds several gigabytes of live DOMs and
-node's default old-space runs out partway through, with no summary line. 5,120 MB
-completes; 4,096 MB does not.
+The heap flag is not optional *for the first of those*. Twenty of its assertions
+build a fresh JSDOM over the whole built page, so the suite holds several
+gigabytes of live DOMs and node's default old-space runs out partway through,
+with no summary line. 5,120 MB completes; 4,096 MB does not.
+
+`verify\check_socketables.js` is the second page's suite — 59 assertions, and it
+needs **no heap flag**, because that page is 213 KB and references the icon sheet
+rather than carrying it, so a DOM over it is tens of megabytes instead of
+hundreds. It builds exactly one JSDOM over the main page, for the outbound links,
+and never rebuilds it. What it asserts is the shape of the table (162 rows,
+5 sections at 57/52/35/12/6, 8 cells, the seven named columns), the marks and
+that they sit on the right rows (the two skulls and the reward ember; the three
+eyes; the four rare families × seven ranks), the pool disclosures (56, all closed
+on load, each wired to its own list and nothing else), the sort and filter
+(family-major order and its reverse, the quality pills, that search reads effect
+text and not just names), and the links back into the main page.
+
+Its load-bearing assertion is the one the whole page rests on: **for all 162
+rows, the two columns are the item's effects partitioned by slot** — every line
+on the right side, in both columns, and nothing else, checked against the same
+per-line `fxs` tags the cards render from. That is an exact content check, not a
+count, because a count would pass a table that put the right number of the wrong
+effects in a column. The build asserts the weaker count form of the same thing in
+`load()`, so a drift surfaces at build time as well.
+
+Two things the suite pins that are easy to mistake for bugs when they are not: a
+reversed sort leads with the fam-8000 group (Rift Ember and every non-ember,
+which sort past the eight families) rather than with Giant Flame Ember, and
+"one of 1" is a real pool rather than a rendering fault.
