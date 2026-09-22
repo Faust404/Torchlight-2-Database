@@ -511,15 +511,25 @@ GRAPH_WEAPON_DAMAGE = 'MEDIA/GRAPHS/STATS/BASE_WEAPON_DAMAGE.DAT'
 # armor with; it is the only one in the PAK (the other *_BYLEVEL graphs are the
 # monsters'), and its own NAME field calls it Armor_Player_byLevel_forSet.
 GRAPH_ARMOR = 'MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT'
-# The character level a socketable of a given item level requires. No socketable
-# DAT carries LEVEL_REQUIRED and TIDBI has it for none of them, so the field the
+# The level a socketable of a given item level asks for. No socketable DAT
+# carries LEVEL_REQUIRED and TIDBI has it for none of them, so the field the
 # rest of the corpus reads from the tables is read from the game's own curve
 # here. All 105 of its points are max(1, level - 8) -- 1-9 map to 1, then 10 to
-# 2 and one per level up to 105 -> 97 -- which is why the wiki's Gems (T2)
-# "Required Level" column, hand-computed from the same rule, agrees with it.
-# The quantity is a *character* level gate, not a gate on the host item: the
-# file's siblings are ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_REQUIREMENTS, and
-# those curves are what an item's own *_REQUIRED fields are read from.
+# 2 and one per level up to 105 -> 97 -- indexed by the socketable's *own* item
+# level, which is why the wiki's Gems (T2) "Required Level" column,
+# hand-computed from the same rule, agrees with it.
+#
+# What that number gates is not settled by the curve's siblings, and an earlier
+# comment here claimed it was. ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_
+# REQUIREMENTS do sit beside this file, but they do not reproduce the items' own
+# *_REQUIRED fields: those are hand-authored round numbers (40, 75, 80, 90, 107),
+# and only 10 of the 1,937 items carrying STRENGTH_REQUIRED land on the curve at
+# their level, all of them by coincidence -- Flint Axe and Baroque Culverin are
+# both level 8 with 40. LEVEL_REQUIRED matches no item at all (Alchemical Plates
+# is level 33, carries 29, the curve says 38). So the sibling-naming argument for
+# "a gate on the character, not on the host item" is retired; the card names the
+# number for a socketable under the socketing vocabulary, and that is a display
+# choice, not a claim the files make.
 GRAPH_SOCKET_LEVEL = 'MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT'
 _graphs = {}
 

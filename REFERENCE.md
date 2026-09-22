@@ -1675,9 +1675,11 @@ and all stay in `items.json` (none was ever a CSV column — that export carries
 
 `MINLEVEL` keeps its row on **socketables**, and there it is **the drop band,
 like everywhere else** — `ml`–`xl`, stated in plain text below the requirements.
-What a socketable *requires* is a **character level**, and it is `lr`, the same
-field every other item's requirement arrives in. The `*_BASE` templates carry
-`998`, a sentinel rather than a band.
+What a socketable *requires* arrives as `lr`, the same field every other item's
+requirement arrives in, and the card names it **"Required Item Level to Socket"**
+rather than "Player Level" — the socketing vocabulary, because a gem is not worn
+at a level. That is a choice about wording and not about the number. The
+`*_BASE` templates carry `998`, a sentinel rather than a band.
 
 That requirement has no home in either table: **no socketable DAT carries
 `LEVEL_REQUIRED`**, and TIDBI's export has it for none of them. It is read from
@@ -1686,11 +1688,27 @@ the game's own curve instead:
     MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT
 
 105 points, and **every one is `max(1, level - 8)`** — levels 1–9 map to 1, then
-10 → 2 and one per level up to 105 → 97. `build.py` reads it through the same
-`graph_points()` the damage and armor curves use (`GRAPH_SOCKET_LEVEL`). The
-file's siblings are `ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_REQUIREMENTS`, whose
-curves are what an item's own `*_REQUIRED` fields derive from, and that is what
-fixes the quantity as a gate on the character rather than on the host item.
+10 → 2 and one per level up to 105 → 97, indexed by the socketable's own item
+level. `build.py` reads it through the same `graph_points()` the damage and armor
+curves use (`GRAPH_SOCKET_LEVEL`).
+
+**The argument that used to be here is retired.** The file's siblings are
+`ITEM_{STRENGTH,DEXTERITY,MAGIC,DEFENSE}_REQUIREMENTS`, and this section used to
+run that those curves are what an item's own `*_REQUIRED` fields derive from —
+which would make the family a gate on the character rather than on the host item.
+**They are not.** Those fields are hand-authored round numbers (40, 75, 80, 90,
+107), and of the 1,937 items carrying `STRENGTH_REQUIRED` only **10** land on the
+curve at their own level, every one by coincidence: Flint Axe and Baroque
+Culverin are both level 8 with 40, Beheading Sword is level 32 with 90. The same
+holds for `LEVEL_REQUIRED`, where **no** item matches — Alchemical Plates is
+level 33, carries 29, and the curve says 38 at that level. So the curve's
+siblings do not say what the socketable curve gates, and nothing else in the PAK
+does either: scanning all 68,820 PAK entries under 300 KB (the `GRAPHS` folder
+itself aside) for the string `ITEM_LEVEL_REQUIREMENTS` returns **no file that
+references it**, so its use is in compiled code. What the files *do* state is the
+shape — 105 points of `max(1, level - 8)` over the socketable's own level, no
+socketable DAT carrying a requirement of its own, and a wiki column that
+reproduces the rule by hand.
 
 **An earlier reading of this section was wrong, and it shipped.** `MINLEVEL` on a
 socketable was read as "the item level a gem needs before it can go into a
@@ -1701,6 +1719,16 @@ tracks `LEVEL - 8` because that is the band's floor, not because it gates
 anything. The card stated a requirement the game does not have while hiding the
 one it does; the `lv` 15 Eye of King Pogg printed "Required Item Level to
 Socket: 1" (its placeholder `MINLEVEL`) where the game's answer is 7.
+
+**The label has since come back, over the right number.** What was wrong in that
+card was the number — `MINLEVEL`, the drop band — and the words went out with it
+because they were sitting on top of it. They now sit on `lr`: King Pogg still
+reads 7, the placeholder is still not the requirement, and the `MINLEVEL` ladder
+above is still not a gate. The one thing the card no longer does is call that 7 a
+player level. See `web/app.js`'s `requirements()`, which puts "Player Level" on a
+thing you wear and "Required Item Level to Socket" on a socketable, and
+`verify/check_page.js`, which asserts both — including that a socketable's card
+carries the first string nowhere.
 
 **The wiki agrees and is the cross-check, not the source.** Its `Gems (T2)`
 `Required Level` column is the same rule applied by hand: all 26 eyes, every
