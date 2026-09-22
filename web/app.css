@@ -96,14 +96,28 @@ button,input,select{font:inherit; color:inherit}
   padding:12px 14px 10px; border-bottom:1px solid var(--line);
   color:var(--head); font-size:14px; letter-spacing:.02em;
 }
-/* The wordmark and `reset` share a flex row rather than the float this used.
+/* The wordmark and `Reset` share a flex row rather than the float this used.
    A float followed by a block -- `small` -- is placed at the top of the
-   containing block only while it fits there, so the rule that held `reset` on
+   containing block only while it fits there, so the rule that held `Reset` on
    the wordmark's line was really a statement about how short the wordmark is.
    The row also has to hold a second link's worth of alignment now. */
-.brow{display:flex; align-items:baseline; gap:10px}
-.brow a{margin-left:auto; color:var(--label); font-size:11px}
-.brow a:hover{color:var(--gold)}
+.brow{display:flex; align-items:center; gap:10px}
+.brow a{margin-left:auto; font-size:11px}
+/* `Reset` is a control, not a note the way `.bsrc` below it is, and it reads as
+   one by wearing the toolbar's button chrome -- the same fill, hairline and
+   radius `#bar button` and `#bar .bar-nav` use. It is the one thing in the
+   masthead that does something when clicked, which is the whole reason to mark
+   it out from the provenance line under it.
+
+   Centring the row is what that box needs. Baseline -- which is what this row
+   used while `Reset` was a bare word -- puts the pill's *text* on the wordmark's
+   line and hangs the border below it, so the box reads as misaligned by exactly
+   its own bottom padding. */
+#reset{
+  color:var(--label); background:#22201d; border:1px solid var(--div);
+  border-radius:3px; padding:2px 9px; line-height:1.5;
+}
+#reset:hover{border-color:var(--label); color:var(--gold)}
 .brand small{display:block; color:var(--label); font-size:10px; letter-spacing:.14em;
   text-transform:uppercase; margin-top:3px}
 /* The source link, on its own line under the wordmark. --label is the page's
