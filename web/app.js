@@ -1476,11 +1476,14 @@
     var fx = root.querySelector('[data-asetfx]');
     advS.setfx = !!(fx && fx.checked);
 
+    // Every row is kept, blank ones included. They are dropped at commit, not
+    // here: this is also what "+ Add stat" and the per-row ✕ read the panel
+    // with, and a collect that discarded a blank row would make a second Add
+    // throw the first one away -- the reader clicks Add and nothing appears.
     advS.aff = [];
     var rows = root.querySelectorAll('[data-arow]');
     for (i = 0; i < rows.length; i++) {
       var row = rows[i], txt = row.querySelector('[data-aaff]').value.trim();
-      if (!txt) continue;
       var stat = affLookup(txt);
       var lo = num(row.querySelector('[data-afend="lo"]').value);
       var hi = num(row.querySelector('[data-afend="hi"]').value);
@@ -1545,9 +1548,12 @@
       // slug -- `x-attack-speed` -- and a panel showing that would look like it
       // held a different stat from the one its own datalist offers.
       var shown = known ? AFF[c.stat][1] : c.text;
-      return '<div class="arow' + (known ? '' : ' bad') + '" data-arow="' + i + '"' +
-        (known ? '' : ' title="Not a stat this database knows. The row filters' +
-          ' out everything until you pick one from the list."') + '>' +
+      // Flagged only when there is text to flag: a row the reader has just
+      // added and not yet filled in is empty, not wrong.
+      var bad = !known && c.text !== '';
+      return '<div class="arow' + (bad ? ' bad' : '') + '" data-arow="' + i + '"' +
+        (bad ? ' title="Not a stat this database knows. The row filters out' +
+          ' everything until you pick one from the list."' : '') + '>' +
         '<input type="text" list="advstats" data-aaff="' + i + '" value="' + esc(shown) +
           '" placeholder="stat" autocomplete="off">' +
         '<input type="number" data-afend="lo" value="' + (c.lo == null ? '' : c.lo) +
@@ -1608,7 +1614,9 @@
     // again after this line, so handing S its members outright shares nothing
     // that can move.
     S.req = advS.req; S.cls = advS.cls; S.dmgv = advS.dmgv; S.armv = advS.armv;
-    S.aff = advS.aff;
+    // The blank rows a draft may be carrying are dropped here, on the way into
+    // S, and only here -- see advCollect on why they are not dropped earlier.
+    S.aff = advS.aff.filter(function (c) { return c.text !== ''; });
     advShow(false);
     // The text box's route, for the two reasons its comment gives.
     //
