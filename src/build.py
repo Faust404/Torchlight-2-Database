@@ -39,6 +39,10 @@ import ember_values
 # and each affix's own 0xED6CBF91 list. TIDBI carries the same split as text
 # prefixes and loses a heading on 7 items; see the module docstring.
 import slots
+# The four-level table on an eye's card: an affix's value is a percentage of a
+# per-stat graph, so the same item at NG+1/2/3 prints numbers TIDBI never had.
+# It takes graph_points below rather than reading graphs a second way.
+import eye_values
 from PIL import Image
 
 BS = chr(92)
@@ -1287,6 +1291,7 @@ def build():
     # stay in the icon-donor pool above but are not items.
     out, skipped_stat, templates, dropped, tl1 = [], 0, [], [], []
     slot_status = collections.defaultdict(list)
+    eye_rows, eye_notes, eye_capped = 0, [], []   # see the eye table below
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
@@ -1560,6 +1565,36 @@ def build():
         if pool and lvl in ember_values.RANK_LEVELS:
             i = ember_values.RANK_LEVELS.index(lvl)
             o['ep'] = {'a': pool['a'][i], 'w': pool['w'][i]}
+        # THE EYES. An eye is one item file that prints four statlines: its DAT
+        # carries the MAXLEVEL 9999999 sentinel, "generated at the level of
+        # whatever dropped it", so Normal prints the file's own LEVEL and
+        # NG+1/2/3 print higher values. TIDBI carries only the Normal row, so
+        # the card showed one of the four -- and the eyes' whole point is that
+        # they scale. The table is derived in eye_values.py; this is the hook.
+        #
+        # The scope test is TWO conditions. 33 items are named "The Eye of ..."
+        # and only 31 are socketables -- The Eye of Envy and The Eye of Jade are
+        # UNIQUE NECKLACE with no LEVEL-driven ladder at all, so the name alone
+        # sweeps in two items with no levels to print.
+        #
+        # `capped` is read from MAXLEVEL here and nowhere else, because this is
+        # the last point at which the sentinel is still visible: line 1350 has
+        # already collapsed 9999999 to 999 in `o['xl']`, so the shipped record
+        # reads "999" for all 31 eyes including the one eye that really is
+        # capped. 999 is a level and 9999-and-up is a sentinel, so the test is
+        # the same MAX_LEVEL_CEILING boundary the clamp uses -- backwards.
+        if (rec.get('UNITTYPE') or '').strip().upper() == 'UNIQUE SOCKETABLE' \
+                and disp.startswith('The Eye of'):
+            _xl = _num(rec.get('MAXLEVEL'))
+            _capped = _xl is not None and _xl <= MAX_LEVEL_CEILING
+            _ng, _notes = eye_values.rows(rec['_path'], o.get('fx', []),
+                                          o.get('fxs', []), lvl, _capped,
+                                          graph_points, socket_level_curve())
+            o['ng'] = _ng
+            eye_rows += len(_ng)
+            eye_notes.extend((o['id'],) + tuple(n) for n in _notes)
+            if _capped:
+                eye_capped.append(o['id'])
         if it['icon']:
             o['ic'] = it['icon']
             if it.get('inherited'):
@@ -1743,6 +1778,80 @@ def build():
                    if o['t'] == 'Socketable' and 'lv' in o and 'lr' not in o)
     assert not _nolr, 'socketables lost the requirement curve: %d without lr, e.g. %s' \
         % (len(_nolr), _nolr[:5])
+
+    # THE EYE TABLES, asserted the way the ember pools are not: `ng` is a
+    # derivation, and a derivation that quietly stops deriving looks exactly
+    # like an item that never had one. The scope test is restated against the
+    # output rather than trusted from the hook above, so an item that enters
+    # the corpus under a different UNITTYPE fails here instead of shipping a
+    # card with no levels on it.
+    _ng_eyes = [o for o in out if 'ng' in o]
+    _want = {o['id'] for o in out if o.get('ut') == 'UNIQUE SOCKETABLE'
+             and o['n'].startswith('The Eye of')}
+    _got = {o['id'] for o in _ng_eyes}
+    assert _got == _want, \
+        'the eye-table set drifted: %d missing (%s), %d extra (%s)' \
+        % (len(_want - _got), sorted(_want - _got)[:3],
+           len(_got - _want), sorted(_got - _want)[:3])
+    # One eye is capped. The count is asserted as a COUNT and the names printed,
+    # so a second capped eye names itself instead of merely breaking the row
+    # arithmetic below -- a capped eye is a one-row table, which is the part a
+    # reader would notice.
+    assert len(eye_capped) == 1, \
+        '%d eyes are capped, expected 1: %s' % (len(eye_capped), eye_capped)
+    assert eye_rows == 121, \
+        'the eye tables hold %d rows, not 121 (30 four-row eyes + 1 capped)' % eye_rows
+    # Every row's requirement is the same ITEM_LEVEL_REQUIREMENTS_SOCKETABLE
+    # value the build already wrote to `lr`, indexed at the same level -- so a
+    # free check that does not need the wiki, and one that holds on all 31 today
+    # (Mordrox 7->1, Winter Widow 11->3, Tiamat 54->46). Any disagreement is the
+    # new ladder being wrong, not the old field.
+    _req_bad = [(o['id'], o['ng'][0][1], o['lr']) for o in _ng_eyes
+                if o['ng'][0][1] != o.get('lr')]
+    assert not _req_bad, 'the eye tables disagree with lr: %s' % _req_bad[:3]
+    # Shape and monotonicity over every row of every eye. NG+3 is the published
+    # cap of 100 for all of them, which is a property of the band formula and
+    # not of any item -- so a table whose last row is not 100 means levels()
+    # moved, not that an item changed.
+    for o in _ng_eyes:
+        assert all(len(r) == 5 for r in o['ng']), \
+            '%s: a row is not five cells' % o['id']
+        assert not [r for r in o['ng'] if r[1] == eye_values.UNKNOWN], \
+            '%s: the requirement curve did not reach a row level' % o['id']
+        assert [int(r[0]) for r in o['ng']] == sorted(int(r[0]) for r in o['ng']), \
+            '%s: the eye levels are not in order: %s' % (o['id'], [r[0] for r in o['ng']])
+        # A capped eye is the one shape that is NOT four rows: it does not
+        # scale, so it has its own level and no NG ladder at all.
+        if o['id'] in eye_capped:
+            assert o['ng'] == [o['ng'][0]] and o['ng'][0][4] == 'Normal', \
+                '%s is capped but its table is %s' % (o['id'], o['ng'])
+            assert o['ng'][0][0] == o.get('lv'), \
+                '%s is capped at level %s but its file says %s' \
+                % (o['id'], o['ng'][0][0], o.get('lv'))
+            continue
+        assert o['ng'][-1][4] == 'NG +3' and int(o['ng'][-1][0]) == 100, \
+            '%s: the last row is %s at %s, not NG +3 at 100' \
+            % (o['id'], o['ng'][-1][4], o['ng'][-1][0])
+    # The cells where TIDBI's own number is NOT the derived one, pinned to its
+    # exact set rather than merely printed -- the same treatment the armor-vs-
+    # TIDBI block above gets, and for the same reason. Today the set is one
+    # cell: the Dark Alchemist's Armor/Trinket Normal row, where the card says
+    # "2 Mana recovery per second" and the wiki's own table says 1.4. The wiki
+    # is right and TIDBI is wrong, which makes this a fourth member of the
+    # files-beat-TIDBI family rather than a defect in the derivation. Anything
+    # else appearing here means the pairing or a curve moved.
+    _drift = sorted('%s %s -> %s (was %s)' % (i, ln, now, was)
+                    for i, kind, ln, was, now in eye_notes if kind == 'value')
+    assert _drift == ['tl2_eyeofdarkalchemist 2 Mana recovery per second '
+                      '-> 1.4 (was 2)'], 'the fx/value drift moved: %s' % _drift
+    # A side whose effects and lines disagree in length is printed exactly as
+    # TIDBI has it, with nothing substituted -- the safe answer, but one that
+    # would silently empty a column, so it is asserted rather than tallied.
+    _unpaired = sorted('%s %s' % (i, side) for i, kind, side, _, _ in eye_notes
+                       if kind == 'unpaired')
+    assert not _unpaired, 'eye effects and lines did not pair: %s' % _unpaired
+    print('  EYE TABLE: %d eyes, %d rows (%s is the one capped), 1 cell of '
+          'TIDBI drift' % (len(_ng_eyes), eye_rows, ', '.join(eye_capped)))
 
     out.sort(key=lambda o: (o['n'].lower(), o['id']))
     print('  %d base templates excluded (nameless or base_*)' % len(templates))

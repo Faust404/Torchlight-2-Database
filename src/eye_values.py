@@ -270,8 +270,11 @@ def pairing(path, fx, fxs):
 def rows(path, fx, fxs, level, capped, graph, level_curve):
     """([[level, req, armor, weapon, ng_label], ...], notes) for one eye.
 
-    armor and weapon are lists of lines. `notes` carries what a reader should
-    not have to take on trust, tagged:
+    Every one of the five is a string, and armor and weapon are lists of lines
+    because one side can print several. `req` is UNKNOWN only if the requirement
+    curve came back empty, which the build asserts against -- graph_points()
+    returns {} rather than raising, so that failure is otherwise silent.
+    `notes` carries what a reader should not have to take on trust, tagged:
 
         ('value', line, was, now)  TIDBI's own number is not the derived one
         ('unpaired', side, n, m)   a side whose effects and lines disagree, so
@@ -286,7 +289,10 @@ def rows(path, fx, fxs, level, capped, graph, level_curve):
     lvls = levels(level, capped)
     out = []
     for i, (lv, label) in enumerate(lvls):
-        row = [lv, level_curve.get(lv)]
+        # Strings, because these are what the card prints and app.js marks at
+        # render time. `lv` stays an int for the graph lookups below.
+        req = level_curve.get(lv)
+        row = ['%d' % lv, UNKNOWN if req is None else '%d' % req]
         for side in ('a', 'w'):
             if pair[side] is None:
                 if i == 0:
