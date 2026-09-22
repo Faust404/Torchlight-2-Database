@@ -535,15 +535,25 @@ button,input,select{font:inherit; color:inherit}
    Auto table layout, not fixed: the card is 366px and the two stat columns are
    the only ones with unpredictable width, so the browser's own algorithm
    divides what is left after the three narrow ones, which a fixed layout would
-   have to be told in advance. */
+   have to be told in advance.
+
+   The headings wrap and the numbers do not. "Req Item Lv to Socket" is 21
+   characters of tracked uppercase and "Armor / Trinket" is 15; held on one line
+   each they want roughly 390px against the card's 366, so the headers wrap to
+   two lines and the table stays inside the card. The opposite rule on the cells
+   -- `nglv`, `ngrq`, `ngb` -- keeps a level, its requirement and an "NG +1" from
+   ever splitting across lines. A table the card has to scroll sideways is the
+   one failure mode worth designing against here, and wrapping the label costs
+   nothing while truncating a number would cost the number. */
 .ngt{width:100%; border-collapse:collapse; margin:0}
 .ngt th{color:var(--label); font-size:9.5px; letter-spacing:.12em;
   text-transform:uppercase; font-weight:400; text-align:left;
-  white-space:nowrap; padding:0 6px 3px 0}
+  padding:0 6px 3px 0}
 .ngt td{border-top:1px solid var(--line); vertical-align:top;
   padding:3px 6px 3px 0; font-family:var(--doc)}
 .ngt td.ngc{color:var(--magic)}
-.ngt td.nglv, .ngt td.ngrq{color:var(--val); font-variant-numeric:tabular-nums}
+.ngt td.nglv, .ngt td.ngrq{color:var(--val); font-variant-numeric:tabular-nums;
+  white-space:nowrap}
 .ngt td.ngb{white-space:nowrap; color:var(--dim)}
 .ngt th:last-child, .ngt td:last-child{padding-right:0; text-align:right}
 .ngt .n{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}

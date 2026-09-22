@@ -881,19 +881,26 @@
   //
   // The columns are the two slots the flat block labelled as headings -- which
   // is why the table needs no heading of its own -- plus the level, its
-  // requirement and which replay the row belongs to. Req is the game's own
-  // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE, the same curve the card prints as
-  // "Required Level" elsewhere, so it moves with the row rather than being
-  // written once.
+  // requirement and which replay the row belongs to.
+  //
+  // The two level columns are spelled out in full because this table is the
+  // only place on the card a level is stated. "Lv" and "Req" were the short
+  // forms back when a Requirements block below said "Required Item Level to
+  // Socket 7" in full and the header could lean on it; that block is gone (see
+  // `requirements` at the foot of the card), so the header carries the whole
+  // phrase and no longer abbreviates. Req Item Lv to Socket is the game's own
+  // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE, so it moves with the row.
+  //
+  // Every one of the 31 eyes gets four rows -- Normal plus the three replays.
+  // The Eye of Tiamat's MAXLEVEL reads 999 where the other 30 read the
+  // 9999999 sentinel, and that is *not* a ceiling: 999 is this corpus's other
+  // spelling of the same sentinel and sits above every reachable level, so
+  // Tiamat scales like the rest. It was given a single row once, on the
+  // opposite reading, and that was wrong.
   //
   // A cell can hold more than one line: one affix can grant four elemental
   // defenses, and they belong together in one cell rather than in four rows.
-  //
-  // One eye is capped (Tiamat, MAXLEVEL 999 rather than the sentinel) and does
-  // not scale, so build.py gives it a single Normal row and there is no ladder
-  // to draw -- the table still prints, because the level and requirement are
-  // the same two facts it would otherwise leave the card without.
-  var NG_HEAD = ['Lv', 'Req', 'Armor / Trinket', 'Weapon', 'NG'];
+  var NG_HEAD = ['Item Lv', 'Req Item Lv to Socket', 'Armor / Trinket', 'Weapon', 'NG'];
 
   function ngTable(o) {
     function cell(lines) {
@@ -976,7 +983,11 @@
     // SETS, but the two are different strings (a token against a display name)
     // and only the token is a key here.
     sec(ladder(o));
-    sec(requirements(o));
+    // An eye's level and its requirement are two columns of the table above, so
+    // a Requirements block would restate them -- and on an eye it is only ever
+    // the one chip, since no socketable carries stat requirements at all (0 of
+    // the 175). Every other item still gets its block.
+    sec(o.ng ? '' : requirements(o));
     sec(lvlRange(o));
 
     h += '<div class="body">' + body + flav(o) + '</div>' + prov(o);

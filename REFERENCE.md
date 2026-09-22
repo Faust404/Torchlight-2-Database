@@ -1403,12 +1403,28 @@ the level is the whole of the transcription.
 ### The eyes' table, as shipped
 
 All of the above is on the site. Each eye's card carries a table —
-`Lv | Req | Armor / Trinket | Weapon | NG` — and its Normal row **is** the flat
-effect block it replaced, which is why a card shows one or the other and never
-both. The record gains `ng`: **124 rows over the 31 eyes**, four apiece. `fx`
-and `fxs` are untouched, because the grid tile's teaser reads `fx[0]` — and a
-pre-change build differs on nothing else at all across the 6,173 items, which
-is the check that the feature did not disturb the record.
+`Item Lv | Req Item Lv to Socket | Armor / Trinket | Weapon | NG` — and its
+Normal row **is** the flat effect block it replaced, which is why a card shows
+one or the other and never both. The record gains `ng`: **124 rows over the 31
+eyes**, four apiece. `fx` and `fxs` are untouched, because the grid tile's
+teaser reads `fx[0]` — and a pre-change build differs on nothing else at all
+across the 6,173 items, which is the check that the feature did not disturb the
+record.
+
+**An eye has no Requirements block.** The table's first two columns are the
+level and the requirement *per row*, which is more than one chip can say, so the
+block below would only restate the Normal row. The two level columns are also
+spelled out rather than abbreviated — they were `Lv` and `Req` while the block
+below named the requirement in full and the header could lean on it, and with
+the block gone the header is the only thing naming either one. That block is
+never more than a single chip in any case: **no socketable carries stat
+requirements, 0 of the 175**, so there is no second branch for it to hold on any
+of them.
+
+The headers wrap and the numbers do not (`.ngt th` vs `.ngt td.nglv`). Held on
+one line each, `Req Item Lv to Socket` and `Armor / Trinket` want roughly 390px
+against the card's 366, and a table that makes the card scroll sideways is the
+one failure mode worth designing against here.
 
 The other 109 socketables that carry a slot split keep the flat block. The
 table's class names are new (`.ngt`, `.ngc`) rather than borrowed, precisely so
@@ -1678,8 +1694,11 @@ like everywhere else** — `ml`–`xl`, stated in plain text below the requireme
 What a socketable *requires* arrives as `lr`, the same field every other item's
 requirement arrives in, and the card names it **"Required Item Level to Socket"**
 rather than "Player Level" — the socketing vocabulary, because a gem is not worn
-at a level. That is a choice about wording and not about the number. The
-`*_BASE` templates carry `998`, a sentinel rather than a band.
+at a level. That is a choice about wording and not about the number. **The 31
+eyes are the exception in form, not in wording**: their card states the
+requirement as the table's second column, once per level, and carries no
+Requirements block at all (§the eyes' table). The `*_BASE` templates carry
+`998`, a sentinel rather than a band.
 
 That requirement has no home in either table: **no socketable DAT carries
 `LEVEL_REQUIRED`**, and TIDBI's export has it for none of them. It is read from
@@ -1734,7 +1753,9 @@ above is still not a gate. The one thing the card no longer does is call that 7 
 player level. See `web/app.js`'s `requirements()`, which puts "Player Level" on a
 thing you wear and "Required Item Level to Socket" on a socketable, and
 `verify/check_page.js`, which asserts both — including that a socketable's card
-carries the first string nowhere.
+carries the first string nowhere. The 31 eyes then drop the block entirely and
+state the number in the table's `Req Item Lv to Socket` column instead; King
+Pogg's 7 is asserted there, as the Normal row's second cell.
 
 **The wiki agrees and is the cross-check, not the source.** Its `Gems (T2)`
 `Required Level` column is the same rule applied by hand: all 26 eyes, every

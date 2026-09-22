@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance and hash deep links -- 206 assertions.
+ * view, provenance and hash deep links -- 207 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node --max-old-space-size=6144 verify/check_page.js
@@ -500,14 +500,22 @@ async function go(hash) {
 
   // The case that prompted the change. Every eye carries the placeholder
   // MINLEVEL 1, so the card read "Required Item Level to Socket: 1" -- the
-  // right label over the wrong number, which is the half that was wrong. The
-  // game's curve gives level 15 -> 7, which is the number the wiki's column
-  // shows for it too, and the label stays.
+  // number was the wrong half. The game's curve gives level 15 -> 7, which is
+  // what the wiki's column shows for it too.
+  //
+  // On an eye that number now arrives as the table's first row rather than as a
+  // chip, so this reads the cells. The 1 is still on the card, and correctly so
+  // -- it is MINLEVEL, the band floor, stated below as a band -- which is why
+  // this is a cell assertion and not a page-wide negative: a search for "1"
+  // somewhere in the text would fail for the right answer.
   const pogg = await deep('#item=tl2_eyeofkingpogg');
   const poggt = pogg.getElementById('detail').textContent;
+  const poggRow = [].map.call(
+    pogg.querySelectorAll('#detail .ngt tbody tr:first-child td'),
+    td => td.textContent);
   ok('an eye states its real requirement, not MINLEVEL\'s placeholder 1',
-     /Required Item Level to Socket\s*7(?!\d)/.test(poggt) &&
-     !/Required Item Level to Socket\s*1(?!\d)/.test(poggt), poggt.slice(0, 240));
+     poggRow[0] === '15' && poggRow[1] === '7' && poggRow[4] === 'Normal',
+     poggRow.join(' / ') + '   card: ' + poggt.slice(0, 200));
   // The same card carries the clamp's own case: the file's MAXLEVEL for this eye
   // is 9999999, and the card must read the clamped 999 rather than the raw run of
   // nines. The negative is what makes it a clamp test rather than a substring
@@ -675,8 +683,15 @@ async function go(hash) {
   // NG +2 is the number no page carries: the wiki's table stops at NG +1 and
   // NG +3 for this eye.
   const kuru = ngRows(await deep('#item=tl2_eyeofelderkuru'));
+  // The two level columns are spelled out rather than abbreviated. They read
+  // "Lv" and "Req" while a Requirements block below stated the requirement in
+  // full and the header could lean on it; with that block gone the header is the
+  // only thing naming either column, so it carries the whole phrase. This is the
+  // assertion that catches a table whose columns moved under a header that did
+  // not -- the strings are compared whole, not by substring.
   ok('an eye prints its four levels as a table, not as flat affix lines',
-     kuru && kuru.head.join('|') === 'Lv|Req|Armor / Trinket|Weapon|NG' &&
+     kuru && kuru.head.join('|') ===
+       'Item Lv|Req Item Lv to Socket|Armor / Trinket|Weapon|NG' &&
      kuru.rows.length === 4 && kuru.rows.every(r => r.length === 5) &&
      kuru.rows.map(r => r[0]).join('/') === '16/60/87/100' &&
      kuru.rows.map(r => r[1]).join('/') === '8/52/79/92' &&
@@ -693,6 +708,15 @@ async function go(hash) {
      kuruDet.querySelectorAll('.aff').length === 0 &&
      kuruDet.querySelectorAll('.fxh').length === 0 &&
      kuruDet.querySelectorAll('.ngt').length === 1);
+  // The table's first two columns ARE the requirement -- one per level, which is
+  // more than a single chip could say -- so the block below is dropped on an eye.
+  // It is never more than the one chip in any case: no socketable carries stat
+  // requirements, 0 of the 175, so there is no second branch for the block to
+  // hold. Asserted on the elements rather than on the word "Requirements", which
+  // would also match a heading left behind with nothing under it.
+  ok('...and no Requirements block, which the table already states per level',
+     kuruDet.querySelectorAll('.rrow').length === 0 &&
+     kuruDet.querySelectorAll('.rhead').length === 0);
   // The Dark Alchemist carries both of this feature's corrections in one card.
   // Its mana line is `2 Mana recovery per second` in TIDBI and 1.4 on the
   // wiki's own table -- the one cell in the whole family where the card's number
