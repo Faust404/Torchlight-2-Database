@@ -697,12 +697,19 @@ button,input,select{font:inherit; color:inherit}
 #adv .arow.bad input[type=text]{border-color:var(--t-legendary); color:var(--t-legendary)}
 #adv .aadd{margin:6px 10px 2px}
 
-/* The Type section. A strip of view tabs over a grid of type boxes -- the tabs
-   choose whose boxes are on screen and never change the selection, so they are
-   styled as tabs (a row of chips, the active one lit) and not as checkboxes. */
+/* The Type section. A strip of group buttons over the grid of type boxes: every
+   group is on screen at once, and a button ticks or unticks that whole group.
+   Styled as buttons and not as checkboxes because they hold no selection of
+   their own -- they report one, which is why the third state exists. */
 #adv .ttabs{display:flex; flex-wrap:wrap; gap:4px; padding:2px 10px 7px}
 #adv .ttab{padding:3px 10px; font-size:12px; color:var(--label)}
-#adv .ttab.on{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+#adv .ttab.t2on{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+/* Some of the group, not all of it. Without this a reader who unticks one armour
+   type sees the Armor button go dark, which reads as "no armour". The ramp is
+   two channels, so the three states cannot be confused for one another: the
+   border goes label -> gold -> gold, the fill stays dark until the group is
+   fully on. */
+#adv .ttab.t2part{background:#241d13; border-color:var(--gold); color:var(--label)}
 /* Two columns, the way the taxonomy's own screens read. The header spans both,
    so a group never breaks across the gutter mid-list. */
 #adv .tgrid{
@@ -716,9 +723,10 @@ button,input,select{font:inherit; color:inherit}
 #adv .tgh.s{padding-left:10px; color:var(--label); letter-spacing:.11em}
 #adv .tgrid .f{padding:2px 0}
 
-/* The socket counts. A checkbox each, visually reduced to the number: the box
-   itself is clipped rather than hidden, so it keeps its place in the tab order
-   and the focus ring can be drawn on the span beside it. */
+/* A chip row: the socket counts and the rarities. A checkbox each, visually
+   reduced to its value: the box itself is clipped rather than hidden, so it
+   keeps its place in the tab order and the focus ring can be drawn on the span
+   beside it. */
 #adv .tgrid.chips{display:flex; flex:1 1 auto; gap:4px; padding:0}
 #adv .chip{position:relative; display:inline-flex}
 #adv .chip input{position:absolute; width:1px; height:1px; opacity:0; margin:0}
@@ -729,7 +737,11 @@ button,input,select{font:inherit; color:inherit}
   font-variant-numeric:tabular-nums;
 }
 #adv .chip:hover span{border-color:var(--label); color:var(--gold)}
-#adv .chip.on span{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+/* The lit state follows the checkbox itself and not a class the renderer writes,
+   because a click toggles the box and nothing re-renders: as a class this rule
+   only ever applied to chips drawn ticked, so ticking one left it looking off
+   while its filter was live. */
+#adv .chip input:checked + span{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
 #adv .chip input:focus-visible + span{outline:2px solid var(--gold); outline-offset:1px}
 
 /* --------------------------------------------------------------- empty/msg */

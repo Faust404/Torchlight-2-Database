@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 293
+ * view, provenance, the advanced-search panel and hash deep links -- 302
  * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
@@ -516,21 +516,47 @@ async function go(hash) {
   {
     d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     const chips = () => [].slice.call(d.querySelectorAll('#advb [data-achip]'));
+    const chipRow = () => chips().map(c => c.value + (c.checked ? '+' : '-')).join(' ');
     ok('the socket row is five chips, one per count',
-       chips().map(c => c.getAttribute('data-achip')).join(',') === '1,2,3,4,5' &&
-       chips().every(c => !c.checked),
-       chips().map(c => c.getAttribute('data-achip')).join(','));
-    chips().forEach(c => { if (/[24]/.test(c.getAttribute('data-achip'))) c.checked = true; });
+       chips().map(c => c.value).join(',') === '1,2,3,4,5' && chips().every(c => !c.checked),
+       chips().map(c => c.value).join(','));
+    chips().forEach(c => { if (/[24]/.test(c.value)) c.checked = true; });
     d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     ok('ticking 2 and 4 arms both and writes them back as a list',
        w.location.hash === '#sk=2,4' && /239/.test(cnt()),
        `${w.location.hash} / ${cnt()}`);
     d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     ok('...and the chips come back ticked, from the URL rather than the draft',
-       [].map.call(d.querySelectorAll('#advb [data-achip]'),
-         c => c.getAttribute('data-achip') + (c.checked ? '+' : '-')).join(' ') === '1- 2+ 3- 4+ 5-',
-       [].map.call(d.querySelectorAll('#advb [data-achip]'),
-         c => c.getAttribute('data-achip') + (c.checked ? '+' : '-')).join(' '));
+       chipRow() === '1- 2+ 3- 4+ 5-', chipRow());
+    // Clicking the chip, not the box: the box is clipped to a pixel and invisible,
+    // so the span is the only thing a reader can hit. And a click *toggles* -- no
+    // render follows it -- which is why the lit state is CSS on the checkbox
+    // rather than a class this renderer writes. There is no way to ask jsdom for
+    // the resolved colour of a :checked sibling (it computes the rule once and
+    // does not re-resolve after the click), so what is asserted is the rule that
+    // does it, and that the render-time class it replaced is gone: with that
+    // class, a chip clicked here stayed dark while its filter was live, which is
+    // what made this row look broken.
+    const css = d.querySelector('style').textContent;
+    chips().forEach(c => { c.checked = false; });
+    chips()[2].closest('label').querySelector('span').click();
+    ok('a chip is lit by its own checkbox, not by a class a re-render wrote',
+       chips()[2].checked &&
+       /\.chip input:checked \+ span/.test(css) && !/\.chip\.on\b/.test(css),
+       `chip 3 ${chips()[2].checked ? 'ticked' : 'not ticked'} / rule ` +
+       `${/\.chip input:checked \+ span/.test(css)} / stale class ${/\.chip\.on\b/.test(css)}`);
+    d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('...and the count it commits is that one count alone',
+       w.location.hash === '#sk=3' && /19/.test(cnt()), `${w.location.hash} / ${cnt()}`);
+    // The pair the chips exist for, through the panel: 5 alone, then 3 with it,
+    // which is the reading a min/max pair could not have given either way round.
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    chips().forEach(c => { if (c.value === '5') c.checked = true; if (c.value === '3') c.checked = true; });
+    d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('5 with 3 alongside it is those two counts, not the span between them',
+       w.location.hash === '#sk=3,5' && /30/.test(cnt()), `${w.location.hash} / ${cnt()}`);
+    await go('');
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   }
 
@@ -2018,38 +2044,74 @@ async function go(hash) {
        arows().length === 0 && /No stat filters yet/.test(ad.getElementById('advb').textContent));
 
     // --- the Type section --------------------------------------------------
-    // A tab strip over one checkbox per type, which is the shape the reference
-    // screenshot has. The strip is read off the taxonomy -- "All", then one tab
-    // per category -- so a fifth category is a tab without a code change, and it
-    // is a *view*: it chooses whose boxes are on screen and never what a search
-    // returns, which is what makes a selection able to span tabs.
+    // A strip of group buttons over one checkbox per type. The strip is read off
+    // the taxonomy -- "All", then one button per category -- so a fifth category
+    // is a button without a code change, and it is a *bulk toggle*: it ticks or
+    // unticks that group's boxes and moves nothing. Every group is on screen at
+    // once, which is why there is no tab state left to get out of step with the
+    // selection.
     const tabs = () => [].map.call(ad.querySelectorAll('#advb .ttab'), b => b.textContent);
     const tboxes = () => [].map.call(ad.querySelectorAll('#advb [data-atype]'), b => b.value);
+    const ticked = () => [].filter.call(ad.querySelectorAll('#advb [data-atype]'),
+      b => b.checked).map(b => b.value);
     const tab = (name) => click([].filter.call(ad.querySelectorAll('#advb .ttab'),
       b => b.textContent === name)[0]);
-    ok('the Type section offers every category as a tab, behind All',
+    ok('the Type section offers every category as a button, behind All',
        tabs().join(' ') === 'All Armor Weapons Accessories Misc', tabs().join(' '));
-    ok('...and All shows every type the corpus carries, in one grid',
+    ok('...and every group\'s boxes are on screen at once, under their headers',
        tboxes().length === 36 && tboxes().indexOf('Axe') >= 0 &&
-       tboxes().indexOf('Chest Armor') >= 0, `${tboxes().length} boxes`);
+       tboxes().indexOf('Chest Armor') >= 0 &&
+       [].map.call(ad.querySelectorAll('#advb .tgh'), h => h.textContent).join(' ') ===
+         'Armor Weapons One-Handed Two-Handed Off-Hand Accessories Misc',
+       `${tboxes().length} boxes`);
+    // The resting state of an allow-list form: every box ticked, which is no
+    // type filter at all. The two rows that run this way are asserted together
+    // because they are the same rule twice -- a reader who opens the panel on a
+    // bare page sees everything they are asking for ticked.
+    const rc = () => [].slice.call(ad.querySelectorAll('#advb [data-atier]'));
+    const sc = () => [].slice.call(ad.querySelectorAll('#advb [data-achip]'));
+    ok('a freshly opened panel has every type and every rarity ticked',
+       ticked().length === 36 && rc().length === 4 && rc().every(c => c.checked) &&
+       sc().length === 5 && sc().every(c => !c.checked),
+       `${ticked().length}/36 types, ${rc().filter(c => c.checked).length}/4 rarities, ` +
+       `${sc().filter(c => c.checked).length}/5 socket chips`);
+    // Every type on is the state the button acts on, so the first click is the
+    // one that takes a group off. Nothing moves on screen but the ticks.
     tab('Armor');
-    ok('a tab narrows the grid to its own group',
-       tboxes().length === 6 && tboxes().indexOf('Helmet') >= 0 && tboxes().indexOf('Axe') < 0 &&
-       ad.querySelector('#advb .ttab.on').textContent === 'Armor',
-       `${tboxes().length} boxes under Armor`);
-    // A tick has to survive a tab change or the panel is a filter that forgets
-    // what it was told: the draft holds every tab and only the visible boxes are
-    // rewritten, which is asserted here rather than left to the code's comment.
-    box('[data-atype][value="Helmet"]').checked = true;
-    tab('Weapons');
-    ok('...and a tick made on one tab is still there after a second one',
-       tboxes().indexOf('Sword') >= 0 && box('[data-atype][value="Sword"]') &&
-       !box('[data-atype][value="Helmet"]'),
-       `${tboxes().length} boxes under Weapons`);
-    box('[data-atype][value="Sword"]').checked = true;
+    ok('clicking a group that is fully on unticks exactly that group',
+       ticked().length === 30 && ticked().indexOf('Helmet') < 0 &&
+       ticked().indexOf('Sword') >= 0 && ticked().indexOf('Ring') >= 0 &&
+       tboxes().length === 36,
+       `${ticked().length} ticked of ${tboxes().length} boxes`);
+    // The buttons' own state, which is the only place a reader can see that a
+    // group is partly on: Armor is dark because it was just emptied, All is half
+    // lit because the other four groups are still on.
+    ok('...and the buttons report on, partly on and off, one group each',
+       [].map.call(ad.querySelectorAll('#advb .ttab'),
+         b => b.textContent + ':' + (b.className.replace('ttab', '').trim() || '-')).join(' ') ===
+         'All:t2part Armor:- Weapons:t2on Accessories:t2on Misc:t2on',
+       [].map.call(ad.querySelectorAll('#advb .ttab'),
+         b => b.textContent + ':' + (b.className.replace('ttab', '').trim() || '-')).join(' '));
+    tab('Armor');
+    ok('...and a second click puts the group back',
+       ticked().length === 36 && ad.querySelector('#advb .ttab.t2on').textContent === 'All',
+       `${ticked().length} ticked`);
+    // A group that is partly on goes fully on, which is the state a reader
+    // reaches by hand and the reason the button asks before it acts: "already
+    // ticked" has to mean the whole group, not the first box in it.
+    box('[data-atype][value="Helmet"]').checked = false;
+    tab('Armor');
+    ok('...and a partly-on group is ticked by the button, not emptied',
+       ticked().length === 36 && ticked().indexOf('Helmet') >= 0, `${ticked().length} ticked`);
+    // The All button is the same toggle over the whole grid, which is the one
+    // click that can clear every box at once.
     tab('All');
-    ok('...and both are ticked when All puts them on screen together',
-       box('[data-atype][value="Helmet"]').checked && box('[data-atype][value="Sword"]').checked);
+    ok('...and All is that same toggle over every box there is',
+       ticked().length === 0, `${ticked().length} ticked`);
+    // Two types, one click each, both on screen together -- the selection that
+    // used to take two tabs to build.
+    box('[data-atype][value="Helmet"]').checked = true;
+    box('[data-atype][value="Sword"]').checked = true;
     click(ad.getElementById('advgo'));
     // The rail's own boxes for the two types are the witness that the commit
     // went through onRoute() rather than apply(): apply() repaints the grid in
@@ -2057,7 +2119,7 @@ async function go(hash) {
     // Helmet and Sword while the rail went on showing its old ticks. With only
     // the type facet on, the rail still carries all 36 rows -- its counts are
     // taken with that facet skipped -- so both boxes are there to be read.
-    ok('Search commits a selection that spans two tabs',
+    ok('Search commits a selection of two types from two groups',
        aw.location.hash === '#type=Helmet%2CSword' && an() === '408 items of 6,048' &&
        !!ad.querySelector('#railbody input[data-f="types"][value="Helmet"]:checked') &&
        !!ad.querySelector('#railbody input[data-f="types"][value="Sword"]:checked'),
@@ -2066,6 +2128,38 @@ async function go(hash) {
     click(abtn);
     click(ad.getElementById('advrst'));
     click(ad.getElementById('advgo'));
+
+    // --- the rarity row ----------------------------------------------------
+    // Four chips over the same S.tiers the strip above the grid writes, which is
+    // the reason this is here and not in the strip: one filter, two surfaces,
+    // and a commit has to reach both or the reader is looking at two answers.
+    // The row runs the other way from the socket chips -- all four on at rest,
+    // because it is an allow-list and "no rarity filter" is every rarity -- so
+    // unticking one is what asks for something.
+    click(abtn);
+    click(rc()[3].closest('label').querySelector('span'));       // Legendary
+    click(ad.getElementById('advgo'));
+    ok('unticking a rarity narrows to the rest, and names them in the URL',
+       aw.location.hash === '#tier=Normal%2CRare%2CUnique' && an() === '5,956 items of 6,048',
+       `${aw.location.hash} / ${an()}`);
+    ok('...and the strip above the grid shows the same three, off one member',
+       !ad.querySelector('#tiers input[value="Legendary"]').checked &&
+       ['Normal', 'Rare', 'Unique'].every(v =>
+         ad.querySelector(`#tiers input[value="${v}"]`).checked),
+       [].map.call(ad.querySelectorAll('#tiers input'),
+         i => i.value + (i.checked ? '+' : '-')).join(' '));
+    click(abtn);
+    click(rc()[3].closest('label').querySelector('span'));
+    click(ad.getElementById('advgo'));
+    // The resting state is stored in its short form: every rarity ticked is no
+    // rarity filter, which is the empty set S already means by it. A commit that
+    // wrote all four out would spell the same answer in a longer URL and leave
+    // the strip below showing four lit pills for a search that has no filter.
+    // The label drops its "of 6,048" when the whole corpus is on screen, which is
+    // the second half of the same statement: nothing was filtered out.
+    ok('...and all four ticked is no rarity filter, so no key is written',
+       !/tier=/.test(aw.location.hash) && an() === '6,048 items',
+       `${aw.location.hash || '(empty)'} / ${an()}`);
 
     // The panel and the rail share one field now -- the type facet -- and write
     // the same S member. So a type ticked on the rail has to be in the panel the
@@ -2130,6 +2224,11 @@ async function go(hash) {
     ok('the Type section keeps every type while a filter is on',
        pbox === 36 && rbox === 16,
        `panel ${pbox} boxes, rail ${rbox} rows, under ${an()}`);
+    // Asking for one type out of a grid with all thirty-six ticked means
+    // clearing it first, which is one click on All and the reason that button is
+    // the same toggle as the rest. The alternative -- untick thirty-five boxes --
+    // is not a thing a reader does.
+    tab('All');
     box('[data-atype][value="Helmet"]').checked = true;
     click(ad.getElementById('advgo'));
     // The type narrows the affix filter rather than replacing it -- both keys
@@ -2155,12 +2254,14 @@ async function go(hash) {
        `${arows().length} rows`);
     click(ad.getElementById('advadd'));
     box('[data-arow="1"] [data-aaff]').value = 'X Health';
-    // A tick thrown away with the draft too, and on a control the commit path
+    // A selection thrown away with the draft too, and on controls the commit path
     // has to write the same way: chips and type boxes are S members like any
     // other, so a discard that left them behind would be a filter that survived
-    // the reader saying no.
-    box('[data-achip="3"]').checked = true;
-    box('[data-atype][value="Boots"]').checked = true;
+    // the reader saying no. The type box is *unticked* rather than ticked, which
+    // is the only way a change is visible on a row that opens fully ticked -- the
+    // state it has to come back to is all thirty-six on.
+    box('[data-achip][value="3"]').checked = true;
+    box('[data-atype][value="Boots"]').checked = false;
     ad.dispatchEvent(new aw.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     ok('Escape closes it and throws the draft away',
        !adv.classList.contains('on') && /aff=x-attack-speed:10:/.test(aw.location.hash) &&
@@ -2168,9 +2269,11 @@ async function go(hash) {
     click(abtn);
     ok('...the discarded row is not there when it reopens', arows().length === 1,
        `${arows().length} rows`);
-    ok('...and neither is the chip or the type tick that went with it',
-       !box('[data-achip="3"]').checked && !box('[data-atype][value="Boots"]').checked,
-       `chip3 ${box('[data-achip="3"]').checked} boots ${box('[data-atype][value="Boots"]').checked}`);
+    ok('...and neither is the chip or the type box that went with it',
+       !box('[data-achip][value="3"]').checked && box('[data-atype][value="Boots"]').checked &&
+       ticked().length === 36,
+       `chip3 ${box('[data-achip][value="3"]').checked} boots ` +
+       `${box('[data-atype][value="Boots"]').checked}, ${ticked().length} ticked`);
     box('[data-aaff]').value = 'X Health';
     click(ad.getElementById('advx'));
     ok('the ✕ throws it away too', !adv.classList.contains('on'));
@@ -2183,10 +2286,14 @@ async function go(hash) {
     // --- Reset -----------------------------------------------------------
     click(abtn);
     click(ad.getElementById('advrst'));
-    ok('Reset empties the draft and leaves the page alone until Search',
+    // Empty means the panel's resting state, which on the two allow-list rows is
+    // every box ticked -- a Reset that left those dark would be promising "back
+    // to how I found you" and delivering an empty grid.
+    ok('Reset returns the draft to its resting state, page untouched until Search',
        arows().length === 0 && box('[data-a="q"]').value === '' &&
-       !box('[data-atype][value="Helmet"]').checked &&
+       ticked().length === 36 && rc().every(c => c.checked) && sc().every(c => !c.checked) &&
        adv.classList.contains('on') && /aff=x-attack-speed:10:/.test(aw.location.hash),
+       `${ticked().length}/36 types, ${rc().filter(c => c.checked).length}/4 rarities, ` +
        `hash ${aw.location.hash}`);
 
     // --- a value-less stat is a presence test, not a broken range ---------
@@ -2266,13 +2373,19 @@ async function go(hash) {
          c.querySelectorAll('#advb [data-arow]').length === 1 &&
          c.querySelector('#advb [data-arow] [data-aaff]').value === 'X Attack Speed',
          c.getElementById('advb').textContent.replace(/\s+/g, ' ').slice(0, 100));
-      ok('...including the chip set and the type box, on their own controls',
-         [].map.call(c.querySelectorAll('#advb [data-achip]'),
-           b => b.getAttribute('data-achip') + (b.checked ? '+' : '')).join(' ') === '1 2+ 3 4+ 5' &&
+      // The socket chips are the link's own two, and the type grid is the link's
+      // own one box -- the other thirty-five read as unticked, not as the
+      // resting state, because this link *has* a type filter for the panel to
+      // show. The rarity row is the link's too, by its absence: nothing in the
+      // hash names a tier, so all four are ticked.
+      const row = sel => [].map.call(c.querySelectorAll(sel),
+        b => b.value + (b.checked ? '+' : '')).join(' ');
+      ok('...including the chip set, the type box and the rarity row',
+         row('#advb [data-achip]') === '1 2+ 3 4+ 5' &&
+         row('#advb [data-atier]') === 'Normal+ Rare+ Unique+ Legendary+' &&
          c.querySelector('#advb [data-atype][value="Helmet"]').checked &&
          !c.querySelector('#advb [data-atype][value="Axe"]').checked,
-         [].map.call(c.querySelectorAll('#advb [data-achip]'),
-           b => b.getAttribute('data-achip') + (b.checked ? '+' : '')).join(' '));
+         `${row('#advb [data-achip]')} | ${row('#advb [data-atier]')}`);
     });
   }
 

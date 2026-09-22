@@ -2141,17 +2141,55 @@ comma-joined, `sk=2,4`. **Zero is deliberately not a chip.** 4,453 items have no
 sockets and there is no way to ask for them by count, on purpose: "no sockets"
 is not a number of sockets, it is the absence of the property, and every filter
 that says nothing about sockets already returns them — including unticking every
-chip, which is the panel's own way of clearing the field.
+chip, which is the panel's own way of clearing the field. The row says so in as
+many words underneath, because it is the one row whose empty state is *any*
+rather than *none*.
 
-**The Type section is a tab strip over 36 checkboxes** — `All`, then one tab per
-category in the taxonomy's order (Armor, Weapons, Accessories, Misc) — which is
-the shape the reference screenshot has. The strip is read off `TAXONOMY`, so a
-fifth category is a tab with no code change, and it is a **view**: it chooses
-whose boxes are on screen and never what a search returns. A selection can
-therefore span tabs, and a tick made under Weapons is still ticked after a look
-at Accessories. Types the taxonomy does not name collect under **Other**, which
-is empty in this corpus but is the difference between a type the panel cannot
-offer and one it offers in the wrong place.
+**Rarity is four more chips** — Normal, Rare, Unique, Legendary, in `TIERORDER`'s
+order — over the same `S.tiers` the strip above the grid writes. One filter, two
+surfaces: a panel commit repaints the strip, and the suite reads the strip's own
+boxes back as the witness. Unclassified is not among them; none of those 125
+records reaches the page, so a fifth chip could never match — the same trade the
+socket row makes with zero.
+
+**Two rows are allow-lists and open fully ticked.** The 36 type boxes and the 4
+rarity chips are on when the panel opens, because both answer "which of these do
+you want": no filter means all of them, so all of them is what the control shows
+for it. The socket chips run the other way — their dark state *is* the absence of
+a filter — and the two hint lines under those rows are what keeps the difference
+readable rather than guessable.
+
+The all-ticked state is stored in its **short form**: a commit that finds every
+type ticked writes no `type=` key at all, and the same for rarity. `S.types`
+empty already means "no type filter", so writing all 36 names out would spell one
+answer two ways and put a 700-character key in the URL for a search with no type
+filter in it. `coverAll()` is the single place that translation happens, on the
+way into `S` — the draft keeps whatever the reader ticked, so the boxes stay
+where they clicked them. The consequence to know: **unticking everything is also
+no filter**, which is the rail's own reading of its unchecked boxes, and the Type
+section says so under the grid.
+
+**The Type section is a strip of group buttons over 36 checkboxes** — `All`, then
+one button per category in the taxonomy's order (Armor, Weapons, Accessories,
+Misc) — read off `TAXONOMY`, so a fifth category is a button with no code change.
+Every group's boxes are on screen at once, and a button is a **bulk toggle**: it
+ticks every box under it, or unticks them all when they are already ticked. So a
+selection that used to take two tabs to build is two clicks, and nothing a reader
+can see ever moves. Each button reports its own group: lit when the group is
+fully on, half lit when it is partly on, dark when it is off — the middle state
+is why the buttons are not styled as checkboxes, since with everything on at rest
+a reader who unticks one armour type would otherwise watch Armor go dark and read
+it as "no armour". Types the taxonomy does not name collect under **Other**,
+which is empty in this corpus but is the difference between a type the panel
+cannot offer and one it offers in the wrong place.
+
+**A chip's lit state is CSS on its own checkbox** — `#adv .chip input:checked +
+span` — and not a class the renderer writes. It was the class, and it was wrong:
+a click toggles the box and *nothing re-renders*, so a chip that started dark
+stayed dark while the filter it carried was live, which is what made the socket
+row look like it did not work. The rule cannot be asserted in jsdom — it
+computes a rule once and does not re-resolve after a click — so the suite asserts
+the rule itself and that the render-time class it replaced is gone.
 
 **The panel's Type list is the whole corpus, always.** `advTypes()` reads its
 types from `ALLTYPES` — a set built once from every item in `DB.items` — rather
@@ -2188,6 +2226,8 @@ onRoute();` — the route the search box's Enter takes.
 |---|---|---|
 | item level | `lvlMin/Max` | the item's own level, either end open |
 | player level | `plrMin/Max` | **equippable in that band** — `LEVEL_REQUIRED` between the two, and an item naming no requirement passes |
+| type | `types` | a box per type in `ALLTYPES`; **or** across boxes; all (or none) ticked = no filter |
+| rarity | `tiers` | the four chips; the same `S.tiers` the strip above the grid writes; all ticked = no filter |
 | sockets | `sockSet` | a tick per count in `SOCKCHIPS`; **or** across ticks |
 | stat requirements | `req` | `{str\|dex\|mag\|def: [min, max]}`, either end open |
 | class | `cls` | **usable by** — an item with no `cls`, or `cls` in the set |
@@ -2227,7 +2267,9 @@ filter into a URL showing all 6,048 items.
 **Hash grammar**, following the file's preference for legible `key=value`:
 `sk=2,4`, `lvl=10-50`, `plr=10-50`, `req=str::50,dex:30:40` (elided when all four
 are on), `cls=Embermage,Outlander`, `setfx=1`, `dmgv=fire:10:20,physical::`,
-`armv=…`, `aff=x-attack-speed:10:,x-health::`. A stat row is `slug:lo:hi`, split
+`armv=…`, `aff=x-attack-speed:10:,x-health::`. `type=` and `tier=` are the two
+allow-list rows and are elided the same way `req=` is: all-36 and all-4 are
+written as nothing. A stat row is `slug:lo:hi`, split
 on `:` so a negative bound needs no escaping (`x-all-armor-per-hit:-4:5`) and an
 empty side is an open bound — the same three shapes a `req=` row has. Rows keep
 the reader's order and are never sorted.
@@ -2459,7 +2501,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 293
+`verify\check_page.js` goes further and drives the built page in a real DOM — 302
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -2473,10 +2515,15 @@ category's subgroups and rows and nothing else, survives the rail being
 rebuilt, and is not a filter, and that no damage rows are left in it), the
 advanced panel (the button and the four ways to close it, the draft being thrown
 away rather than applied, a commit going through `onRoute()` so the rail's own
-boxes carry the tick, the Type section's tabs and its 36 boxes against the
-rail's 16 under a live filter, the chips, both empty boxes meaning no constraint,
-a value-less stat's boxes switched off, the category tabs leaving a tick in
-place, and a cold-loaded URL putting every control back where it was spelled),
+boxes carry the tick, the Type section's 36 boxes against the rail's 16 under a
+live filter, its group buttons ticking, unticking and half-ticking their own
+group, every box ticked at rest and again after Reset, the type and rarity rows
+elided from the URL when they are full, an unticked rarity reaching the strip
+above the grid as the same member, the socket chips answering one count alone and
+two counts with a gap between them, a chip lit by its own checkbox rather than by
+a class a re-render wrote, both empty boxes meaning no constraint, a value-less
+stat's boxes switched off, and a cold-loaded URL putting every control back where
+it was spelled),
 the set bonus
 ladder in three shapes (a set that ships every piece it gates on, one that does
 not, one gated on more pieces than exist), and a set piece's rarity (the type

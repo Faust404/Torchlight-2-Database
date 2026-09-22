@@ -80,6 +80,12 @@
   // those two pills. Set filtering is a separate control over the top.
   var TIERRANK = { 'Normal': 0, 'Rare': 1, 'Unique': 2, 'Legendary': 3, 'Unclassified': 4 };
   var TIERORDER = ['Normal', 'Rare', 'Unique', 'Legendary', 'Unclassified'];
+  // What the panel's rarity chips offer: TIERORDER's first four, without the
+  // Unclassified tail. None of those 125 records reaches the page, so a fifth
+  // chip would be a control that can never match anything -- the same trade the
+  // socket row makes by leaving out zero. Written as a slice rather than four
+  // literals so the chips cannot get out of the strip's order.
+  var RARITYCHIPS = TIERORDER.slice(0, 4);
 
   // The game's names for the .DAT's requirement fields. TL2 renamed Torchlight
   // 1's Magic -> Focus and Defense -> Vitality, but the field names kept the
@@ -1452,10 +1458,6 @@
   var advS = null;
   var advOn = false;
   // Which tab the Type section is showing. View state, not filter state: it
-  // chooses whose boxes are on screen and never enters the draft, so switching
-  // tabs cannot change what a search would return.
-  var advTab = 'All';
-
   // The four class names, read off the corpus rather than written down here: a
   // fifth would otherwise be unselectable without a code change, and `cls` is
   // the build's own field for this. Sorted, so the boxes hold still.
@@ -1503,7 +1505,15 @@
     return {
       q: S.q, lvlMin: S.lvlMin, lvlMax: S.lvlMax,
       plrMin: S.plrMin, plrMax: S.plrMax, req: r,
-      types: new Set(S.types), sockSet: new Set(S.sockSet),
+      // The two allow-list rows read an empty set as "everything on". S.types
+      // and S.tiers empty is no filter, and this is the control that shows that
+      // state -- so a reader who opens the panel on a filtered page sees exactly
+      // the types and rarities their search would return, and one who opens it
+      // on a bare page sees every box ticked. The socket chips are not in this
+      // category: their empty set is a filter's off state, not a full set.
+      types: S.types.size ? new Set(S.types) : new Set(ALLTYPEKEYS),
+      tiers: S.tiers.size ? new Set(S.tiers) : new Set(RARITYCHIPS),
+      sockSet: new Set(S.sockSet),
       cls: new Set(S.cls), dmgv: d, armv: a, setfx: S.setfx,
       aff: S.aff.map(function (c) {
         return { text: c.text, stat: c.stat, lo: c.lo, hi: c.hi };
@@ -1549,10 +1559,9 @@
     advS.cls = new Set();
     var cls = root.querySelectorAll('[data-acls]');
     for (i = 0; i < cls.length; i++) if (cls[i].checked) advS.cls.add(cls[i].value);
-    // The type boxes only carry the tab that is on screen; the draft holds every
-    // tab. So the ones the reader cannot see are kept as they stand and only the
-    // visible ones are rewritten -- which is what makes switching tabs a view
-    // change and not a filter change. Cleared first so unticking works.
+    // Every type box is on screen at once, so this is a straight read of the
+    // grid: ticked adds, unticked removes. No member is left as it stands,
+    // because there is no longer a box the reader cannot see.
     var seen = root.querySelectorAll('[data-atype]');
     for (i = 0; i < seen.length; i++) {
       if (seen[i].checked) advS.types.add(seen[i].value);
@@ -1567,7 +1576,13 @@
     advS.sockSet = new Set();
     var chips = root.querySelectorAll('[data-achip]');
     for (i = 0; i < chips.length; i++)
-      if (chips[i].checked) advS.sockSet.add(+chips[i].getAttribute('data-achip'));
+      if (chips[i].checked) advS.sockSet.add(+chips[i].value);
+    // The rarity chips, which write the same S.tiers the strip above the grid
+    // writes -- one member, two surfaces, so the two can never disagree.
+    advS.tiers = new Set();
+    var tchips = root.querySelectorAll('[data-atier]');
+    for (i = 0; i < tchips.length; i++)
+      if (tchips[i].checked) advS.tiers.add(tchips[i].value);
     var fx = root.querySelector('[data-asetfx]');
     advS.setfx = !!(fx && fx.checked);
 
@@ -1602,15 +1617,19 @@
     h.querySelector('.tog').textContent = SEC[k] === false ? '+' : '−';
   }
 
-  // The Type section: one checkbox per type, grouped by the taxonomy, behind a
-  // strip of tabs that choose which group is on screen.
+  // The Type section: one checkbox per type, grouped by the taxonomy under a
+  // strip of group buttons.
   //
-  // The tab strip is a *view*. It is built from TAXONOMY's own category names
-  // so a fifth category is a tab without a code change, and it never touches the
-  // draft -- "All" is every group stacked, with each group's header above its
-  // boxes, and any other tab is that one group's rows. Switching re-renders from
-  // the draft (advCollect first, so the tab being left keeps its ticks), which
-  // is why a selection can span tabs.
+  // The strip is a *bulk toggle*, not a view. Every group's boxes are on screen
+  // at once, stacked with each group's header above its rows, and a group button
+  // ticks every box under that group -- or unticks them all when they are
+  // already ticked. Nothing is hidden and nothing moves, so there is no state a
+  // reader can lose by clicking one.
+  //
+  // It is built from TAXONOMY's own category names, so a fifth category is a
+  // button without a code change. The boxes are all ticked when the panel opens,
+  // because the panel is an allow-list: an empty S.types is no filter, and "no
+  // filter" on this control is every box on. See advCopy and coverAll.
   //
   // The rows are deliberately not checkRow(): that writes data-f and data-ct,
   // and the document's change handler owns data-f while paintCounts() walks
@@ -1629,13 +1648,43 @@
     for (var i = 0; i < ITEMS.length; i++) seen[ITEMS[i].t] = 1;
     return seen;
   })();
+  // The same names as a list, so "every type is ticked" and "this group's boxes
+  // are all ticked" are countable without walking the object each time.
+  var ALLTYPEKEYS = Object.keys(ALLTYPES);
+
+  // Every type the corpus carries that belongs to one tab group -- "All" is the
+  // whole corpus, since the grid's Other block is drawn under All and belongs to
+  // no category. The corpus's keys and not TAXONOMY's own lists, so a group's
+  // size here matches the number of boxes the grid actually draws.
+  // ALLTYPEKEYS is a fixed order, so a group's state is one pass and no sorting.
+  function groupTypes(g) {
+    if (g === 'All') return ALLTYPEKEYS;
+    var out = [];
+    TAXONOMY.forEach(function (e) {
+      if (e.g !== g) return;
+      e.t.forEach(function (t) { if (ALLTYPES[t]) out.push(t); });
+    });
+    return out;
+  }
+
+  // What a group's tab looks like: lit when every box under it is ticked, half
+  // lit when some are. The half state is not decoration -- with every type on at
+  // rest, a reader who unticks one armour type would otherwise see the Armor tab
+  // go dark, which reads as "no armour" when it means "nearly all armour".
+  function groupState(g) {
+    var list = groupTypes(g), on = 0;
+    for (var i = 0; i < list.length; i++) if (advS.types.has(list[i])) on++;
+    return on === 0 ? '' : on === list.length ? 'on' : 'part';
+  }
 
   function advTypes() {
     var seen = ALLTYPES;
     var placed = Object.create(null);
     var h = '<div class="ttabs">' + TGROUPS.map(function (g) {
-      return '<button class="ttab' + (advTab === g ? ' on' : '') + '" data-atab="' +
-        esc(g) + '">' + esc(g) + '</button>';
+      var st = groupState(g);
+      return '<button class="ttab' + (st ? ' t2' + st : '') + '" data-atgl="' +
+        esc(g) + '" title="Tick or untick every ' + esc(g.toLowerCase()) +
+        ' type">' + esc(g) + '</button>';
     }).join('') + '</div>';
     var box = function (t) {
       var on = advS.types.has(t);
@@ -1645,7 +1694,6 @@
     };
     var rows = '', lastG = null;
     TAXONOMY.forEach(function (e) {
-      if (advTab !== 'All' && e.g !== advTab) return;
       if (e.g !== lastG) { rows += '<div class="tgh">' + esc(e.g) + '</div>'; lastG = e.g; }
       if (e.s) rows += '<div class="tgh s">' + esc(e.s) + '</div>';
       e.t.forEach(function (t) {
@@ -1657,27 +1705,45 @@
     // Belt and braces, the same one the rail keeps for the same reason: build.py
     // asserts every type it emits is in TYPE_GROUPS, but losing a type silently
     // is the one failure this could hide, so anything unnamed still renders
-    // rather than vanishing. Only under "All" -- an unnamed type belongs to no
-    // tab. `rest` walks the corpus's types rather than the taxonomy, so a type
-    // the taxonomy forgot is found here rather than nowhere.
+    // rather than vanishing. `rest` walks the corpus's types rather than the
+    // taxonomy, so a type the taxonomy forgot is found here rather than nowhere.
+    // It belongs to no tab's group, which is why the All tab counts the corpus's
+    // keys rather than the taxonomy's lists -- groupTypes says so.
     var rest = Object.keys(ALLTYPES).filter(function (t) { return !placed[t]; }).sort();
-    if (rest.length && advTab === 'All') {
+    if (rest.length) {
       rows += '<div class="tgh">Other</div>';
       rest.forEach(function (t) { rows += box(t); });
     }
     if (!rows) rows = '<div class="f off"><span class="lbl">nothing matches</span></div>';
-    return h + '<div class="tgrid">' + rows + '</div>';
+    // The same sentence the socket row carries, and for the same reason: this is
+    // an allow-list whose empty state is not "nothing" but "anything". A reader
+    // who clears every box -- one click on All does it -- has to be able to read
+    // what that means before they hit Search, and the answer is not guessable
+    // from a dark grid.
+    return h + '<div class="tgrid">' + rows + '</div>' +
+      '<div class="rng"><span class="rl"></span><span>Nothing ticked means any' +
+      ' type, as does everything ticked.</span></div>';
   }
 
-  // The socket counts, as a row of chips. Multi-select: ticking 2 and 4 asks for
-  // items with two sockets or four, which is the whole reason this is not the
-  // min/max pair it replaces -- a range cannot leave a hole in the middle.
-  function advChips() {
-    return '<div class="tgrid chips">' + SOCKCHIPS.map(function (c) {
-      var on = advS.sockSet.has(c);
-      return '<label class="chip' + (on ? ' on' : '') + '">' +
-        '<input type="checkbox" data-achip="' + c + '"' + (on ? ' checked' : '') + '>' +
-        '<span>' + c + '</span></label>';
+  // A row of chips: one hidden checkbox each, drawn as the value alone. Used by
+  // both the socket counts and the rarities, so the two rows cannot drift into
+  // two different-looking controls.
+  //
+  // The checkbox carries its value in a `value` attribute *and* in its data
+  // name. Value because a checkbox with no value attribute reports the literal
+  // "on", which reads back as a chip named "on"; the data name so advCollect has
+  // one spelling to query per row. `attr` is that name: achip, atier.
+  //
+  // The lit state is CSS (`input:checked + span`), not a class this renderer
+  // writes. A class would only be right at render time -- a click toggles the
+  // box and no render follows it, so the chip stayed dark while the filter it
+  // carried was live. That is the bug this spelling exists to make impossible.
+  function advChips(attr, list, on) {
+    return '<div class="tgrid chips">' + list.map(function (c) {
+      return '<label class="chip">' +
+        '<input type="checkbox" data-' + attr + ' value="' + esc(c) + '"' +
+        (on.has(c) ? ' checked' : '') + '>' +
+        '<span>' + esc(c) + '</span></label>';
     }).join('') + '</div>';
   }
 
@@ -1689,7 +1755,18 @@
     g += advRange('plr', 'Player Level', advS.plrMin, advS.plrMax);
     // A row of its own rather than a pair: the label column is the same 84px
     // the rows above use, so the chips line up under the boxes they replace.
-    g += '<div class="rng"><span class="rl">Sockets</span>' + advChips() + '</div>';
+    //
+    // The hint is not padding. These chips start dark and the rarity chips below
+    // start lit, because the two rows answer two different questions: sockets
+    // asks "which counts do you want", so nothing ticked is any count, while
+    // rarity is an allow-list whose everything-on state is no rarity filter.
+    // Without the line a reader can only guess which way each row runs.
+    g += '<div class="rng"><span class="rl">Sockets</span>' +
+      advChips('achip', SOCKCHIPS, advS.sockSet) + '</div>';
+    g += '<div class="rng"><span class="rl"></span><span>No chip ticked means' +
+      ' any number of sockets.</span></div>';
+    g += '<div class="rng"><span class="rl">Rarity</span>' +
+      advChips('atier', RARITYCHIPS, advS.tiers) + '</div>';
 
     // "Stat Requirements", because that is what these four are: an item's
     // requirement is met either by its level or by its stats, and these rows
@@ -1783,23 +1860,38 @@
 
   // Reset empties the *draft*. It is a form reset, not an undo of the page's
   // filters: nothing has been applied yet, so there is nothing to take back
-  // until Search. The tab goes back to All for the same reason -- it is part of
-  // what the panel looks like when it opens, and Reset leaves it as it found it.
+  // until Search. "Empty" means the panel's own resting state, which for the two
+  // allow-list rows is every box ticked -- a Reset that emptied them would leave
+  // the grid dark and a search that returned nothing, on a button whose promise
+  // is "back to how I found you".
   function advReset() {
     advS = {
       q: '', lvlMin: null, lvlMax: null, plrMin: null, plrMax: null,
-      req: {}, types: new Set(), sockSet: new Set(),
+      req: {}, types: new Set(ALLTYPEKEYS), tiers: new Set(RARITYCHIPS),
+      sockSet: new Set(),
       cls: new Set(), dmgv: {}, armv: {}, setfx: false, aff: []
     };
-    advTab = 'All';
     renderAdv();
+  }
+
+  // Every type, or every rarity. The two allow-list rows are stored in their
+  // short form: "all of them ticked" is no filter, which is the set S already
+  // uses for it, so the panel's default costs no hash key and the URL stays the
+  // one a reader would have written by hand. Normalised here, on the way into S,
+  // and only here -- the draft keeps whatever the reader ticked so the boxes
+  // they see while the panel is open are the boxes they clicked.
+  function coverAll(set, names) {
+    for (var i = 0; i < names.length; i++) if (!set.has(names[i])) return false;
+    return true;
   }
 
   function advCommit() {
     advCollect();
     S.q = advS.q; S.lvlMin = advS.lvlMin; S.lvlMax = advS.lvlMax;
     S.plrMin = advS.plrMin; S.plrMax = advS.plrMax;
-    S.sockSet = advS.sockSet; S.types = advS.types;
+    S.sockSet = advS.sockSet;
+    S.types = coverAll(advS.types, ALLTYPEKEYS) ? new Set() : advS.types;
+    S.tiers = coverAll(advS.tiers, RARITYCHIPS) ? new Set() : advS.tiers;
     S.setfx = advS.setfx;
     // The draft is built fresh by advCopy() on every open and never touched
     // again after this line, so handing S its members outright shares nothing
@@ -1837,7 +1929,6 @@
   document.getElementById('advbtn').addEventListener('click', function () {
     if (advOn) { advShow(false); return; }
     advS = advCopy();
-    advTab = 'All';
     renderAdv();
     advShow(true);
     var f = document.querySelector('#advb [data-a="q"]');
@@ -1865,12 +1956,18 @@
       renderAdv();
       return;
     }
-    var tab = t.getAttribute && t.getAttribute('data-atab');
-    if (tab != null) {
-      // Collected first: the tab being left is about to be taken off screen, and
-      // without this its ticks would go with it.
+    var gl = t.getAttribute && t.getAttribute('data-atgl');
+    if (gl != null) {
+      // Collected first: a box the reader ticked a moment ago has not reached the
+      // draft yet, and it decides whether this group counts as already-ticked.
       advCollect();
-      advTab = tab;
+      var list = groupTypes(gl);
+      var all = true;
+      for (var i = 0; i < list.length; i++)
+        if (!advS.types.has(list[i])) { all = false; break; }
+      for (var j = 0; j < list.length; j++) {
+        if (all) advS.types.delete(list[j]); else advS.types.add(list[j]);
+      }
       renderAdv();
       return;
     }
