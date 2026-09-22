@@ -1400,6 +1400,87 @@ prediction.
 Nothing downstream needs it: the numbers on every row follow from the level, so
 the level is the whole of the transcription.
 
+### The eyes' table, as shipped
+
+All of the above is on the site. Each eye's card carries a table —
+`Lv | Req | Armor / Trinket | Weapon | NG` — and its Normal row **is** the flat
+effect block it replaced, which is why a card shows one or the other and never
+both. The record gains `ng`: **124 rows over the 31 eyes**, four apiece. `fx`
+and `fxs` are untouched, because the grid tile's teaser reads `fx[0]` — and a
+pre-change build differs on nothing else at all across the 6,173 items, which
+is the check that the feature did not disturb the record.
+
+The other 109 socketables that carry a slot split keep the flat block. The
+table's class names are new (`.ngt`, `.ngc`) rather than borrowed, precisely so
+that `.fxh` and `.aff` go on meaning the flat block on those 109 — the suite
+reads both, on Flame Ember and on the augmented weapons, so reusing either
+would have broken assertions about items that did not change.
+
+**Three traps the derivation had to clear.**
+
+*The value member is not one hash.* `0x0000BD6E` carries the value on almost
+every affix, but two of the eyes write the min/max pair under `0xD6CEC8D9`
+instead: `UNIQUE_TL2_DRAWARMOR_PHYSICAL2` (The Eye of the Killbot) and
+`UNIQUE_TL2_DRAWARMOR_PHYSICAL3` (The Eye of Aruk), both
+`PERCENT DAMAGE TAKEN BY MONSTER COUNT`. Reading one hash returns **zero
+effects** for those two, which empties a cell rather than failing — so the
+value members are read as a set, and the build asserts every eye's effects
+resolve.
+
+`UNIQUE_TL2_DRAWMANA2` (Mana Guardian, Wraith Lord) is the opposite case: it
+carries **no value member in any form**, its amount sitting in unhashed floats.
+Nothing needs the number, because `DRAW MANA` has no curve — but the *pairing*
+does. An effect list is therefore flushed when the next list header arrives,
+not when a value does; waiting for one drops the effect's `TYPE` and unpairs
+its line.
+
+And `0xE03B279B` is never a candidate. It is the string duration, present as
+`0` on nearly every affix, and `build.py`'s own `EMBER_VALUE_KEYS` names it
+`dur` — legitimately, for a different question. Listed as a value it wins by
+row order, and every scaled stat on every eye reads `0`.
+
+**The damage-over-time column is the page's, not the files'.** Of the 16
+published tables, one column moves with the level and no graph explains it. The
+card ships the wiki's own numbers for it — `480 / 1370 / 2260 / 2375` on The Eye
+of the Dark Alchemist — keyed by *affix* rather than by TYPE, and the build
+asserts those four levels are the ones the band formula gives (48/79/98/100),
+which is what keeps the transcription tied to the item it came from. The Eye of
+Jutham Kasam carries the same TYPE and no page publishes a number for it, so
+its rows past Normal read `?`.
+
+**One place the card and the page disagree, and the page is right.** The Dark
+Alchemist's Armor/Trinket Normal row is `2 Mana recovery per second` in TIDBI
+and **1.4** on the wiki's own table — the derived value, and the whole cell at
+every level: 1.4 / 1.9 / 2.2 / 2.2. That is a *value* divergence, where the
+seven rows above are all *slot* divergences, so it is a new class rather than a
+member of that table — but it is the same finding about the export, that TIDBI
+carries a captured number where the files carry the rule. What did not move is
+the line: no source disputes the wording, only the quantity in it.
+
+**Tiamat is not a special case, and this was got wrong once.** The Eye of
+Tiamat is the one eye whose `MAXLEVEL` is not the `9999999` sentinel: it reads
+`0..999` where the other 30 read `1..9999999`. That looks like a ceiling and is
+not one. `build.py`'s `MAX_LEVEL_CEILING` records 999 as *the number this corpus
+already uses to spell the sentinel* — the clamp collapses 9999999 onto it, not
+away from it — and 999 is above every reachable level either way, so both bands
+admit any dropper level and both scale. The two fields moved together, and a
+hand-authored cap would read `MINLEVEL 54, MAXLEVEL 54`, not `0..999`. The
+paragraph above had already predicted Tiamat at 82 / 100 / 100, which is where
+the plan that contradicted it went wrong.
+
+What would matter is an eye that *cannot* be generated at NG+3's level of 100,
+and none is in that state. The build collects any eye whose `MAXLEVEL` is
+present and below 100 and fails naming the item, so the four-row assumption is
+checked rather than assumed.
+
+**Do not use `test/eyes_ladders.json` as a fixture.** It is a bad parse: it
+carries `1.4 Mana recovery per second` down all four of the Dark Alchemist's
+rows where the page gives 1.9 / 2.2 / 2.2, and several eyes have one row where
+the page has four `?` rows. The usable fixture is `test/eyes_wiki.json` — raw
+wikitext — read through the rowspan-aware `table_rows()` in `test/_aleera.py`.
+That pairing reproduces **96 of 96 published cells** across the 16 pages that
+carry a table, with exactly the one Dark Alchemist drift above and nothing else.
+
 ### Type facet, and the rail's taxonomy
 
 39 values. **The item's own DAT decides the type; TIDBI says what to call it.**
