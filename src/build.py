@@ -7,13 +7,14 @@ Merges three sources into one dataset and a grimtools-style browser over it:
     TIDBI            a recovered 2014 Access DB -- display text, effects, icons
     alfgeir          a third-party site's curated name/type/classification
 
-Outputs land in out/: items.json, items.csv, icons.webp, icons.json, index.html.
+Outputs land in out/: items.json, items.csv, icons.webp, icons.json, index.html,
+socketables.html.
 
 Reads only. Nothing here writes to the game install.
 
 Usage:
     python build.py            # data + app
-    python build.py --no-app   # data only (skips index.html)
+    python build.py --no-app   # data only (skips both pages)
 """
 import base64, collections, csv, io, json, os, re, struct, sys, unicodedata
 
@@ -1148,7 +1149,22 @@ def _decimal(s):
     return DECIMAL_COMMA.sub('.', s)
 
 
+_TIDBI = []
+
+
 def load_tidbi():
+    """(by ConsolNAME, effects by name) out of the two TIDBI CSVs.
+
+    Memoised, because it is a pure function of two files that do not change
+    during a build and there is now more than one caller: `build()` reads it for
+    the corpus, and the socketables page reads it again to re-derive the slot
+    split and compare its answer against TIDBI's own headings. Without this the
+    page would re-parse ~1 MB of CSV to arrive at a dict build() already had.
+    Handing the dict down instead would mean changing build()'s signature, which
+    has other callers, for the same result.
+    """
+    if _TIDBI:
+        return _TIDBI[0]
     items = read_csv(os.path.join(CSV, 'items.csv'))
     by_name = {}
     for r in items:
@@ -1164,7 +1180,8 @@ def load_tidbi():
             # split_effects() uses to tell a block's own rows from the affixes
             # that merely happen to sit nearby in the tooltip (see below)
             effects.setdefault(it, []).append((int(r['id']), tx))
-    return by_name, effects
+    _TIDBI.append((by_name, effects))
+    return _TIDBI[0]
 
 
 def load_alfgeir():
@@ -1902,6 +1919,27 @@ def write_csv(items, path):
                         o.get('ic', ''), o['p']])
 
 
+def bitter_face():
+    """The @font-face rule for Bitter as a data URI, with a trailing newline.
+
+    The face is a variable font whose `wght` axis defaults to 100, so the
+    `font-weight: 400 600` range is load-bearing rather than decorative --
+    without it every affix line in the corpus renders in Bitter Thin. No
+    `font-display`: a data URI has nothing to wait for.
+
+    A function and not a constant because two pages carry the face now --
+    out/index.html and out/socketables.html -- and they have to agree about the
+    weight range, which is exactly the kind of thing that gets fixed in one
+    copy. This page prepends it to the app's own CSS rather than putting a token
+    in the shell, which keeps the token count down and puts the face in the file
+    that uses it.
+    """
+    with open(os.path.join(paths.WEB, 'fonts', 'bitter-latin.woff2'), 'rb') as fh:
+        face = base64.b64encode(fh.read()).decode('ascii')
+    return ("@font-face{font-family:Bitter;font-style:normal;font-weight:400 600;"
+            "src:url(data:font/woff2;base64,%s) format('woff2')}\n" % face)
+
+
 def write_page(items, coords, sheet_bytes, size, sets):
     app = paths.WEB
     with open(os.path.join(app, 'app.css'), encoding='utf-8') as fh:
@@ -1912,17 +1950,7 @@ def write_page(items, coords, sheet_bytes, size, sets):
         shell = fh.read()
 
     # --- the two assets the card needs that the corpus does not supply ---
-    #
-    # Bitter, as an @font-face rule prepended to the app's own CSS rather than a
-    # token in the shell: it keeps the token count down and puts the face in the
-    # file that uses it. The face is a variable font whose `wght` axis defaults
-    # to 100, so the `font-weight: 400 600` range is load-bearing rather than
-    # decorative -- without it every affix line in the corpus renders in Bitter
-    # Thin. No `font-display`: a data URI has nothing to wait for.
-    with open(os.path.join(app, 'fonts', 'bitter-latin.woff2'), 'rb') as fh:
-        face = base64.b64encode(fh.read()).decode('ascii')
-    css = ("@font-face{font-family:Bitter;font-style:normal;font-weight:400 600;"
-           "src:url(data:font/woff2;base64,%s) format('woff2')}\n" % face) + css
+    css = bitter_face() + css
 
     # The five element marks, a strip of five equal tiles. Its geometry is read
     # off the PNG instead of being written into app.css, so re-cutting the strip
@@ -2293,6 +2321,49 @@ def main():
               % (n / 1048576, len(shown), len(items), len(items) - len(shown),
                  ', '.join(SITE_HIDDEN_TIERS)))
         assert n <= 12 * 1048576, 'page too large: %.2f MB' % (n / 1048576)
+
+        # The socketables page: the families in one table, because the
+        # comparative question ("what does a level 40 gem give me, and what did
+        # the level 30 one give") is read down a column and not across a card.
+        # It gets `shown` -- the same list the cards do -- so the page can never
+        # carry an item the site hides.
+        #
+        # Imported here rather than at the top of the module because
+        # socket_page imports this one back for load_tidbi/split_effects. By the
+        # time main() runs, this module is fully loaded and the cycle is moot.
+        import socket_page
+        s, st = socket_page.write(shown, coords)
+        print('%s  %.0f KB (%d rows: %s)'
+              % (socket_page.PAGE, s / 1024, st['rows'],
+                 ' '.join('%s %d' % (k, st['by_kind'][k]) for k in socket_page.KINDS)))
+        # A cap of its own, and a far tighter one than index.html's. That page
+        # is 7.3 MB because it inlines the 3.63 MB icon sheet; this one is
+        # served that sheet from beside itself. If this number ever reaches
+        # megabytes, someone has inlined the sprite here too, and the cap is
+        # what says so rather than a slow page nobody traces.
+        assert s <= 512 * 1024, 'socketables page too large: %.2f MB' % (s / 1048576)
+
+        # The page's own population, pinned. `shown` is 6,048 items and 168 of
+        # them are typed Socketable; six do not reach the table. Five are
+        # Components, and the sixth is tl2_bloodember_BASE -- a template the tier
+        # rule cannot catch, because it is Rare and is named "Blood Ember".
+        assert st['rows'] == 162, 'socketables page carries %d rows' % st['rows']
+        assert dict(st['by_kind']) == {'Embers': 57, 'Skulls': 52, 'Eyes': 35,
+                                       'Gems': 12, 'Other': 6}, dict(st['by_kind'])
+        # And the honesty claim, which is the number the page prints in words:
+        # 121 'files' (the files decided the split and TIDBI agreed, or was
+        # silent -- this is what "agree on 121 of the 162" counts), 28 'none'
+        # (the rare embers, whose effect is a roll and which have no affix list
+        # at all), 7 'text' (no affix applicability list, so TIDBI's headings
+        # stand), 3 'split' (TIDBI lost a heading) and 3 'conflict' (TIDBI
+        # prints one the files contradict).
+        #
+        # The corpus's fourth conflict, Quest_ManaVent_Acquire, is a Quest Item
+        # and not a socketable, which is why this page counts 3 where the SLOT
+        # line above counts 4.
+        assert dict(st['splits']) == {'files': 121, 'none': 28, 'text': 7,
+                                      'split': 3, 'conflict': 3}, dict(st['splits'])
+        assert st['pooled'] == 28 and st['shared'] == 12 and st['marked'] == 6
 
 
 if __name__ == '__main__':
