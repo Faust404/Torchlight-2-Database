@@ -1360,8 +1360,14 @@ exceptions are the point:
 | The Eye of Gallo | 6 | NG+4 and NG+5 repeat NG+3's values; 100 is the cap |
 | The Eye of Ezrek Khan | 4 | labels its rows `0 / 1 / 2 / 3+` instead of Normal / NG+n |
 | The Eye of Prion-Kuru | 3 | NG+2 is **absent** — not `?`, no row at all |
+| Rift Ember | 4 | a unique socketable, not an eye — and the fit's own test |
+| Vyrax's Heartfire | 4 | states its Normal and NG+1 rows; NG+2 and NG+3 are `?` |
 
-**Every number in those 42 rows comes out of the files.** The 42 are what a
+The last two are the only published tables on a **socketable outside the eye
+family** — every other table the wiki publishes is an eye's — and they are the
+evidence the five socketable tables the cards now carry rest on.
+
+**Every number in the 42 eye rows comes out of the files.** The 42 are what a
 strict parse sees: the rows of the 15 standard tables that state a level, `?`
 cells and Ezrek Khan's separately-labelled table falling outside it. Applying
 the rule above to the eye's own affixes reproduces all 38 curved values on the
@@ -1405,13 +1411,31 @@ constants that fit every published NG level are
     NG+1 = 51 + (level - 1) x 29/49        NG+2 = 81 + (level - 1) x 18/49
 
 with NG+3 always 100 because 100 is the cap. The wiki publishes a NG level on
-**30 rows**, and the formula reproduces **30 of 30** — 12, 9 and 9 per rung. Two
-free parameters fitted to 23 of them, with the other 7 out of sample, is still a
-**hypothesis with predictions**, not a rule, and it is worth stating which
-predictions are untested. The wiki leaves 16 NG cells as `?`, has no table at
-all for 15 of its 31 pages, and has no page for 4 of the 35 eyes; those are
-where it would be falsified. The Eye of Tiamat at `LEVEL` 54 is the first — the
-formula sends it to 82 / 100 / 100.
+**30 rows** of eye tables, and the formula reproduces **30 of 30** — 12, 9 and 9
+per rung. Two free parameters fitted to 23 of them, with the other 7 out of
+sample, is still a **hypothesis with predictions**, not a rule, and it is worth
+stating which predictions are untested.
+
+**Two socketables then tested it from outside the family, and it passed.** Rift
+Ember states all three of its replay levels — 65, 90 and 100 against a Normal of
+25 — and Vyrax's Heartfire states its NG+1, 77 against a Normal of 45. The
+formula gives all four to the digit: **34 of 34** published NG levels, 30 of them
+on the family the fit was made on and 4 not. That is the evidence the eyes could
+never supply, because the wiki offers no second table to check them against, and
+it is what makes this the game's band map rather than an eye-shaped coincidence.
+
+The requirement column is confirmed by the same two pages, and it is a *second*
+rule rather than a consequence of the first: Rift Ember's 17 / 57 / 82 / 92 is
+`max(1, level - 8)` off the game's own `ITEM_LEVEL_REQUIREMENTS_SOCKETABLE`
+curve, every cell. Heartfire's 37 is the same rule, and its NG+1 cell is the one
+number in the two tables that does not hold — see below.
+
+The wiki leaves 16 NG cells as `?` on the eyes' tables, has no table at all for
+15 of its 31 pages, and has no page for 4 of the 35 eyes; those are where it
+would be falsified. Heartfire's page adds 4 more `?` cells — its NG+2 and NG+3
+rows — so those two are predictions now on the site: **97 / 89** and **100 /
+92**. The Eye of Tiamat at `LEVEL` 54 is the older one — the formula sends it to
+82 / 100 / 100.
 
 **Prion-Kuru is the live one, because its missing row is already on a page.** Its
 table stops at NG+1 and resumes at an unlabelled 100, so its NG+2 has to be
@@ -1421,23 +1445,49 @@ matching `+375` and `+94` to the digit — so the page is the one place a reader
 can already check three of the four rows against the files. The fourth is the
 prediction.
 
+**Heartfire's NG+1 requirement is the one published cell that is wrong, and the
+wiki is wrong in it.** It prints **79**; the curve gives **69**. Every other row
+of every other published table satisfies `level - req = 8`, Heartfire's own
+Normal row included (45 - 37), and 77 - 69 does while 77 - 79 does not. 79 is a
+transposition of 69, and the card ships 69.
+
 Nothing downstream needs it: the numbers on every row follow from the level, so
 the level is the whole of the transcription.
 
-### The eyes' table, as shipped
+### The NG table, as shipped
 
-All of the above is on the site. Each eye's card carries a table —
+All of the above is on the site. Each item that carries one has a table —
 `Item Lv | Req Item Lv to Socket | Armor / Trinket | Weapon | NG` — and its
 Normal row **is** the flat effect block it replaced, which is why a card shows
-one or the other and never both. The record gains `ng`: **124 rows over the 31
-eyes**, four apiece. `fx` and `fxs` are untouched, because the grid tile's
-teaser reads `fx[0]` — and a pre-change build differs on nothing else at all
-across the 6,173 items, which is the check that the feature did not disturb the
-record.
+one or the other and never both. The record gains `ng`: **144 rows over the 36
+items that have one**, four apiece — the 31 eyes, and the five socketables
+below. `fx` and `fxs` are untouched, because the grid tile's teaser reads
+`fx[0]` — and a pre-change build differs on nothing else at all across the 6,173
+items, which is the check that the feature did not disturb the record.
 
-**An eye has no Requirements block.** The table's first two columns are the
-level and the requirement *per row*, which is more than one chip can say, so the
-block below would only restate the Normal row. The two level columns are also
+**The five are named in the build, not detected.** Nothing in the files marks
+them apart from the tiered ladders. The candidate was the unnamed flag
+`0x2905B0EE`, and it is not a marker: it is present on 87 items across
+one-handed swords, belts, boots, rings and monster props. So `NG_SOCKETABLES` in
+`src/build.py` lists their ids — `Quest_ManaVent_Reward`, `tl2_dragon_heartfire`,
+`tl2_poggslammer`, `tl2_claptrapbolt`, `tl2_claptrapnut` — and the eye test is
+untouched beside it. Being in that set is the *whole* gate, which matters because
+**Claptrap's Bolt and Nut are `MAGIC SOCKETABLE`**, not `UNIQUE SOCKETABLE`, so a
+tier test cannot be part of it. Rift Ember's id is the quest **Reward** record;
+`Quest_ManaVent_Acquire` is a `QUESTITEM` of the same display name and correctly
+carries no table.
+
+**Kelton's Rock and Lito Inso's Lens are deliberately out.** Both derive cleanly
+and were checked — `tl2_keltonsrock` at level 50 gives 80 / 99 / 100, `tl2_lens`
+at level 1 gives 51 / 81 / 100 — so adding either later is one line in the same
+set. Four socketables filed under the eyes on the socketables page (the three
+Basilisk Eyes and One-Eyed Willy's Other Eye) have no table either: they are
+`MAGIC SOCKETABLE`, so the name test does not reach them, and that is a
+pre-existing inconsistency rather than one this change introduced.
+
+**An item with the table has no Requirements block.** The first two columns are
+the level and the requirement *per row*, which is more than one chip can say, so
+the block below would only restate the Normal row. The two level columns are also
 spelled out rather than abbreviated — they were `Lv` and `Req` while the block
 below named the requirement in full and the header could lean on it, and with
 the block gone the header is the only thing naming either one. That block is
@@ -1450,11 +1500,15 @@ one line each, `Req Item Lv to Socket` and `Armor / Trinket` want roughly 390px
 against the card's 366, and a table that makes the card scroll sideways is the
 one failure mode worth designing against here.
 
-The other 109 socketables that carry a slot split keep the flat block. The
-table's class names are new (`.ngt`, `.ngc`) rather than borrowed, precisely so
-that `.fxh` and `.aff` go on meaning the flat block on those 109 — the suite
-reads both, on Flame Ember and on the augmented weapons, so reusing either
-would have broken assertions about items that did not change.
+The other 103 socketables carry effects, split across slots, and no table, so
+they keep the flat block. The table's class names are new (`.ngt`, `.ngc`)
+rather than borrowed, precisely so that `.fxh` and `.aff` go on meaning the flat
+block on those — the suite reads both, on Flame Ember and on the augmented
+weapons, so reusing either would have broken assertions about items that did not
+change. The 175 socketables divide cleanly: **36 with a table, 103 with the flat
+block, and 36 with no effects at all** — the last being the eight families'
+`_BASE` files plus the 28 ranks of the four rare ones (blood, chaos, iron,
+void), which the socketables page renders as pooled `one of N` rows instead.
 
 **Three traps the derivation had to clear.**
 
@@ -1508,10 +1562,21 @@ hand-authored cap would read `MINLEVEL 54, MAXLEVEL 54`, not `0..999`. The
 paragraph above had already predicted Tiamat at 82 / 100 / 100, which is where
 the plan that contradicted it went wrong.
 
-What would matter is an eye that *cannot* be generated at NG+3's level of 100,
-and none is in that state. The build collects any eye whose `MAXLEVEL` is
-present and below 100 and fails naming the item, so the four-row assumption is
-checked rather than assumed.
+**`MAXLEVEL` does not bound this ladder, and Rift Ember is the proof.** Its
+`MAXLEVEL` is **75**, below NG+3's 100, and its page carries in-game screenshots
+of the same item at LV65 and LV90. So the field is the level band it *drops* at
+in Normal, not a ceiling on what it can be generated as in a later replay — which
+is also why the embers read `lv8 xl18` at Speck and `lv92 xl999` at Giant. The
+eyes could not show this: all 31 read the sentinel, so the guard that rejected a
+low `MAXLEVEL` had never once fired.
+
+The build's guard is therefore a **pinned list of one** instead of a blanket
+ban. It still collects every item whose `MAXLEVEL` is present and below 100, but
+asserts the collected list *equals* `['Quest_ManaVent_Reward (MAXLEVEL 75)']`.
+That is strictly stronger than the rule it replaced: it covers the 31 eyes as
+well, so an eye that grew a low ceiling now fails by joining a list of one rather
+than by being absent from it, and a sixth low-ceiling socketable cannot slip in
+unnoticed either.
 
 **Do not use `test/eyes_ladders.json` as a fixture.** It is a bad parse: it
 carries `1.4 Mana recovery per second` down all four of the Dark Alchemist's
@@ -1520,6 +1585,9 @@ the page has four `?` rows. The usable fixture is `test/eyes_wiki.json` — raw
 wikitext — read through the rowspan-aware `table_rows()` in `test/_aleera.py`.
 That pairing reproduces **96 of 96 published cells** across the 16 pages that
 carry a table, with exactly the one Dark Alchemist drift above and nothing else.
+Rift Ember's page is that same read taken on a socketable, and the derived table
+matches it cell for cell; Heartfire's differs in the single requirement cell
+above and nowhere else.
 
 ### Type facet, and the rail's taxonomy
 
@@ -1718,11 +1786,11 @@ like everywhere else** — `ml`–`xl`, stated in plain text below the requireme
 What a socketable *requires* arrives as `lr`, the same field every other item's
 requirement arrives in, and the card names it **"Required Item Level to Socket"**
 rather than "Player Level" — the socketing vocabulary, because a gem is not worn
-at a level. That is a choice about wording and not about the number. **The 31
-eyes are the exception in form, not in wording**: their card states the
-requirement as the table's second column, once per level, and carries no
-Requirements block at all (§the eyes' table). The `*_BASE` templates carry
-`998`, a sentinel rather than a band.
+at a level. That is a choice about wording and not about the number. **The 36
+items with an NG table are the exception in form, not in wording**: their card
+states the requirement as the table's second column, once per level, and carries
+no Requirements block at all (§7, *The NG table, as shipped*). The `*_BASE`
+templates carry `998`, a sentinel rather than a band.
 
 That requirement has no home in either table: **no socketable DAT carries
 `LEVEL_REQUIRED`**, and TIDBI's export has it for none of them. It is read from
@@ -1777,9 +1845,9 @@ above is still not a gate. The one thing the card no longer does is call that 7 
 player level. See `web/app.js`'s `requirements()`, which puts "Player Level" on a
 thing you wear and "Required Item Level to Socket" on a socketable, and
 `verify/check_page.js`, which asserts both — including that a socketable's card
-carries the first string nowhere. The 31 eyes then drop the block entirely and
-state the number in the table's `Req Item Lv to Socket` column instead; King
-Pogg's 7 is asserted there, as the Normal row's second cell.
+carries the first string nowhere. The 36 items with a table then drop the block
+entirely and state the number in the table's `Req Item Lv to Socket` column
+instead; King Pogg's 7 is asserted there, as the Normal row's second cell.
 
 **The wiki agrees and is the cross-check, not the source.** Its `Gems (T2)`
 `Required Level` column is the same rule applied by hand: all 26 eyes, every

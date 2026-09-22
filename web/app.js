@@ -882,13 +882,18 @@
     return group('Armor / Trinket', ep.a) + group('Weapon', ep.w);
   }
 
-  // ---- the eye's levels ----
-  // An eye is one item file that prints four statlines: its DAT carries the
-  // "generated at the level of whatever dropped it" sentinel, so Normal prints
-  // the file's own level and NG+1/2/3 print higher numbers. build.py derives
-  // all four (eye_values.py) and they arrive as `ng`, one array per row. This
-  // replaces the flat effect block for these items rather than joining it: the
-  // Normal row IS those lines, so showing both would print every effect twice.
+  // ---- the four levels ----
+  // One item file that prints four statlines: its DAT carries the "generated at
+  // the level of whatever dropped it" sentinel, so Normal prints the file's own
+  // level and NG+1/2/3 print higher numbers. build.py derives all four
+  // (eye_values.py) and they arrive as `ng`, one array per row. This replaces
+  // the flat effect block for these items rather than joining it: the Normal row
+  // IS those lines, so showing both would print every effect twice.
+  //
+  // The 31 eyes were the whole of it until 2026-09-22; five unique socketables
+  // joined them (Rift Ember, Vyrax's Heartfire, Pogg Slammer, Claptrap's Bolt
+  // and Nut), named in build.py's NG_SOCKETABLES because nothing in the files
+  // marks them apart.
   //
   // The columns are the two slots the flat block labelled as headings -- which
   // is why the table needs no heading of its own -- plus the level, its
@@ -902,12 +907,14 @@
   // phrase and no longer abbreviates. Req Item Lv to Socket is the game's own
   // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE, so it moves with the row.
   //
-  // Every one of the 31 eyes gets four rows -- Normal plus the three replays.
-  // The Eye of Tiamat's MAXLEVEL reads 999 where the other 30 read the
+  // Every one of the 36 gets four rows -- Normal plus the three replays. The
+  // Eye of Tiamat's MAXLEVEL reads 999 where the other 30 eyes read the
   // 9999999 sentinel, and that is *not* a ceiling: 999 is this corpus's other
   // spelling of the same sentinel and sits above every reachable level, so
   // Tiamat scales like the rest. It was given a single row once, on the
-  // opposite reading, and that was wrong.
+  // opposite reading, and that was wrong. Neither is a low MAXLEVEL a ceiling,
+  // which Rift Ember shows: its 75 is below NG+3's level of 100 and its page
+  // carries screenshots of the same item at LV65 and LV90.
   //
   // A cell can hold more than one line: one affix can grant four elemental
   // defenses, and they belong together in one cell rather than in four rows.
@@ -994,10 +1001,10 @@
     // SETS, but the two are different strings (a token against a display name)
     // and only the token is a key here.
     sec(ladder(o));
-    // An eye's level and its requirement are two columns of the table above, so
-    // a Requirements block would restate them -- and on an eye it is only ever
-    // the one chip, since no socketable carries stat requirements at all (0 of
-    // the 175). Every other item still gets its block.
+    // The level and the requirement are two columns of the table above, so a
+    // Requirements block would restate them -- and on one of these items it is
+    // only ever the one chip, since no socketable carries stat requirements at
+    // all (0 of the 175). Every other item still gets its block.
     sec(o.ng ? '' : requirements(o));
     sec(lvlRange(o));
 

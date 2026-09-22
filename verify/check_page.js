@@ -617,6 +617,63 @@ async function go(hash) {
      /Max Level\s*999(?!\d)/.test(poggt) && !/9999999/.test(poggt),
      poggt.slice(0, 240));
 
+  // ------------------------------------------------- the five non-eye tables
+  // The same four-row table on the socketables that are not eyes. Rift Ember is
+  // the one with an independent source: the wiki prints all four rows for it,
+  // and the derivation matches the wiki in BOTH columns on all four. That is
+  // what shows levels() is the game's band map rather than an eye-shaped
+  // coincidence -- the eyes could never prove it, since the wiki offers no
+  // second table to check them against.
+  //
+  // Rift Ember is also the case that settled the scope. Its MAXLEVEL is 75,
+  // below NG+3's level of 100, and the naive reading of that says the top row is
+  // unreachable; the wiki has in-game screenshots of it at LV65 and LV90. So
+  // MAXLEVEL is the Normal drop band, not a cross-replay ceiling.
+  const riftRows = async (id) => {
+    const t = await deep(`#item=${id}`);
+    return [].map.call(t.querySelectorAll('#detail .ngt tbody tr'),
+      tr => [].map.call(tr.querySelectorAll('td'), td => td.textContent));
+  };
+  const rift = await riftRows('Quest_ManaVent_Reward');
+  ok('Rift Ember carries the four-row NG table', rift.length === 4, `${rift.length} rows`);
+  ok('...at the levels and requirements the wiki prints for it',
+     rift.map(r => r[0]).join(',') === '25,65,90,100' &&
+     rift.map(r => r[1]).join(',') === '17,57,82,92',
+     rift.map(r => `${r[0]}/${r[1]}`).join(' '));
+  ok('...and its weapon column scales across the rows, which is what it is for',
+     rift.map(r => (r[3].match(/(\d+) Mana stolen/) || [])[1]).join(',') === '10,20,26,28',
+     rift.map(r => r[3]).join(' | '));
+  // Heartfire is the other shape: its two effects are proc chances, which do not
+  // scale, so its three later rows repeat the first in both columns. That is the
+  // correct answer and the same thing an eye's proc lines do -- and asserting
+  // the repetition is what separates "the effect does not scale" from "the
+  // derivation flattened it".
+  const vyrax = await riftRows('tl2_dragon_heartfire');
+  ok('Vyrax\'s Heartfire carries the table at its own levels',
+     vyrax.map(r => r[0]).join(',') === '45,77,97,100', vyrax.map(r => r[0]).join(','));
+  ok('...and its proc lines read the same on all four rows, as procs should',
+     vyrax.length === 4 && vyrax.every(r => r[2] === vyrax[0][2] && r[3] === vyrax[0][3]),
+     vyrax.map(r => r[3]).join(' | '));
+  for (const [id, name] of [['tl2_poggslammer', 'Pogg Slammer'],
+                            ['tl2_claptrapbolt', "Claptrap's Bolt"],
+                            ['tl2_claptrapnut', "Claptrap's Nut"]]) {
+    const r = await riftRows(id);
+    ok(`${name}: carries the NG table too`, r.length === 4, `${r.length} rows`);
+  }
+  // ...and the gate did not widen into "socketables have tables now". Each of
+  // these is a socketable the set does not include, for a different reason: a
+  // common ember (a tiered ladder), a skull (also tiered), and Kelton's Rock,
+  // which derives a table cleanly and is deferred by decision rather than by
+  // inability. The last one is the assertion that would catch a careless edit
+  // to NG_SOCKETABLES.
+  for (const [id, why] of [['tl2_flameember_rank1', 'a tiered ember'],
+                           ['tl2_skull002', 'a tiered skull'],
+                           ['tl2_keltonsrock', 'a deferred socketable']]) {
+    const t = await deep(`#item=${id}`);
+    ok(`${why} keeps its flat affix block and no NG table`,
+       t.querySelectorAll('#detail .ngt').length === 0);
+  }
+
   // A skull is where the curve and the wiki part company. The wiki's Gems (T2)
   // "Required Level" column follows the same rule on 43 of its 52 skull rows --
   // Vastok, Whorlbarb, X'n!troph and Zardon's Mighty among them, interleaved

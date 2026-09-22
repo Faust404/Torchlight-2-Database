@@ -427,6 +427,34 @@ DROP_ITEMS = ('polearm_vanq01',)
 # drop normally. Being unnamed is what a socketable looks like, not a defect.
 TL1_ITEMS = ('devil fish', 'unicorn fish', 'fish bones')
 
+# The one-off unique socketables that get the same four-row NG table as the 31
+# eyes. They are named here because nothing in the files marks them apart from
+# the tiered ladders: the eyes are recognisable by their display name, and these
+# five are not a family of any kind -- three are one-off quest and novelty
+# items, two are a pair. The unnamed flag 0x2905B0EE looked like a candidate
+# marker and is not one: it is set on 87 items spanning swords, rings, boots and
+# monster props, so it means something else entirely. The group is a judgement
+# about which socketables scale, so it is written down rather than inferred.
+#
+# The ids are the DAT basenames, which is also the site's `id`. Two details are
+# load-bearing. First, Rift Ember's id is the REWARD record -- Quest_ManaVent_
+# Acquire carries the same DISPLAYNAME and is a QUESTITEM, not a socketable, and
+# must stay out. Second, Claptrap's Bolt and Nut are MAGIC SOCKETABLE rather
+# than UNIQUE SOCKETABLE, so being in this set is the whole gate for them; the
+# eye half of the test below is separate and does not reach them.
+#
+# Lito Inso's Lens (tl2_lens) and Kelton's Rock (tl2_keltonsrock) are
+# deliberately NOT here: deferred, not excluded. Both derive a table cleanly --
+# the Lens at lv 1 gives 51/81/100, Kelton's Rock at lv 50 gives 80/99/100 -- so
+# adding either is one line. See REFERENCE.md section 7.
+NG_SOCKETABLES = frozenset((
+    'Quest_ManaVent_Reward',   # Rift Ember
+    'tl2_dragon_heartfire',    # Vyrax's Heartfire
+    'tl2_poggslammer',         # Pogg Slammer
+    'tl2_claptrapbolt',        # Claptrap's Bolt
+    'tl2_claptrapnut',         # Claptrap's Nut
+))
+
 # Tiers the browser does not render. "Unclassified" is what the pipeline calls
 # an item TIDBI has no row for -- it means "no tier could be established", not
 # that a tier of that name exists, and the set is overwhelmingly dev, test and
@@ -1318,7 +1346,7 @@ def build():
     # stay in the icon-donor pool above but are not items.
     out, skipped_stat, templates, dropped, tl1 = [], 0, [], [], []
     slot_status = collections.defaultdict(list)
-    eye_rows, eye_notes, eye_topped = 0, [], []   # see the eye table below
+    ng_rows, ng_notes, ng_capped = 0, [], []      # see the NG table below
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
@@ -1592,39 +1620,41 @@ def build():
         if pool and lvl in ember_values.RANK_LEVELS:
             i = ember_values.RANK_LEVELS.index(lvl)
             o['ep'] = {'a': pool['a'][i], 'w': pool['w'][i]}
-        # THE EYES. An eye is one item file that prints four statlines: its DAT
+        # THE NG TABLES. These items print four statlines from one file: the DAT
         # carries the MAXLEVEL 9999999 sentinel, "generated at the level of
         # whatever dropped it", so Normal prints the file's own LEVEL and
         # NG+1/2/3 print higher values. TIDBI carries only the Normal row, so
-        # the card showed one of the four -- and the eyes' whole point is that
-        # they scale. The table is derived in eye_values.py; this is the hook.
+        # the card showed one of the four -- and the whole point of these items
+        # is that they scale. The table is derived in eye_values.py; this is the
+        # hook, and NG_SOCKETABLES above supplies the other half of the scope.
         #
-        # The scope test is TWO conditions. 33 items are named "The Eye of ..."
-        # and only 31 are socketables -- The Eye of Envy and The Eye of Jade are
-        # UNIQUE NECKLACE with no LEVEL-driven ladder at all, so the name alone
-        # sweeps in two items with no levels to print.
+        # The eye half of the test is TWO conditions. 33 items are named "The
+        # Eye of ..." and only 31 are socketables -- The Eye of Envy and The Eye
+        # of Jade are UNIQUE NECKLACE with no LEVEL-driven ladder at all, so the
+        # name alone sweeps in two items with no levels to print. The named-set
+        # half is tested on its own rather than folded into the UNITTYPE test,
+        # because two of the five are MAGIC SOCKETABLE.
         #
         # MAXLEVEL is read here rather than from `o['xl']` because this is the
         # last point at which it is still itself: line 1350 has already
-        # collapsed every sentinel to 999 in the record. The four-row table
-        # rests on the item being generatable above level 100 -- which every
-        # eye is, including The Eye of Tiamat, whose MAXLEVEL is 999 rather
-        # than 9999999. That is the corpus's other spelling of "no ceiling"
-        # (see MAX_LEVEL_CEILING, and its MINLEVEL is 0, so its band is the
-        # permissive one either way), so it scales like the other 30. The
-        # assertion in the battery below keeps that true for eyes not yet
-        # shipped rather than assuming it here.
-        if (rec.get('UNITTYPE') or '').strip().upper() == 'UNIQUE SOCKETABLE' \
-                and disp.startswith('The Eye of'):
+        # collapsed every sentinel to 999 in the record. It is recorded, not
+        # enforced: Rift Ember's 75 sits BELOW NG+3's level of 100 and still
+        # gets all four rows, because MAXLEVEL is the Normal drop band rather
+        # than a cross-replay ceiling -- the wiki settles that with in-game
+        # screenshots of Rift Ember at LV65 and LV90. The battery below pins
+        # which items are in that state instead of refusing them a table here.
+        if o['id'] in NG_SOCKETABLES or (
+                (rec.get('UNITTYPE') or '').strip().upper() == 'UNIQUE SOCKETABLE'
+                and disp.startswith('The Eye of')):
             _ng, _notes = eye_values.rows(rec['_path'], o.get('fx', []),
                                           o.get('fxs', []), lvl,
                                           graph_points, socket_level_curve())
             o['ng'] = _ng
-            eye_rows += len(_ng)
-            eye_notes.extend((o['id'],) + tuple(n) for n in _notes)
+            ng_rows += len(_ng)
+            ng_notes.extend((o['id'],) + tuple(n) for n in _notes)
             _xl = _num(rec.get('MAXLEVEL'))
             if _xl is not None and _xl < eye_values.NG_CAP:
-                eye_topped.append('%s (MAXLEVEL %g)' % (o['id'], _xl))
+                ng_capped.append('%s (MAXLEVEL %g)' % (o['id'], _xl))
         if it['icon']:
             o['ic'] = it['icon']
             if it.get('inherited'):
@@ -1809,51 +1839,52 @@ def build():
     assert not _nolr, 'socketables lost the requirement curve: %d without lr, e.g. %s' \
         % (len(_nolr), _nolr[:5])
 
-    # THE EYE TABLES, asserted the way the ember pools are not: `ng` is a
+    # THE NG TABLES, asserted the way the ember pools are not: `ng` is a
     # derivation, and a derivation that quietly stops deriving looks exactly
     # like an item that never had one. The scope test is restated against the
     # output rather than trusted from the hook above, so an item that enters
     # the corpus under a different UNITTYPE fails here instead of shipping a
     # card with no levels on it.
-    _ng_eyes = [o for o in out if 'ng' in o]
+    _ng_items = [o for o in out if 'ng' in o]
     _want = {o['id'] for o in out if o.get('ut') == 'UNIQUE SOCKETABLE'
-             and o['n'].startswith('The Eye of')}
-    _got = {o['id'] for o in _ng_eyes}
+             and o['n'].startswith('The Eye of')} | set(NG_SOCKETABLES)
+    _got = {o['id'] for o in _ng_items}
     assert _got == _want, \
-        'the eye-table set drifted: %d missing (%s), %d extra (%s)' \
+        'the NG-table set drifted: %d missing (%s), %d extra (%s)' \
         % (len(_want - _got), sorted(_want - _got)[:3],
            len(_got - _want), sorted(_got - _want)[:3])
-    # Every eye gets four rows, and that rests on one fact: the item can be
-    # generated at NG+3's level of 100. MAXLEVEL is the ceiling that says so,
-    # and an eye whose ceiling were below 100 would print its top row at a
-    # level the game cannot reach -- silently, since the formula would happily
-    # produce it. No eye is in that state (Tiamat's 999 is the corpus's other
-    # spelling of "no ceiling", and it is above 100 besides), so this is a
-    # guard for eyes not yet shipped rather than a live exception, and it names
-    # the item instead of merely failing the row count below.
-    assert not eye_topped, \
-        'eye(s) cannot reach NG +3: %s' % eye_topped
-    assert eye_rows == 124, \
-        'the eye tables hold %d rows, not 124 (31 eyes x 4)' % eye_rows
+    # Every item in the set gets four rows, and that rests on one fact: it can
+    # be generated at NG+3's level of 100. The naive version of that check --
+    # MAXLEVEL must be at least 100 -- is wrong for socketables, and Rift Ember
+    # is the proof: its MAXLEVEL is 75 and the wiki shows it in game at LV65
+    # and LV90. MAXLEVEL is the Normal drop band, not a cross-replay ceiling, so
+    # a low one is not evidence the top row is unreachable. What the check is
+    # actually for is noticing when the set changes, so it pins the exact list
+    # instead of demanding it be empty -- the same treatment the fx drift below
+    # gets, and for the same reason. Today the list is one item by decision.
+    assert ng_capped == ['Quest_ManaVent_Reward (MAXLEVEL 75)'], \
+        'the below-100 MAXLEVEL set moved: %s' % ng_capped
+    assert ng_rows == 144, \
+        'the NG tables hold %d rows, not 144 (31 eyes + 5 socketables, x 4)' % ng_rows
     # Every row's requirement is the same ITEM_LEVEL_REQUIREMENTS_SOCKETABLE
     # value the build already wrote to `lr`, indexed at the same level -- so a
-    # free check that does not need the wiki, and one that holds on all 31 today
-    # (Mordrox 7->1, Winter Widow 11->3, Tiamat 54->46). Any disagreement is the
-    # new ladder being wrong, not the old field.
-    _req_bad = [(o['id'], o['ng'][0][1], o['lr']) for o in _ng_eyes
+    # free check that does not need the wiki, and one that holds on all 36 today
+    # (Mordrox 7->1, Winter Widow 11->3, Tiamat 54->46, Rift Ember 17->17). Any
+    # disagreement is the new ladder being wrong, not the old field.
+    _req_bad = [(o['id'], o['ng'][0][1], o['lr']) for o in _ng_items
                 if o['ng'][0][1] != o.get('lr')]
-    assert not _req_bad, 'the eye tables disagree with lr: %s' % _req_bad[:3]
-    # Shape and monotonicity over every row of every eye. NG+3 is the published
+    assert not _req_bad, 'the NG tables disagree with lr: %s' % _req_bad[:3]
+    # Shape and monotonicity over every row of every item. NG+3 is the published
     # cap of 100 for all of them, which is a property of the band formula and
     # not of any item -- so a table whose last row is not 100 means levels()
     # moved, not that an item changed.
-    for o in _ng_eyes:
+    for o in _ng_items:
         assert all(len(r) == 5 for r in o['ng']), \
             '%s: a row is not five cells' % o['id']
         assert not [r for r in o['ng'] if r[1] == eye_values.UNKNOWN], \
             '%s: the requirement curve did not reach a row level' % o['id']
         assert [int(r[0]) for r in o['ng']] == sorted(int(r[0]) for r in o['ng']), \
-            '%s: the eye levels are not in order: %s' % (o['id'], [r[0] for r in o['ng']])
+            '%s: the NG levels are not in order: %s' % (o['id'], [r[0] for r in o['ng']])
         assert len(o['ng']) == 4, \
             '%s has %d rows, not four' % (o['id'], len(o['ng']))
         assert o['ng'][0][0] == o.get('lv'), \
@@ -1871,17 +1902,17 @@ def build():
     # files-beat-TIDBI family rather than a defect in the derivation. Anything
     # else appearing here means the pairing or a curve moved.
     _drift = sorted('%s %s -> %s (was %s)' % (i, ln, now, was)
-                    for i, kind, ln, was, now in eye_notes if kind == 'value')
+                    for i, kind, ln, was, now in ng_notes if kind == 'value')
     assert _drift == ['tl2_eyeofdarkalchemist 2 Mana recovery per second '
                       '-> 1.4 (was 2)'], 'the fx/value drift moved: %s' % _drift
     # A side whose effects and lines disagree in length is printed exactly as
     # TIDBI has it, with nothing substituted -- the safe answer, but one that
     # would silently empty a column, so it is asserted rather than tallied.
-    _unpaired = sorted('%s %s' % (i, side) for i, kind, side, _, _ in eye_notes
+    _unpaired = sorted('%s %s' % (i, side) for i, kind, side, _, _ in ng_notes
                        if kind == 'unpaired')
-    assert not _unpaired, 'eye effects and lines did not pair: %s' % _unpaired
-    print('  EYE TABLE: %d eyes, %d rows, 1 cell of TIDBI drift'
-          % (len(_ng_eyes), eye_rows))
+    assert not _unpaired, 'effects and lines did not pair: %s' % _unpaired
+    print('  NG TABLE: %d eyes + %d socketables, %d rows, 1 cell of TIDBI drift'
+          % (len(_ng_items) - len(NG_SOCKETABLES), len(NG_SOCKETABLES), ng_rows))
 
     out.sort(key=lambda o: (o['n'].lower(), o['id']))
     print('  %d base templates excluded (nameless or base_*)' % len(templates))

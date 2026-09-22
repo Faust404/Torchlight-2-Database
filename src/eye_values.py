@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
-"""The four-level table on an eye's card, derived from the files.
+"""The four-level NG table on a scaling socketable's card, derived from the files.
 
-An eye socketable is one item file that prints four statlines. Its DAT carries
-MAXLEVEL 9999999 -- the sentinel for "generated at the level of whatever
-dropped it" -- so in Normal it prints its own LEVEL and in NG+1/2/3 it prints
-higher values. The tables carry only the Normal row, so the card showed one of
-the four levels the item actually has. This module derives the other three.
+A scaling socketable is one item file that prints four statlines. Its DAT
+carries MAXLEVEL 9999999 -- the sentinel for "generated at the level of
+whatever dropped it" -- so in Normal it prints its own LEVEL and in NG+1/2/3 it
+prints higher values. The tables carry only the Normal row, so the card showed
+one of the four levels the item actually has. This module derives the other
+three.
+
+The 31 eyes were the whole of this until 2026-09-22, when five one-off unique
+socketables joined them: Rift Ember, Vyrax's Heartfire, Pogg Slammer and
+Claptrap's Bolt and Nut. Nothing here is eye-specific -- the derivation is
+driven by the item's AFFIXES and its LEVEL, and it ran on those five unchanged
+-- so the module keeps its name while its scope has widened. Which items
+qualify is decided in `build.py` (see NG_SOCKETABLES), not here.
 
 **The values are in the files.** An affix's effect value is a *percentage* of a
 per-stat by-level graph in MEDIA/GRAPHS/STATS, and the printed number is
@@ -22,8 +30,24 @@ the files do carry is the *bands*: REPLAY_GAME_OFFSET.DAT is 0, 51, 81, 100,
 the Normal level sits in its band by a straight line. That fit reproduces 30 of
 30 published NG levels. It is a *hypothesis*, not a rule read from a file --
 two free parameters, 23 of the 30 fitted and 7 out of sample -- and `levels()`
-below is the only place it lives. NG+3 is the cap at 100 for every eye, which
-is why every eye's last row is the same level.
+below is the only place it lives. NG+3 is the cap at 100 for every item, which
+is why every one's last row is the same level.
+
+**Rift Ember is the hypothesis's real test, and it passes.** The fit was made
+on eyes; Rift Ember is a socketable it never saw, and the wiki prints all four
+of its rows -- 25/17, 65/57, 90/82, 100/92. `levels()` with the requirement
+curve reproduces every cell of both columns. That is the evidence the eyes
+could never supply, since the wiki offers no second table to check them
+against, and it is what makes this the game's band map rather than an
+eye-shaped coincidence.
+
+Rift Ember is also the case that shows MAXLEVEL does not bound this ladder. Its
+MAXLEVEL is 75 -- below NG+3's level of 100 -- and the wiki carries in-game
+screenshots of it at LV65 and LV90, so MAXLEVEL is the Normal drop band, not a
+cross-replay ceiling. Its neighbour Heartfire agrees wherever the wiki can be
+read, with one correction: the wiki's NG+1 requirement reads 79, the curve says
+69, and 69 is right, because lv - req = 8 holds on every other row of every
+other table while 77 - 79 does not.
 
 Two traps this module exists to make explicit:
 
