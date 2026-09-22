@@ -42,7 +42,10 @@ TL2_SRC = os.path.join(SRC, 'tl2')
 # index.tsv is the game's own archive index and the tables began as TIDBI's
 # export, but TIDBI is a cross-check now -- REFERENCE.md section 5 records its
 # provenance, and nothing in the build needs to know it.
-PAK_INDEX = os.path.join(DATA, 'index.tsv')   # 70,437 validated PAK paths
+PAK_INDEX = os.path.join(DATA, 'index.tsv')   # 70,443 validated PAK paths
+# Regenerate with `python src/tl2/parse_man.py --dump data/index.tsv` whenever
+# the game updates: the offsets are absolute, so a repack invalidates every one
+# of them at once and the symptom is a zlib "incorrect header check" on reads.
 CSV_DIR = os.path.join(DATA, 'csv')           # the item tables the build reads
 ICON_DIR = os.path.join(DATA, 'icons')        # the 1,053-file sprite source
 
