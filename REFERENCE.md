@@ -945,7 +945,7 @@ verify\            check_page.js and check_socketables.js — the two suites
 test\              local scratch, gitignored: research, fixtures, third-party
 out\               generated
   index.html  7.30 MB, self-contained — open it straight off disk
-  socketables.html  213 KB, the socketables table — also opens straight off disk
+  socketables.html  209 KB, the socketables table — also opens straight off disk
   items.json  2.31 MB, 6,173 items
   items.csv   flat table for Excel/pandas
   sets.json   the 80 set bonus ladders, shared by the 556 set pieces
@@ -1912,7 +1912,7 @@ more, so the URL normalises to `type=…` on the first checkbox touch.
 
 ### The socketables page
 
-`out\socketables.html` — 213 KB, built by `src\socket_page.py`, served at
+`out\socketables.html` — 209 KB, built by `src\socket_page.py`, served at
 `/socketables`, linked from the toolbar's right end. It is a **second document
 and not a route in the app**, because it is a different shape of answer: the
 site shows everything as a card, and a card is the wrong instrument for a
@@ -1931,20 +1931,26 @@ the six Lucky Coins and the six Lucky Dice).
 That split is **re-derived from the game files rather than copied from the
 card**. `slots.py` reads it out of each item's ordered `AFFIXES` list and each
 affix's own applicability list (§7, "Every socketable's slot split"), which is
-stricter than it sounds: it independently confirms TIDBI on 121 of the 162 rows.
-On the other 41 it does not, and the page says so instead of quietly repairing
-it:
+stricter than it sounds: it independently confirms TIDBI on **121 of the 162
+rows**, and the page states that number in its footer. The other 41 break down
+as 3 rows where TIDBI merged two blocks and the boundary *inside* it had to be
+inferred, 3 where TIDBI prints a heading the files contradict (the files are
+shown), 28 pooled embers with no affix list to split at all, and 7 where the
+files could not decide so TIDBI's headings stand as they are. The corpus's
+fourth conflict, `Quest_ManaVent_Acquire`, is not among them: it is a Quest Item
+rather than a Socketable, which is why this page counts 3 where the build's own
+`SLOT` line counts 4.
 
-| mark | rows | meaning |
-|---|---|---|
-| `heading lost` | 3 | TIDBI merged two blocks, so the boundary *inside* it was inferred |
-| `sources differ` | 3 | TIDBI printed a heading the files contradict |
-| `rolled` | 28 | the rare embers — the effect is a roll, and there is no affix list to split |
-| *(no mark)* | 7 | the files could not decide, so TIDBI's headings stand as they are |
-
-The corpus's fourth conflict, `Quest_ManaVent_Acquire`, is not among them: it is
-a Quest Item rather than a Socketable, which is why this page counts 3 where the
-build's own `SLOT` line counts 4.
+**Rows carry no provenance badge.** An earlier build put `heading lost`,
+`sources differ` and `rolled` chips against the item name — they sat in the one
+column a reader scans, and the six rows they qualified are a fact about how the
+split was derived rather than anything about the socketable, so they were
+removed on request. Nothing is now unchecked: `build.py` pins the whole status
+distribution (`dict(st['splits']) == {'files': 121, 'none': 28, 'text': 7,
+'split': 3, 'conflict': 3}`), the footer states the 121 in prose, and the 28
+pooled rows are still visibly distinct because they carry the disclosure. The
+`either` tag is *not* a badge and stayed: it says a line is the same bonus in
+both columns rather than a second one, which is what reading the row needs.
 
 **Six items never reach the table, out of 175.** Five are
 `TL2_PARTS_WEAPON1-5`, a Transmuter recipe input rather than a family a player
@@ -1984,13 +1990,15 @@ since inlining the sprite here the way the main page does is the one change that
 would blow the page up 20×, and the cap is what says so rather than a slow page
 nobody traces.
 
-The entry point sits at the **right end of the toolbar**, and the bar specifically
-because it is the one piece of chrome no breakpoint hides: below 769px the rail
-goes off-canvas behind `#railbtn` and `.brand` goes with it, so a link up there
-would be unreachable without opening the drawer first. It is an `<a>`, not a
-`<button>`, because it navigates — a button would lose the middle-click and
-open-in-new-tab a reader expects of a link out. **It is the page's only outbound
-link**; before it, `reset` was the only `<a>` on the site.
+The entry point is a **Socketables Table** link in the toolbar, sitting with the
+set controls (right after the set `<select>`, before the spacer that pushes the
+sort group to the right). It is in the bar at all because that is the one piece
+of chrome no breakpoint hides: below 769px the rail goes off-canvas behind
+`#railbtn` and `.brand` goes with it, so a link up there would be unreachable
+without opening the drawer first. It is an `<a>`, not a `<button>`, because it
+navigates — a button would lose the middle-click and open-in-new-tab a reader
+expects of a link out. **It is the page's only outbound link**; before it,
+`reset` was the only `<a>` on the site.
 
 Note that the public URL is `/socketables` and not `/socketables.html`:
 `wrangler.jsonc` sets no `html_handling`, so Cloudflare's default
@@ -2128,17 +2136,17 @@ build a fresh JSDOM over the whole built page, so the suite holds several
 gigabytes of live DOMs and node's default old-space runs out partway through,
 with no summary line. 5,120 MB completes; 4,096 MB does not.
 
-`verify\check_socketables.js` is the second page's suite — 59 assertions, and it
-needs **no heap flag**, because that page is 213 KB and references the icon sheet
+`verify\check_socketables.js` is the second page's suite — 62 assertions, and it
+needs **no heap flag**, because that page is 209 KB and references the icon sheet
 rather than carrying it, so a DOM over it is tens of megabytes instead of
 hundreds. It builds exactly one JSDOM over the main page, for the outbound links,
 and never rebuilds it. What it asserts is the shape of the table (162 rows,
-5 sections at 57/52/35/12/6, 8 cells, the seven named columns), the marks and
-that they sit on the right rows (the two skulls and the reward ember; the three
-eyes; the four rare families × seven ranks), the pool disclosures (56, all closed
-on load, each wired to its own list and nothing else), the sort and filter
-(family-major order and its reverse, the quality pills, that search reads effect
-text and not just names), and the links back into the main page.
+5 sections at 57/52/35/12/6, 8 cells, the seven named columns), that no
+provenance badge survives in any row and the badge vocabulary is gone from the
+document, the pool disclosures (56, all closed on load, each wired to its own
+list and nothing else), the sort and filter (family-major order and its reverse,
+the quality pills, that search reads effect text and not just names), and the
+links back into the main page.
 
 Its load-bearing assertion is the one the whole page rests on: **for all 162
 rows, the two columns are the item's effects partitioned by slot** — every line

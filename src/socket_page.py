@@ -23,8 +23,9 @@ each item's ordered AFFIXES list, and each affix's own applicability list --
 rather than out of TIDBI's tooltip headings. That is stricter than it sounds: it
 independently confirms TIDBI on 121 of the 162 rows, and on six it does not --
 three where TIDBI lost a heading and the line boundary inside a merged block had
-to be inferred, three where TIDBI printed a heading the files contradict. The
-page marks those rather than quietly fixing them.
+to be inferred, three where TIDBI printed a heading the files contradict. On
+those six the files are shown and the footer says so; the rows themselves carry
+no badge, which is a deliberate change (see row()).
 
 This module began as test/socketables_mockup/build_mockup.py, a design study.
 It is a study no longer -- build.py calls write() from main(). The study is left
@@ -222,21 +223,18 @@ def icon(r):
 
 
 def row(r):
-    marks = []
-    if r['status'] == 'split':
-        marks.append('<span class="mark ok" title="TIDBI lost the heading that '
-                     'separates these two effects, so its lines run together. '
-                     'The game files say where the break is.">heading lost'
-                     '</span>')
-    elif r['status'] == 'conflict':
-        marks.append('<span class="mark warn" title="TIDBI prints a heading the '
-                     'game files contradict. The files are shown, but a wrong '
-                     'heading is not something the files can prove wrong, so '
-                     'this row is flagged rather than fixed.">sources differ'
-                     '</span>')
-    if r['pa'] or r['pw']:
-        marks.append('<span class="mark roll" title="Its bonus is rolled from a '
-                     'pool when it drops, not fixed.">rolled</span>')
+    # No provenance badges in the name cell. There were three -- `heading lost`
+    # and `sources differ` on the six rows where slots.py and TIDBI disagree, and
+    # `rolled` on the 28 pooled embers -- and they are gone on request: they sat
+    # against the name, which is the one column a reader scans, and the six rows
+    # they qualified are a fact about how the split was derived rather than
+    # anything about the socketable. The derivation is still strict and the
+    # disagreements are still counted; the footer states them and build.py's
+    # counter pins the distribution, so nothing here is now unchecked.
+    #
+    # The `either` tag stays: it is not provenance. It says a line is the same
+    # bonus in both columns rather than a second one, which is what the reader
+    # needs to read the row at all.
     search = ' '.join([r['name']] + r['armor'] + r['weapon']
                       + r['pa'] + r['pw'] + [r['desc']]).lower()
     # data-fam is the family and tier collapsed into one sortable number, so the
@@ -251,7 +249,7 @@ def row(r):
         ' data-fx="%s">'
         '<td class="c-ic">%s</td>'
         '<td class="c-n"><a class="nm" href="index.html#item=%s"'
-        ' target="_blank" rel="noopener">%s</a>%s</td>'
+        ' target="_blank" rel="noopener">%s</a></td>'
         '<td class="c-lv num">%s</td><td class="c-lr num">%s</td>'
         '<td class="c-a">%s</td><td class="c-w">%s</td>'
         '<td class="c-ml num">%s</td><td class="c-xl num">%s</td></tr>' % (
@@ -259,7 +257,6 @@ def row(r):
             r['ml'] or 0, r['xl'] or 0, fam * 1000 + tier,
             html.escape(r['name'].lower()), html.escape(search),
             icon(r), html.escape(r['id'], quote=True), html.escape(r['name']),
-            ''.join(marks),
             dash(r['lv']), dash(r['lr']),
             cell(r['armor'], r['pa'], r['shared'], r['id'] + '-a'),
             cell(r['weapon'], r['pw'], r['shared'], r['id'] + '-w'),
@@ -443,12 +440,6 @@ tbody td{padding:6px 10px; vertical-align:top}
 tr.q-rare .nm{color:var(--t-rare)}
 tr.q-unique .nm{color:var(--t-unique)}
 tr.q-normal .nm{color:var(--t-normal)}
-.mark{display:inline-block; margin:4px 4px 0 0; padding:1px 5px;
-  border:1px solid var(--div); border-radius:2px; font-size:9px;
-  letter-spacing:.07em; text-transform:uppercase; color:var(--label)}
-.mark.roll{color:var(--gold); border-color:rgba(227,186,107,.35)}
-.mark.warn{color:#e0a06a; border-color:rgba(224,160,106,.4)}
-
 .fx{margin:0 0 3px; font-family:var(--doc); font-size:13px; color:var(--val)}
 .fx:last-child{margin-bottom:0}
 .fx.loose{color:var(--dim)}
@@ -664,29 +655,27 @@ __CSS__</style>
   99999, 999999, 9999999) for the same idea, so 256 items were collapsed to the
   999 the rest of them already use. <code>MINLEVEL</code> sentinels are left
   alone.</p>
-  <p><b>rolled</b> marks the __POOLED__ rare embers (Blood, Chaos, Iron, Void).
-  Their item files declare an empty affix list, so what one grants is not fixed:
-  the game rolls one effect from the armor pool and one from the weapon pool
-  when it drops. Each cell lists the whole pool it rolls from, behind its own
-  disclosure.</p>
+  <p>__POOLED__ rows carry a <b>one of N</b> button instead of an effect. Those
+  are the rare embers &mdash; Blood, Chaos, Iron and Void &mdash; whose item
+  files declare an empty affix list: what one grants is not fixed, because the
+  game rolls one effect from the armor pool and one from the weapon pool when it
+  drops. The button opens the whole pool it rolls from.</p>
   <p><b>either</b> marks the __EITHER__ socketables whose bonus applies in
   whichever slot it goes &mdash; the six Lucky Coins and the six Lucky Dice.
   Their affixes declare both armor and weapon in the game files, so the line
   appears in both columns rather than being assigned to one. The three
   Torchlight 1 fish scales were the other three until they left the database;
   the corpus still holds their affixes, which is why the files count 15.</p>
-  <p><b>heading lost</b> and <b>sources differ</b> together mark __MARKED__ rows
-  where the two sources for this split disagree. TIDBI's 2014 export carries the
-  split as <code>Weapon:</code> / <code>Armor/Trinket:</code> lines, and the game
-  files carry it as an ordered affix list where each affix declares its own
-  slots. They agree on __AGREE__ of the __ROWS__. Where a heading is simply
-  missing, TIDBI's lines run into the block above and are reassigned from the
-  files &mdash; Skull of Quato is the clearest case, its four <code>+64
-  &lt;element&gt; Armor</code> lines sitting under a Weapon heading when the
-  wiki also files them under Armor/Trinket. Where TIDBI prints a heading the
-  files contradict, the row is flagged instead of silently corrected: a missing
-  heading is provably a gap, but a wrong one is not something the files alone
-  can settle.</p>
+  <p>This split is not printed in either source, so it is worked out and then
+  checked. TIDBI's 2014 export carries it as <code>Weapon:</code> /
+  <code>Armor/Trinket:</code> headings; the game files carry it as an ordered
+  affix list where each affix declares its own slots, which is what this page
+  reads. The two agree on <b>__AGREE__ of the __ROWS__ rows</b>. On the other
+  __MARKED__, the files are shown and TIDBI is not followed, because a missing
+  heading is provably a gap while a wrong one is not something the files alone
+  can settle. Skull of Quato is the clearest case: its four <code>+64
+  &lt;element&gt; Armor</code> lines sit under a Weapon heading in TIDBI, and
+  the wiki files them under Armor/Trinket too.</p>
   <p>Five socketables are deliberately <b>not</b> on this page: Unusual, Magic,
   Enchanted, Marvelous and Runic Component. They are the Transmuter's recipe
   inputs &mdash; handed out by

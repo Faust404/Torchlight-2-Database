@@ -40,7 +40,7 @@ That is the only dependency. `--no-app` stops after the data and skips both page
 | File | What it is |
 |---|---|
 | `out/index.html` | the whole site, 7.30 MB, self-contained — open it straight off disk |
-| `out/socketables.html` | the socketables table, 213 KB — linked from the toolbar |
+| `out/socketables.html` | the socketables table, 209 KB — linked from the toolbar |
 | `out/items.json` | 6,173 items, 2.32 MB |
 | `out/items.csv` | the same rows as a flat table, for Excel or pandas |
 | `out/sets.json` | the 80 set bonus ladders |

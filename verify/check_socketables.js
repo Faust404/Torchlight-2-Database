@@ -178,32 +178,57 @@ async function type(el, v) { el.value = v; el.dispatchEvent(new w.Event('input')
   ok('24 either tags -- two columns each',
      d.querySelectorAll('.tag').length === 24, `${d.querySelectorAll('.tag').length}`);
 
-  // ----------------------------------------------------------- the marks
-  // The page's honesty claim, printed in words in its footer: the files decided
-  // the split on 121 of the 162 rows. Where they did not, the row says so rather
-  // than being quietly repaired.
-  const marked = id => rows().filter(tr => idOf(tr) === id).map(marksIn)[0] || [];
-  const splitIds = rows().filter(tr => marksIn(tr).indexOf('heading lost') >= 0).map(idOf).sort();
-  const conflictIds = rows().filter(tr => marksIn(tr).indexOf('sources differ') >= 0).map(idOf).sort();
-  const rolledIds = rows().filter(tr => marksIn(tr).indexOf('rolled') >= 0);
-  ok('3 rows say a heading was lost', splitIds.length === 3, `${splitIds.length}`);
-  ok('they are the two skulls and the reward ember',
-     splitIds.join(',') === 'Quest_ManaVent_Reward,tl2_skull014,tl2_skull033',
-     splitIds.join(','));
-  ok('3 rows say the sources differ', conflictIds.length === 3, `${conflictIds.length}`);
-  ok('they are the three eyes',
-     conflictIds.join(',') === 'tl2_eyeofgallo,tl2_eyeofkingpogg,tl2_eyeofmordrox',
-     conflictIds.join(','));
-  // The corpus has a fourth conflict -- Quest_ManaVent_Acquire -- which is a
-  // Quest Item rather than a Socketable, so it is not on this page. That is why
-  // this count is 3 where the build's SLOT line reports 4.
-  ok('28 rows are a roll from a pool', rolledIds.length === 28, `${rolledIds.length}`);
+  // ------------------------------------------------- no provenance badges
+  // The name cell carries the name and nothing else. It used to carry up to two
+  // of `heading lost`, `sources differ` and `rolled`, and they were removed on
+  // request: they sat against the one column a reader scans, and the six rows
+  // they qualified are a fact about how the split was derived rather than
+  // anything about the socketable. The facts themselves are unchanged and still
+  // pinned -- the build asserts the whole status distribution, and the assertions
+  // below reach the same populations through what the table still shows.
+  ok('no provenance badge is left in any row',
+     d.querySelectorAll('.mark').length === 0, `${d.querySelectorAll('.mark').length} found`);
+  ok('the name cell holds only the name',
+     rows().every(tr => tr.children[1].children.length === 1 &&
+                        tr.children[1].firstElementChild.className === 'nm'),
+     rows().find(tr => tr.children[1].children.length !== 1) ?
+       idOf(rows().find(tr => tr.children[1].children.length !== 1)) : '');
+  ok('and its text is exactly the item\'s name',
+     rows().every(tr => {
+       const it = byId.get(idOf(tr));
+       return it && tr.children[1].textContent === it.n;
+     }));
+  // The three badge words are gone from the document, not just from the rows --
+  // the footer explained them, and a paragraph about a badge nobody can see is
+  // worse than no paragraph.
+  ok('the badge vocabulary is gone from the page',
+     ['heading lost', 'sources differ', '>rolled<'].every(s => html.indexOf(s) < 0),
+     ['heading lost', 'sources differ', '>rolled<'].filter(s => html.indexOf(s) >= 0).join(', '));
+  // The either tag is NOT a badge and stays: it says a line is the same bonus in
+  // both columns rather than a second one, which is what reading the row needs.
+  ok('the either tag survives', d.querySelectorAll('.tag').length === 24,
+     `${d.querySelectorAll('.tag').length}`);
+
+  // What the badges used to identify is still on the page in other forms. The 28
+  // pooled rows are the ones with a disclosure, which is the same population the
+  // `rolled` badge marked.
+  const pooledRows = rows().filter(tr => tr.querySelector('.oneof'));
+  ok('28 rows disclose a pool', pooledRows.length === 28, `${pooledRows.length}`);
   ok('they are the four rare families, seven ranks each',
-     rolledIds.every(tr => /^tl2_(blood|chaos|iron|void)ember_rank[1-7]$/.test(idOf(tr))),
-     rolledIds.map(idOf).filter(i => !/^tl2_(blood|chaos|iron|void)ember/.test(i)).join(','));
-  ok('no row is marked twice',
-     rows().every(tr => new Set(marksIn(tr).filter(m => m !== 'either')).size ===
-                        marksIn(tr).filter(m => m !== 'either').length));
+     pooledRows.every(tr => /^tl2_(blood|chaos|iron|void)ember_rank[1-7]$/.test(idOf(tr))),
+     pooledRows.map(idOf).filter(i => !/^tl2_(blood|chaos|iron|void)ember/.test(i)).join(','));
+  ok('and no unpooled row is one of them',
+     rows().filter(tr => !tr.querySelector('.oneof'))
+         .every(tr => !/^tl2_(blood|chaos|iron|void)ember_rank/.test(idOf(tr))));
+  // The six rows the two sources disagree about are no longer distinguishable in
+  // the DOM, so that they are still the same six is a build-time assertion --
+  // build.py pins the whole status distribution. What the page still states is
+  // the count, in the footer, in words.
+  ok('the footer still states the derivation\'s agreement',
+     /agree on\s*<b>121 of the 162 rows<\/b>/.test(html.replace(/\s+/g, ' ')) ||
+     html.indexOf('121 of the 162 rows') >= 0 ||
+     /121 of the __ROWS__|121 of the 162/.test(html),
+     (html.match(/agree on[^<]*<b>[^<]*<\/b>/) || [''])[0]);
 
   // --------------------------------------------------- the pool disclosure
   // Collapsed on load: 56 open lists would swamp a 162-row table. What is
