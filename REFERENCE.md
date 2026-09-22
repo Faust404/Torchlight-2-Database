@@ -412,13 +412,13 @@ and items are built from it (§7). What remains:
    damage, armor and requirement fields are *pre-scale*, and TIDBI holds the
    rendered values. The build now reads TIDBI first and flags the 114 items where
    it has to fall back (§7).
-6. **The ember scaling multiplier.** Three of the four rare ember families carry
-   a fixed float per option in the files where the game shows a level-scaled
-   number (§7, *Rare embers*). The multiplier is per stat and lives in
-   `MEDIA\STATS\<Stat>.DAT` (plus `MEDIA\GRAPHS\STATS\`), whose reference section
-   the decoder does not read yet — the same "read the reference section" job as
-   the drop weights, and the one thing on the site that is transcribed rather
-   than derived.
+6. ~~**The ember scaling multiplier.**~~ **Resolved — and it was not a
+   multiplier.** An affix's `0x0000BD6E` is a **percentage** of a by-level curve,
+   and the game prints `ceil(pct x CURVE(level) / 100)` against a graph in
+   `MEDIA\GRAPHS\STATS\`, evaluated at the **carrier item's own** `LEVEL`. Nine of
+   the thirteen rare-ember ladders now come out of the files exactly, one to six
+   of seven, and two carry a transcription error (§7, *Rare embers*). Nothing
+   here needs `MEDIA\STATS\`'s reference section after all.
 7. **Drop weights and the 64 unnamed field hashes** stay the real blockers —
    nothing about the above touches them.
 
@@ -930,7 +930,7 @@ is derived from the files and has a section of its own below.
 ```
 src\
   build.py         the pipeline
-  ember_values.py  the 42 ember values the files cannot supply, with their source
+  ember_values.py  the ember tooltip lines still transcribed, with their source
   slots.py         a socketable's slot split, read from its AFFIXES order
   paths.py         every path in the repo, anchored to this file
   tl2\             the PAK reader: dat_decode, dat_hash, parse_man, extract
@@ -1217,17 +1217,63 @@ every rank carries a *second* Attack Speed option beside its band's, and no
 84-999 attack-speed band file exists at all, so rank 7's weapon list holds the
 3% and nothing higher.
 
-**Blood, Iron and Void are not.** Each of their affixes is a single `1-999` file
-with one fixed float — Blood's Health 10, Iron's Armor 20, Void's Mana 20 —
-while the number the game prints grows with the gem's level. The per-level
-multiplier is not in the affix, not in the item DAT, and not in
-`MEDIA\STATS\<Stat>.DAT`, whose reference section this decoder does not read.
-It is **per stat**: Blood's Health and Health Regen share one factor (10 ×
-`0.4·ilvl + 1.6` reproduces both ladders exactly, 48 … 384), but Iron's Armor
-(20 at file, 5 shown at ilvl 8) and Iron's Ranged bonus (10 at file, 6 shown) do
-not. That is the one unsolved piece here. The 42 values are accordingly
-**transcribed** into `src\ember_values.py`, whose docstring carries the source
-and the reasoning.
+**Blood, Iron and Void are derivable too, and there is no per-stat multiplier
+anywhere.** An affix's `0x0000BD6E` is a **percentage** of a by-level curve, and
+the game prints
+
+    ceil( pct x CURVE(level) / 100 )
+
+with `CURVE` a graph in `MEDIA\GRAPHS\STATS\` and `level` the carrier item's own
+`LEVEL`. Integer stats ceil; the per-second regen stats print one decimal,
+**rounded half-up** — Void's `MANA RECHARGE PLAYER` at 2% against the curve's
+82.5 is 1.65 and prints `1.7`. The stats these families use map like this:
+
+| effect TYPE | curve |
+|---|---|
+| `MAX HP`, `HP RECHARGE PLAYER` | `HEALTH_PLAYER_GENERIC` |
+| `MAX MANA`, `MANA RECHARGE PLAYER` | `MANA_PLAYER_GENERIC` |
+| `LIFE STEAL` | `STEAL_HEALTH_AND_MANA` |
+| `MANA STEAL` | `STEAL_MANA` |
+| `ARMOR BONUS`, `<element> DEFENSE` | `ARMOR_PLAYER_BYLEVEL_FORSET` |
+| `MELEEDAMAGEBONUS`, `RANGEDDAMAGEBONUS`, `DAMAGE BONUS` | `BASE_WEAPON_DAMAGE` |
+| `DEGRADE ARMOR` | `ARMOR_MONSTER_BYLEVEL` |
+
+Checked ladder by ladder at the seven rank levels — 8, 22, 36, 50, 64, 78, 92 —
+against the transcriptions in `src\ember_values.py`:
+
+| ladder | affix | pct | the files give | verdict |
+|---|---|---|---|---|
+| Blood Health | `MAX HP` | 10 | 48 … 384 | 7/7 exact |
+| Blood Health Regeneration | `HP RECHARGE PLAYER` | 1.5 | 7.2, 15.6, 24, **32.4, 40.8, 49.2, 57.6** | 3/7 — ranks 4-7 transcribed as 33, 41, 50, 58 |
+| Blood Lifesteal | `LIFE STEAL` | 250 | 12 … 90 | 7/7 exact |
+| Blood Bleed | `DAMAGE` | 15 | — | 0/7 — the damage-over-time ladder below |
+| Iron Armor | `ARMOR BONUS` | 20 | 5 … 73 | 7/7 exact |
+| Iron Melee bonus | `MELEEDAMAGEBONUS` | 10 | 6 … 44 | 7/7 exact |
+| Iron Ranged bonus | `RANGEDDAMAGEBONUS` | 10 | 6 … 44 | 7/7 exact |
+| Iron Thorns | `DAMAGE REFLECTION` | 33 | 6/7 at `33% x BASE_WEAPON_DAMAGE` | rank 3 prints 56 where the curve gives 59 |
+| Iron Damage | `DAMAGE BONUS` | 30 | 16 … 130 | 7/7 exact |
+| Iron Degrade Armor | `DEGRADE ARMOR` | 15 | **4, 15**, 31, 54, 81, 115, 155 | 5/7 — ranks 1-2 transcribed as 8 and 29 |
+| Void Mana | `MAX MANA` | 20 | 11 … 28 | 7/7 exact |
+| Void Mana Regeneration | `MANA RECHARGE PLAYER` | 2 | 1.1 … 2.8 | 7/7 exact |
+| Void Mana Steal | `MANA STEAL` | 50 | 2 … 11 | 7/7 exact |
+
+**Nine of the thirteen are exact**, which is what makes the other four readable
+as findings rather than as noise. Two are transcription errors: Iron's Degrade
+Armor opens 8, 29 where the files say 4, 15 — and 29 is not reachable from any
+level in rank 2's band, whose own ceiling is 26 — while Blood's Health
+Regeneration prints 33, 41, 50, 58 where the curve gives 32.4, 40.8, 49.2, 57.6,
+whole numbers above the third rank in a ladder whose first three ranks are
+decimals. The two "not smooth" ladders `ember_values.py`'s docstring flags as
+possibly typos are now settled in opposite directions: Void's Mana Steal is
+exact at every rank, and Iron's Degrade Armor is wrong at exactly the two ranks
+that looked wrong.
+
+The other two are genuinely unsolved. Iron's Thorns reproduces six of seven
+ranks at 33% of `BASE_WEAPON_DAMAGE`, and no graph in the directory reproduces
+all seven at any percentage from 1 to 500 under the ceil rule the other twelve
+obey. Blood's Bleed — `TYPE = DAMAGE` with the duration `5` in a *string* member
+of the same effect list, `0xE03B279B` — fits nothing at all; it is the only
+effect TYPE on the site whose printed number is still unexplained.
 
 The source is the wiki's rare-gems table, and it is trustworthy on numbers for a
 checkable reason: its Normal-gems table covers the four varying families (Flame,
@@ -1268,6 +1314,53 @@ The card prints the pair as two **"one of N"** lists rather than as stat lines,
 because the item does not have those stats — it has one of them, and which one
 is decided when the gem drops. The numbers in each list are the rank's own, so
 nothing on the card scales them.
+
+### One file, four statlines: the instance level and the NG bands
+
+Because the printed number follows the level, an item with `MAXLEVEL 9999999` —
+a cap rather than a missing field — prints a **different statline in each
+playthrough**. The game generates it at the level of whatever dropped it, which
+in Normal is the file's own `LEVEL` and in NG+n is higher. The eyes are the clean
+case — 35 in the files, 31 of them with a wiki table — because their values move
+with the level in *both* slots and each such table has four rows: **the Normal
+row equals the file's `LEVEL` on all 31**, and every row's `Req. Level` is
+`max(1, LEVEL - 8)` off the game's own `ITEM_LEVEL_REQUIREMENTS_SOCKETABLE` —
+42 rows of 42. The four rows are one item printed at four levels, not four
+items.
+
+**Every number in those 42 rows comes out of the files.** Applying the rule
+above to the eye's own affixes reproduces all 38 curved values on the rows that
+carry one, and the effects with no curve print the affix's own percentage, 28 in
+their own row and 19 more through a cell the wiki merged across rows
+(`rowspan`). The Eye of Winter Widow is the type specimen: `UNIQUE_MAGIC_BONUS3`
+(120) over `ATTRIBUTE_BONUS` gives 6, 24, 36, 42 at levels 11, 57, 85, 100, and
+`GEM_IRONEMBER_WEAPON_DEGRADEARMOR` (15) over `ARMOR_MONSTER_BYLEVEL` gives 6,
+67, 134, 180 — its four rows, both slots, the affix's own value, `ceil`. Five
+effect-rows stay unaccounted for across the whole set, and all five are the
+damage-over-time TYPE above: no other effect on any eye is unexplained.
+
+**The four levels are the only thing the files do not state.** No eye DAT, no
+spawn class and no monster unit carries them — the eyes' own
+`*_EYE_CHANCE` and treasure classes are level-less — and there are no per-NG
+item variants: `*NGP` names exist for monsters and skills, not for items. What
+the files do give is the level each replay **starts** at:
+
+    MEDIA\GRAPHS\STATS\REPLAY_GAME_OFFSET.DAT    0, 51, 81, 100, 120, 120
+
+Normal 0, NG+1 51, NG+2 81, NG+3 100 — the same numbers the fitted ladder lands
+on. The eye's Normal level sits inside its band by a straight line, and the two
+constants that fit every published NG level are
+
+    NG+1 = 51 + (level - 1) x 29/49        NG+2 = 81 + (level - 1) x 18/49
+
+with NG+3 always 100 because 100 is the cap: 10 of 10, 7 of 7 and 6 of 6. Two
+free parameters fitted to 23 points is a **hypothesis with predictions**, not a
+rule, and it is worth stating which predictions are still untested — the wiki
+leaves NG+1 and NG+2 of most eyes as `?` and has no table at all for 16 of the
+31, so the eyes it does not cover (The Eye of Tiamat at `LEVEL` 54, say, which
+the formula sends to 82 / 100 / 100) are where it would be falsified. Nothing
+downstream needs it: the numbers on every row follow from the level, so the
+level is the whole of the transcription.
 
 ### Type facet, and the rail's taxonomy
 
