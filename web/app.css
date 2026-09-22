@@ -518,6 +518,36 @@ button,input,select{font:inherit; color:inherit}
 .pool li:before{content:"\2022"; position:absolute; left:7px; color:#6b645c}
 .pool .n{color:var(--val); font-weight:600; font-variant-numeric:tabular-nums}
 
+/* ---------------------------------------------------------------- the eyes
+   The eyes' four-level table. It replaces the flat `.fxh`/`.aff` block on those
+   cards, so it borrows that block's vocabulary rather than inventing one: the
+   column headings are `.fxh` (label, uppercase, tracked), the two stat columns
+   are `.aff` (magic green, the card's serif, values lifted to --head), and the
+   level and requirement columns are the card's numeric voice (--val, tabular).
+
+   The three outer columns are facts about the ROW -- which level, what it
+   needs, which replay -- and they are the card's furniture, not the item's
+   stats, which is why they are not green. Only the two middle columns are
+   affix lines, and one of them can hold four of them (four elemental defenses
+   from a single affix), so they stack in one cell rather than spreading across
+   four rows.
+
+   Auto table layout, not fixed: the card is 366px and the two stat columns are
+   the only ones with unpredictable width, so the browser's own algorithm
+   divides what is left after the three narrow ones, which a fixed layout would
+   have to be told in advance. */
+.ngt{width:100%; border-collapse:collapse; margin:0}
+.ngt th{color:var(--label); font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; font-weight:400; text-align:left;
+  white-space:nowrap; padding:0 6px 3px 0}
+.ngt td{border-top:1px solid var(--line); vertical-align:top;
+  padding:3px 6px 3px 0; font-family:var(--doc)}
+.ngt td.ngc{color:var(--magic)}
+.ngt td.nglv, .ngt td.ngrq{color:var(--val); font-variant-numeric:tabular-nums}
+.ngt td.ngb{white-space:nowrap; color:var(--dim)}
+.ngt th:last-child, .ngt td:last-child{padding-right:0; text-align:right}
+.ngt .n{color:var(--head); font-weight:600; font-variant-numeric:tabular-nums}
+
 /* --------------------------------------------------------- requirements
    The one thing the block may never lose is the either/or: a player level OR
    all of the attributes, whichever the player reaches first -- not a

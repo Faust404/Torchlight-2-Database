@@ -863,6 +863,47 @@
     return group('Armor / Trinket', ep.a) + group('Weapon', ep.w);
   }
 
+  // ---- the eye's levels ----
+  // An eye is one item file that prints four statlines: its DAT carries the
+  // "generated at the level of whatever dropped it" sentinel, so Normal prints
+  // the file's own level and NG+1/2/3 print higher numbers. build.py derives
+  // all four (eye_values.py) and they arrive as `ng`, one array per row. This
+  // replaces the flat effect block for these items rather than joining it: the
+  // Normal row IS those lines, so showing both would print every effect twice.
+  //
+  // The columns are the two slots the flat block labelled as headings -- which
+  // is why the table needs no heading of its own -- plus the level, its
+  // requirement and which replay the row belongs to. Req is the game's own
+  // ITEM_LEVEL_REQUIREMENTS_SOCKETABLE, the same curve the card prints as
+  // "Required Level" elsewhere, so it moves with the row rather than being
+  // written once.
+  //
+  // A cell can hold more than one line: one affix can grant four elemental
+  // defenses, and they belong together in one cell rather than in four rows.
+  //
+  // One eye is capped (Tiamat, MAXLEVEL 999 rather than the sentinel) and does
+  // not scale, so build.py gives it a single Normal row and there is no ladder
+  // to draw -- the table still prints, because the level and requirement are
+  // the same two facts it would otherwise leave the card without.
+  var NG_HEAD = ['Lv', 'Req', 'Armor / Trinket', 'Weapon', 'NG'];
+
+  function ngTable(o) {
+    function cell(lines) {
+      return lines.map(function (l) { return mark(l); }).join('<br>');
+    }
+    return '<table class="ngt"><thead><tr>' +
+      NG_HEAD.map(function (t) { return '<th>' + esc(t) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      o.ng.map(function (r) {
+        return '<tr><td class="nglv">' + esc(r[0]) + '</td>' +
+          '<td class="ngrq">' + esc(r[1]) + '</td>' +
+          '<td class="ngc">' + cell(r[2]) + '</td>' +
+          '<td class="ngc">' + cell(r[3]) + '</td>' +
+          '<td class="ngb">' + esc(r[4]) + '</td></tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
   function flav(o) {
     return o.ds ? '<p class="flav">' + esc(o.ds.replace(/\\n/g, ' ')) + '</p>' : '';
   }
@@ -914,7 +955,7 @@
     if (lead) { body += lead; any = true; }
 
     sec(statLines(o.dmg, 'Damage') + statLines(o.arm, 'Armor'));
-    sec(o.fx && o.fx.length ? affLines(o) : '');
+    sec(o.ng ? ngTable(o) : (o.fx && o.fx.length ? affLines(o) : ''));
     // The rolled pair, where a socketable's own affixes would sit: the rare
     // embers have no `fx` at all, so this is the only stat block they have.
     sec(o.ep ? poolHTML(o.ep) : '');
