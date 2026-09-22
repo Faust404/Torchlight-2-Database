@@ -1705,7 +1705,13 @@ level 33, carries 29, and the curve says 38 at that level. So the curve's
 siblings do not say what the socketable curve gates, and nothing else in the PAK
 does either: scanning all 68,820 PAK entries under 300 KB (the `GRAPHS` folder
 itself aside) for the string `ITEM_LEVEL_REQUIREMENTS` returns **no file that
-references it**, so its use is in compiled code. What the files *do* state is the
+references it**, so its use is in compiled code. That negative is worth only
+what its scan is worth — DAT string tables are **UTF-16**, so an ASCII scan
+returns 0 for everything and would report the same clean result on a file that
+did reference it. The scan above searched both encodings, and it was validated
+against a control string known to be present: `Blood Ember Shard` returns **0
+hits as ASCII and 1 as UTF-16-LE**. Same 0/0 on the target, so the curve is
+genuinely unreferenced rather than merely invisible to the needle. What the files *do* state is the
 shape — 105 points of `max(1, level - 8)` over the socketable's own level, no
 socketable DAT carrying a requirement of its own, and a wiki column that
 reproduces the rule by hand.
