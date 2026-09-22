@@ -1291,7 +1291,7 @@ def build():
     # stay in the icon-donor pool above but are not items.
     out, skipped_stat, templates, dropped, tl1 = [], 0, [], [], []
     slot_status = collections.defaultdict(list)
-    eye_rows, eye_notes, eye_capped = 0, [], []   # see the eye table below
+    eye_rows, eye_notes, eye_topped = 0, [], []   # see the eye table below
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
@@ -1577,24 +1577,27 @@ def build():
         # UNIQUE NECKLACE with no LEVEL-driven ladder at all, so the name alone
         # sweeps in two items with no levels to print.
         #
-        # `capped` is read from MAXLEVEL here and nowhere else, because this is
-        # the last point at which the sentinel is still visible: line 1350 has
-        # already collapsed 9999999 to 999 in `o['xl']`, so the shipped record
-        # reads "999" for all 31 eyes including the one eye that really is
-        # capped. 999 is a level and 9999-and-up is a sentinel, so the test is
-        # the same MAX_LEVEL_CEILING boundary the clamp uses -- backwards.
+        # MAXLEVEL is read here rather than from `o['xl']` because this is the
+        # last point at which it is still itself: line 1350 has already
+        # collapsed every sentinel to 999 in the record. The four-row table
+        # rests on the item being generatable above level 100 -- which every
+        # eye is, including The Eye of Tiamat, whose MAXLEVEL is 999 rather
+        # than 9999999. That is the corpus's other spelling of "no ceiling"
+        # (see MAX_LEVEL_CEILING, and its MINLEVEL is 0, so its band is the
+        # permissive one either way), so it scales like the other 30. The
+        # assertion in the battery below keeps that true for eyes not yet
+        # shipped rather than assuming it here.
         if (rec.get('UNITTYPE') or '').strip().upper() == 'UNIQUE SOCKETABLE' \
                 and disp.startswith('The Eye of'):
-            _xl = _num(rec.get('MAXLEVEL'))
-            _capped = _xl is not None and _xl <= MAX_LEVEL_CEILING
             _ng, _notes = eye_values.rows(rec['_path'], o.get('fx', []),
-                                          o.get('fxs', []), lvl, _capped,
+                                          o.get('fxs', []), lvl,
                                           graph_points, socket_level_curve())
             o['ng'] = _ng
             eye_rows += len(_ng)
             eye_notes.extend((o['id'],) + tuple(n) for n in _notes)
-            if _capped:
-                eye_capped.append(o['id'])
+            _xl = _num(rec.get('MAXLEVEL'))
+            if _xl is not None and _xl < eye_values.NG_CAP:
+                eye_topped.append('%s (MAXLEVEL %g)' % (o['id'], _xl))
         if it['icon']:
             o['ic'] = it['icon']
             if it.get('inherited'):
@@ -1793,14 +1796,18 @@ def build():
         'the eye-table set drifted: %d missing (%s), %d extra (%s)' \
         % (len(_want - _got), sorted(_want - _got)[:3],
            len(_got - _want), sorted(_got - _want)[:3])
-    # One eye is capped. The count is asserted as a COUNT and the names printed,
-    # so a second capped eye names itself instead of merely breaking the row
-    # arithmetic below -- a capped eye is a one-row table, which is the part a
-    # reader would notice.
-    assert len(eye_capped) == 1, \
-        '%d eyes are capped, expected 1: %s' % (len(eye_capped), eye_capped)
-    assert eye_rows == 121, \
-        'the eye tables hold %d rows, not 121 (30 four-row eyes + 1 capped)' % eye_rows
+    # Every eye gets four rows, and that rests on one fact: the item can be
+    # generated at NG+3's level of 100. MAXLEVEL is the ceiling that says so,
+    # and an eye whose ceiling were below 100 would print its top row at a
+    # level the game cannot reach -- silently, since the formula would happily
+    # produce it. No eye is in that state (Tiamat's 999 is the corpus's other
+    # spelling of "no ceiling", and it is above 100 besides), so this is a
+    # guard for eyes not yet shipped rather than a live exception, and it names
+    # the item instead of merely failing the row count below.
+    assert not eye_topped, \
+        'eye(s) cannot reach NG +3: %s' % eye_topped
+    assert eye_rows == 124, \
+        'the eye tables hold %d rows, not 124 (31 eyes x 4)' % eye_rows
     # Every row's requirement is the same ITEM_LEVEL_REQUIREMENTS_SOCKETABLE
     # value the build already wrote to `lr`, indexed at the same level -- so a
     # free check that does not need the wiki, and one that holds on all 31 today
@@ -1820,15 +1827,11 @@ def build():
             '%s: the requirement curve did not reach a row level' % o['id']
         assert [int(r[0]) for r in o['ng']] == sorted(int(r[0]) for r in o['ng']), \
             '%s: the eye levels are not in order: %s' % (o['id'], [r[0] for r in o['ng']])
-        # A capped eye is the one shape that is NOT four rows: it does not
-        # scale, so it has its own level and no NG ladder at all.
-        if o['id'] in eye_capped:
-            assert o['ng'] == [o['ng'][0]] and o['ng'][0][4] == 'Normal', \
-                '%s is capped but its table is %s' % (o['id'], o['ng'])
-            assert o['ng'][0][0] == o.get('lv'), \
-                '%s is capped at level %s but its file says %s' \
-                % (o['id'], o['ng'][0][0], o.get('lv'))
-            continue
+        assert len(o['ng']) == 4, \
+            '%s has %d rows, not four' % (o['id'], len(o['ng']))
+        assert o['ng'][0][0] == o.get('lv'), \
+            '%s prints its Normal row at %s but its file says %s' \
+            % (o['id'], o['ng'][0][0], o.get('lv'))
         assert o['ng'][-1][4] == 'NG +3' and int(o['ng'][-1][0]) == 100, \
             '%s: the last row is %s at %s, not NG +3 at 100' \
             % (o['id'], o['ng'][-1][4], o['ng'][-1][0])
@@ -1850,8 +1853,8 @@ def build():
     _unpaired = sorted('%s %s' % (i, side) for i, kind, side, _, _ in eye_notes
                        if kind == 'unpaired')
     assert not _unpaired, 'eye effects and lines did not pair: %s' % _unpaired
-    print('  EYE TABLE: %d eyes, %d rows (%s is the one capped), 1 cell of '
-          'TIDBI drift' % (len(_ng_eyes), eye_rows, ', '.join(eye_capped)))
+    print('  EYE TABLE: %d eyes, %d rows, 1 cell of TIDBI drift'
+          % (len(_ng_eyes), eye_rows))
 
     out.sort(key=lambda o: (o['n'].lower(), o['id']))
     print('  %d base templates excluded (nameless or base_*)' % len(templates))

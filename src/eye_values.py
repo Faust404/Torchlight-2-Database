@@ -182,18 +182,25 @@ def printed(ty, pct, level, graph):
     return float(math.ceil(v))
 
 
-def levels(level, capped):
-    """[(level, label), ...] -- four rows, or one when the eye is capped.
+def levels(level):
+    """[(level, label), ...] -- Normal plus the three replays, four rows.
 
     The Normal level is the file's own. The rest are the band map: the level
     moved to the same *fraction* of its band that the Normal level occupies of
     band 0. int(round()) is Python's banker's rounding, which is safe here
     only because the two slopes (29/49 and 18/49) can never land a tie -- the
     numerator is even and 49 is odd.
+
+    Four rows unconditionally, because every eye can be generated above level
+    100. The Eye of Tiamat is the one eye whose MAXLEVEL is not the 9999999
+    sentinel -- it reads 0..999 rather than 1..9999999 -- and that is *not* a
+    ceiling: build.py's MAX_LEVEL_CEILING comment records 999 as the number the
+    corpus already uses to spell the same thing, and it is above every
+    reachable level either way. Both bands say "generated at the level of
+    whatever dropped it", so both scale. build.py asserts the condition that
+    makes this safe (MAXLEVEL >= 100 or absent) rather than trusting it.
     """
     out = [(level, NG_LABELS[0])]
-    if capped:
-        return out
     for ng in (1, 2, 3):
         base, span = NG_BANDS[ng]
         out.append((int(round(base + (level - 1) * span / NG_SPAN)), NG_LABELS[ng]))
@@ -267,7 +274,7 @@ def pairing(path, fx, fxs):
     return out
 
 
-def rows(path, fx, fxs, level, capped, graph, level_curve):
+def rows(path, fx, fxs, level, graph, level_curve):
     """([[level, req, armor, weapon, ng_label], ...], notes) for one eye.
 
     Every one of the five is a string, and armor and weapon are lists of lines
@@ -286,7 +293,7 @@ def rows(path, fx, fxs, level, capped, graph, level_curve):
     """
     pair = pairing(path, fx, fxs)
     notes = []
-    lvls = levels(level, capped)
+    lvls = levels(level)
     out = []
     for i, (lv, label) in enumerate(lvls):
         # Strings, because these are what the card prints and app.js marks at

@@ -706,16 +706,26 @@ async function go(hash) {
        '480 Physical Damage over 5 sec. | 1370 Physical Damage over 5 sec. | ' +
        '2260 Physical Damage over 5 sec. | 2375 Physical Damage over 5 sec.',
      showN(alch));
-  // One eye does not scale. Tiamat's MAXLEVEL is 999 rather than the sentinel,
-  // so it has no NG ladder and build.py gives it a single Normal row -- which
-  // the shipped JSON cannot tell you, because the build clamps the sentinel to
-  // 999 before it reaches the record and every one of the 31 reads `xl: 999`.
-  // The table still prints: level and requirement are the two facts the card
-  // would otherwise lose along with the flat block.
+  // Tiamat is the one eye whose MAXLEVEL is not the 9999999 sentinel: it reads
+  // 0..999 where the other 30 read 1..9999999. That is not a ceiling. 999 is
+  // the number this corpus already uses to spell the same thing -- see
+  // MAX_LEVEL_CEILING in build.py, which clamps the sentinels *down* to it --
+  // and it is above every reachable level either way, so Tiamat scales like the
+  // rest and its band is the more permissive one. It is also the eye with no
+  // published table anywhere, so this is a prediction rather than a match:
+  // 54 -> 82 / 100 / 100.
+  //
+  // Both of its lines are proc chances, and a proc chance is not a scaled stat
+  // -- no graph exists for the TYPE -- so the four rows carry the same text and
+  // only the level and requirement move. That is what the table is for here,
+  // and it is why the assertion is on the outer three columns.
   const tiamat = ngRows(await deep('#item=tl2_eyeoftiamat'));
-  ok('the one capped eye prints a single Normal row and no ladder',
-     tiamat.rows.length === 1 && tiamat.rows[0][0] === '54' &&
-     tiamat.rows[0][1] === '46' && tiamat.rows[0][4] === 'Normal', showN(tiamat));
+  ok('the eye with no published table is predicted, not skipped',
+     tiamat.rows.length === 4 &&
+     tiamat.rows.map(r => r[0]).join('/') === '54/82/100/100' &&
+     tiamat.rows.map(r => r[1]).join('/') === '46/74/92/92' &&
+     tiamat.rows.map(r => r[4]).join('/') === 'Normal/NG +1/NG +2/NG +3',
+     showN(tiamat));
   // ...and the other half of the same claim: a socketable that is not an eye
   // keeps the flat block byte-for-byte. Flame Ember is asserted two ways above
   // already, so this pins only the negative -- that the table did not leak out
