@@ -135,6 +135,17 @@ button,input,select{font:inherit; color:inherit}
 }
 .rsearch input:focus{border-color:var(--label)}
 
+/* The rail's rows now sit directly in #railbody: with the "Type" superheader
+   gone, the one section it had is gone too, and the box that section used to
+   draw -- its horizontal padding and its top offset -- is the body's own. The
+   10px is not a fresh choice; it is the same 10px, which matters because the
+   `.f.s0`/`.f.s1` indent ladder below is measured from it. `border-bottom` is
+   the one declaration deliberately dropped: under a single section it was a
+   hairline at the very foot of the list, separating the types from nothing. */
+#railbody{padding:2px 10px 9px}
+
+/* `#railbody`'s padding was `.sec-b`'s. See the note above it for why the rail
+   no longer reaches these rules. */
 .sec{border-bottom:1px solid var(--line)}
 .sec-h{
   display:flex; align-items:center; gap:6px; padding:7px 10px;
@@ -142,10 +153,12 @@ button,input,select{font:inherit; color:inherit}
   font-size:10px; letter-spacing:.13em; text-transform:uppercase;
 }
 .sec-h:hover{color:var(--gold)}
-/* The fold glyph, shared by the section headers and the four category headers.
-   Its 9px box plus the 6px gap is what a rail label's slot is made of, and the
-   rows below step in by the same 9px -- `.f.s0`/`.f.s1` -- so that a folded
-   category's rows still line up under the label they belong to. */
+/* The fold glyph, shared by the advanced panel's section headers and the rail's
+   category headers -- the rail's own sections are gone, but the glyph still has
+   to land in the same slot in both places. Its 9px box plus the 6px gap is what
+   a rail label's slot is made of, and the rows below step in by the same 9px --
+   `.f.s0`/`.f.s1` -- so that a folded category's rows still line up under the
+   label they belong to. */
 .sec-h .tog,.grp .tog,.sgrp .tog{
   font-family:ui-monospace,Consolas,monospace; width:9px; color:var(--muted);
 }
@@ -191,7 +204,7 @@ button,input,select{font:inherit; color:inherit}
    included -- with the native attribute, so they leave the accessibility tree
    too. The id is load-bearing: a bare `[hidden]` rule loses to `.f{display:flex}`,
    which is the trap that attribute always springs. */
-#rail .sec-b [hidden]{display:none}
+#railbody [hidden]{display:none}
 /* tri-state: the header is the only thing that says what a click will do, so
    "all of it" and "some of it" must not look the same */
 .grp.on,.sgrp.on{color:var(--gold)}
@@ -651,10 +664,12 @@ button,input,select{font:inherit; color:inherit}
    in the rail would be clipped into a 220px column. It is a sibling of the rail
    instead (see index.html), stacked over it.
 
-   Everything inside it reuses the rail's own vocabulary -- .sec for the
-   collapsible groups, .f for a checkbox row, .rng for a `label | min | max`
-   row -- so the panel and the rail cannot drift apart in look any more than
-   they can in state. Only the parts the rail has no equivalent of are new. */
+   Everything inside it reuses the rail's own vocabulary -- .f for a checkbox
+   row, .rng for a `label | min | max` row -- so the panel and the rail cannot
+   drift apart in look any more than they can in state. `.sec` is the one rule
+   the rail has handed over rather than shared: it gave up its last section with
+   the "Type" superheader, so the panel is the only thing on the page that folds
+   one. Only the parts neither had are new. */
 #advscrim{display:none; position:fixed; inset:0; z-index:39; background:rgba(0,0,0,.6)}
 #advscrim.on{display:block}
 #adv{

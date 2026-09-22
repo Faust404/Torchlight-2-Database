@@ -1472,7 +1472,10 @@ async function go(hash) {
     ok('the tier facet is gone from the rail',
        !rail.querySelector('input[data-f="tiers"]') &&
        !rail.querySelector('.sec[data-sec="tiers"]'),
-       [].map.call(rail.querySelectorAll('.sec'), s => s.getAttribute('data-sec')).join(','));
+       // the facets the rail *does* carry, so a failure names one rather than
+       // printing the empty string this used to print once the sections went
+       [].map.call(rail.querySelectorAll('input[data-f]'), i => i.getAttribute('data-f'))
+         .filter((v, i, a) => a.indexOf(v) === i).join(','));
   }
 
   // A pill click is a rail checkbox click: filter, dim, land in the URL. The
@@ -1675,13 +1678,25 @@ async function go(hash) {
   // now, and leaving a second control behind for any of them is how a grid ends
   // up empty with nothing on screen to explain why. The type facet and the tier
   // strip above the grid are the two the page keeps in front of the reader.
+  //
+  // The facet's own `section()` wrapper went too: with one facet left, a "Type"
+  // superheader separated nothing from nothing while taking a row of the rail's
+  // height and a fold that could only ever hide the entire rail. So the claim
+  // is stronger than "the only section is types" -- there is no section in the
+  // rail at all, and every checkbox in it is a type.
   await go('');
+  const railFacets = () =>
+    [].map.call(d.querySelectorAll('#railbody input[data-f]'), i => i.getAttribute('data-f'))
+      .filter((v, i, a) => a.indexOf(v) === i).join(' ');
   ok('the rail is the type facet alone',
-     [].map.call(d.querySelectorAll('#railbody .sec'), s => s.getAttribute('data-sec')).join(' ') === 'types' &&
+     !d.querySelector('#railbody .sec') &&
+     !!d.querySelector('#railbody .grp[data-grp]') &&
+     [].every.call(d.querySelectorAll('#railbody input[data-f]'),
+       i => i.getAttribute('data-f') === 'types') &&
      d.querySelectorAll('#railbody input[type=number]').length === 0 &&
      d.querySelectorAll('#railbody input[data-f="dmg"]').length === 0 &&
      !d.querySelector('#railbody input[type=checkbox][id=sock]'),
-     [].map.call(d.querySelectorAll('#railbody .sec'), s => s.getAttribute('data-sec')).join(' '));
+     railFacets() || '(no facet controls at all)');
   // ...and the filters it gave up are still reachable, which is the half that
   // matters: a control removed without a replacement is a filter removed. The
   // damage facet's old key still asks its own question through the panel's own
@@ -1771,8 +1786,14 @@ async function go(hash) {
        b => (owner(b.value) === 'Weapons/One-Handed') === b.checked));
   ok('...and the header says it is fully applied', hdr('Weapons/One-Handed').classList.contains('on'));
   ok('a bulk toggle lands in the URL', /(^|[#&])type=/.test(w.location.hash), w.location.hash);
+  // The delegation reads data-sec before data-grp, so the bug this guards
+  // against is a header click folding a section. The rail has no section left to
+  // fold; what such a click can still do by mistake is hide rows, which is a
+  // *category's* own fold -- so the assertion is that this click toggled the
+  // group and moved nothing else.
   ok('a group header is not a collapse toggle',
-     !d.querySelector('.sec[data-sec="types"]').classList.contains('closed'));
+     !rb.querySelector('.sec') &&
+     [].every.call(rb.querySelectorAll('.f'), f => !f.hidden));
   await wait(30);   // let jsdom's spurious hashchange settle
   click(hdr('Weapons/One-Handed'));
   ok('clicking it again clears them', /6,048/.test(cnt()), cnt());

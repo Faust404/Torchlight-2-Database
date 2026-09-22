@@ -607,12 +607,17 @@
   //
   // The `tiers` skip is the same one it always was: the tier strip above the
   // grid is that facet's control, and renderTiers() owns it.
+  //
+  // The facet's own `section()` wrapper went next, and for the same reason: a
+  // superheader is worth a row of the reader's attention when it separates one
+  // filter from another, and there is no second filter to separate it from. Its
+  // "Type" caption said what the four category headers under it already say, so
+  // the body's rows hang off #railbody directly. section() itself stays -- the
+  // advanced panel is built from it, and so is the fold handler that reads
+  // data-sec.
   function renderRail() {
-    var h = '', fv = facetValues('types');
-    h += section('types', 'Type', typesBody(), fv.total);
-
     var rb = document.getElementById('railbody');
-    rb.innerHTML = h;
+    rb.innerHTML = typesBody();
     // Every rebuild renders all four categories open, so the ones the user has
     // folded are re-folded here. The markup already wrote their `+`, so this is
     // only about the rows.
