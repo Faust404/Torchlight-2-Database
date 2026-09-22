@@ -1999,6 +1999,92 @@ It resolves to the group as the taxonomy defines it *today*: `#cat=Armor` is now
 have moved out. `Jewelry` is aliased to `Accessories`; nothing writes `cat=` any
 more, so the URL normalises to `type=…` on the first checkbox touch.
 
+### The affix index
+
+Filtering by an affix needs the effect lines to have **identities**, and they are
+the game's own sentences — **1,892 distinct ones across 7,140 uses** on items and
+327 set rungs. The identity is the sentence with its quantities taken out:
+mask every number to `#`, fold a rolled range into that same slot, and drop a
+trailing duration clause. `build.py` derives it once and ships it; `app.js` will
+read it. The vocabulary is **154 entries** — 152 shapes from the items and the
+two that exist only as set bonuses, `X Mana stolen` and `X Health stolen`.
+
+Four normalisations, each a deliberate merge. A filter answers "who has Fire
+Damage", not "who has it in this exact spelling":
+
+- **Numbers are masked**, and the **sign is captured** rather than consumed.
+  118 lines carry a real negative (`-17 to All Armor per hit`, `All Damage Taken
+  is reduced by -5%`), and a pattern that swallowed the minus would index every
+  one of them as a positive. Masking is unaffected either way — `sub()` replaces
+  the whole match. The trailing `%` goes with them, which is a merge and not an
+  oversight: `+16% to Fire Damage` and a flat `+16 to Fire Damage` are one stat,
+  and no label carries a percent sign.
+- **A roll is folded into the flat form.** `+4~6% Attack Speed` and `+3% Attack
+  Speed` are one stat; the range survives in the *value*, never in the label.
+- **A trailing duration is dropped**, so `+20% to Fire Damage` and `+20% to Fire
+  Damage for 300 sec.` are one entry. Worth about 23 entries.
+- **The corpus's own typos are cleaned.** `Charge  rate increased by` is spelled
+  with a double space on 7 lines and a single space on 1; the weapon-range line
+  reads `+-2m to Bow, Crossbow, Pistol and Wand range` where the rest of its
+  family read `+1m`. Neither is repaired in the source — they are normalised on
+  the way in, so a reader never sees them.
+
+The third and fourth are what the slug-collision assertion found, and that is
+why it exists: the roll fold alone accounts for 8 of the 10, the typos for the
+other 2, and together they are the whole of the 164 → 154 count. Before them,
+both spellings of a rolled stat slugged to the same string, so the picker would
+have carried **two entries with identical labels** — a filter that reads as
+working and silently splits its own results.
+
+Three shapes of stored value, because the page has three cases to draw. Values
+are **numbers in variable-length arrays**, not the `'10-12'` string `dmg` uses:
+`-4~5` would serialise as `-4-5` and there is no way to split that back apart.
+
+```
+af  [[12, 20], [34, 4, 6], [56]]    12 at 20; 34 rolled 4 to 6; 56 has no value
+sf  the same, from the set's reachable rungs   sf is absent when there are none
+aff [[slug, label, hasValue], ...]   the vocabulary the picker reads
+```
+
+- **`af`** — 7,293 pairs on 2,314 items: every `fx` line plus the 153 from the 74
+  augmented weapons. `len(af) == len(fx) + Σlen(aug[].fx)` is asserted per item,
+  which is the check that catches a mis-keyed id — the failure the whole index
+  rests on, and one that would otherwise show up as a filter quietly missing rows.
+- **`sf`** — 2,878 pairs on the 556 pieces of the 80 sets, from every rung whose
+  threshold is `<= cap`. A rung above the set's worn capacity is skipped, because
+  the card already dims those: the game cannot be worn to them. Set-item lines
+  live in their own field rather than being merged into `af`, so the eyebrow
+  "set bonuses" filter can be off by default without a second index.
+- **`aff`** — 15 of the 154 carry no value at all (`Identify Item`, the nine
+  `Transform into a … permanently`, `Explosion On Death`). Those are filters of
+  *has this effect*, not ranges, and the flag is what lets the page draw a
+  checkbox instead of two boxes.
+
+The **slug is the label lower-cased**, so it keeps the value slot's `x`:
+`X to Fire Damage` is `x-to-fire-damage`, and `to-fire-damage` matches no entry.
+Over the 154, the longest slug is 58 characters and one label carries commas
+(`Xm to Bow, Crossbow, Pistol and Wand range`) — which is why a hash carries
+slugs and never labels, and why `,` and `:` are safe separators: `AFFIX_SLUG`
+maps every other character to `-`.
+
+**`hasValue` is read off the real line, never off the shape.** A shape has had
+its numbers masked away, so asking it whether it carries one answers *no* for
+every entry in the vocabulary — the first version of this derivation did exactly
+that and reported all 154 as value-less. Masking is positional, so every line
+that shares a shape agrees about whether a number stood there.
+
+The sign capture and the fold were both found by running the thing, not by
+reading it: the first build to reach the assertion failed with 10 colliding
+slugs. The measured pins in `build.py` — 154 entries, 152 + 2, 15 without a
+value, 7,293 pairs on 2,314 items, 2,878 on 556, and the five commonest labels
+with their use counts — are there because a corpus change that reshaped the
+picker would otherwise pass every size check while listing different stats.
+
+**What it costs:** +100,789 bytes raw and **+21,859 served**, measured by
+stripping the three fields back out of the built page and re-compressing both
+halves rather than extrapolating — **0.52%** of the 7.82 MB page, on a site
+whose icon sheet is 92% of the payload.
+
 ### The socketables page
 
 `out\socketables.html` — 209 KB, built by `src\socket_page.py`, served at

@@ -1265,6 +1265,124 @@ def build_sheet(icon_files, cols=33):
     return data, coords, (cols * cw, rows * ch)
 
 
+# ----------------------------------------------------------- the affix index
+# "Filter by any affix" needs the effect lines to have identities, and they are
+# the game's own sentences -- 1,810 distinct ones across 7,140 uses. So the
+# identity is the sentence with its quantities taken out: mask every number,
+# fold a rolled range into that same single slot (`+4~6% Attack Speed` is the
+# same stat as `+3% Attack Speed`, and the range survives in the value, not in
+# the label), and drop a trailing duration clause so that `+20% to Fire Damage`
+# and `+20% to Fire Damage for 300 sec.` are one stat rather than two. What is
+# left is the label, its value slot printed `X`.
+#
+# Two judgement calls, both deliberate, both merging rather than splitting: the
+# question a filter answers is "who has Fire Damage", not "who has it
+# permanently", and "who has Attack Speed", not "who has it as a range". The
+# duration fold is worth about 23 entries and the roll fold 10, with the two
+# typos above accounting for the 164 -> 154 count. The last 10 were found by the
+# slug-collision assertion below, which is why that assertion is there: before
+# the fold, both spellings of a rolled stat slugged to the same string and the
+# picker would have listed two entries reading identically.
+#
+# The vocabulary is built from items AND set ladders, because `X Mana stolen`
+# and `X Health stolen` exist only as set bonuses. Each entry carries a slug so
+# the hash stays readable -- `#aff=x-to-fire-damage:20~` rather than an index
+# that moves whenever the corpus does.
+#
+# The slug is the label lower-cased, so it keeps the value slot's `x`: the slug
+# for `X to Fire Damage` is `x-to-fire-damage`, and `to-fire-damage` matches no
+# entry at all. A hash written from the shorter spelling filters to nothing,
+# which is why the page resolves a slug through the vocabulary and reports one
+# it does not know rather than trusting the reader to have guessed right.
+#
+# The sign is captured rather than merely consumed: 118 lines carry a real
+# negative (`-17 to All Armor per hit`, `All Damage Taken is reduced by -5%`),
+# and a pattern that swallowed the minus would index every one of them as a
+# positive. Masking is unaffected -- sub() replaces the whole match either way.
+AFFIX_NUM = re.compile(r'([-+]?\d+(?:[.,]\d+)?)%?')
+AFFIX_ROLL = re.compile(r'([-+]?\d+(?:[.,]\d+)?)~([-+]?\d+(?:[.,]\d+)?)')
+AFFIX_DUR = re.compile(r'\s+for\s+#\s*(?:secs?\.?|seconds?\.?)$')
+AFFIX_SLUG = re.compile(r'[^a-z0-9]+')
+# The corpus's own typos, each of which spells one stat two ways. `Charge` is
+# written with a double space on 7 lines and a single space on 1; the weapon
+# range line reads `+-2m to Bow...` where the rest of its family read `+1m`. The
+# mask leaves both marks behind -- `+` is only consumed as part of a sign it can
+# complete -- so they are cleaned here rather than being carried into labels a
+# reader would see. Both were found by the slug-collision assertion, not by
+# reading the data.
+AFFIX_SIGN = re.compile(r'\+\s*(?=#)')
+AFFIX_WS = re.compile(r'\s{2,}')
+
+
+def affix_shape(line):
+    """The line's identity: numbers masked, a roll folded, no duration.
+
+    Masking happens first, so the roll is the literal `#~#` by the time it is
+    folded -- matching a roll against the raw digits would have to restate the
+    number pattern and the two could drift.
+    """
+    s = AFFIX_NUM.sub('#', line).replace('#~#', '#')
+    s = AFFIX_SIGN.sub('', AFFIX_WS.sub(' ', s))
+    return AFFIX_DUR.sub('', s).strip()
+
+
+def affix_slug(shape):
+    """`+#% to Fire Damage` -> `to-fire-damage`. Readable, and pinned unique."""
+    return AFFIX_SLUG.sub('-', shape.replace('#', 'x').lower()).strip('-')
+
+
+def affix_slot(line):
+    """(lo, hi) for the line's value slot, or None when it carries no number.
+
+    The value is the FIRST number, which is the same rule eye_values._cell()
+    substitutes by and the reason these numbers are worth indexing at all. A
+    roll gives both ends; a flat value gives the same number twice. 15 shapes
+    have no number at all -- `Identify Item`, the `Transform into ...` family --
+    and those are filters of "has this effect" rather than ranges.
+    """
+    m = AFFIX_ROLL.search(line)
+    if m:
+        return (float(m.group(1).replace(',', '.')),
+                float(m.group(2).replace(',', '.')))
+    m = AFFIX_NUM.search(line)
+    if m:
+        v = float(m.group(1).replace(',', '.'))
+        return v, v
+    return None
+
+
+def affix_pairs(lines):
+    """[[stat_id, lo], [stat_id, lo, hi], [stat_id], ...] -- JSON-shaped.
+
+    Three lengths, because the app has three cases to draw: a presence filter,
+    a flat min/max, and a min/max over a range. Numeric rather than the 'lo-hi'
+    string `dmg` uses, so nothing downstream has to re-parse a value that was
+    serialised only to be parsed again.
+    """
+    out = []
+    for ln in lines:
+        i = AFFIX_ID.get(affix_shape(ln))
+        assert i is not None, 'effect line has no stat: %r' % ln
+        slot = affix_slot(ln)
+        if slot is None:
+            out.append([i])
+        elif slot[0] == slot[1]:
+            out.append([i, slot[0]])
+        else:
+            out.append([i, slot[0], slot[1]])
+    return out
+
+
+# The id -> shape table the pass above reads, filled by build() once the whole
+# corpus and every ladder are in hand. Module-level because affix_pairs() is
+# called per item from two places (the item's own lines and its set's rungs).
+AFFIX_ID = {}
+# The vocabulary as the page receives it: [slug, label, hasValue]. Filled by the
+# same pass, in the same module-level way, because write_page() emits it and
+# build() is no longer holding it by then.
+AFFIX_STATS = []
+
+
 # ------------------------------------------------------------------------ build
 
 def build():
@@ -1787,6 +1905,123 @@ def build():
         'sets with an unreachable top rung drifted: %d' % len(_short)
     print('  SET BONUS: %d ladders, %d rungs, %d sets gate a rung they cannot reach'
           % (len(sets), sum(len(s['b']) for s in sets.values()), len(_short)))
+
+    # ---------------------------------------------------------- the affix index
+    # Built here rather than in the item loop because it needs the whole corpus
+    # in hand: the vocabulary is what every line in it has in common, so it
+    # cannot exist until the last item has been read. See the section above.
+    #
+    # Sorting by label rather than by frequency is what the picker wants -- a
+    # datalist reads in document order, so the list should be predictable
+    # rather than reshuffled by whichever item happened to be read first.
+    #
+    # `has_value` is read off the real line, never off the shape: a shape has
+    # had its numbers masked away, so asking it whether it carries one answers
+    # no for every entry in the vocabulary. Masking is positional, so every line
+    # that shares a shape agrees about whether a number stood there.
+    _shapes = {}
+    _use = collections.Counter()
+    for o in out:
+        for ln in list(o.get('fx', ())) + [l for a in o.get('aug', ())
+                                           for l in a['fx']]:
+            sh = affix_shape(ln)
+            _shapes[sh] = _shapes.get(sh, False) or affix_slot(ln) is not None
+            _use[sh] += 1
+    # Every rung is read, not only the reachable ones: a stat that just one
+    # unreachable rung prints is still a stat the game names, and dropping it
+    # would tie the vocabulary's size to this corpus's 15 short ladders.
+    _laddered = {}
+    for s in sets.values():
+        for _thr, _lines in s['b']:
+            for ln in _lines:
+                sh = affix_shape(ln)
+                _use[sh] += 1
+                _laddered[sh] = _laddered.get(sh, False) \
+                    or affix_slot(ln) is not None
+    _set_only = {sh: v for sh, v in _laddered.items() if sh not in _shapes}
+    _vocab = sorted(set(_shapes) | set(_set_only),
+                    key=lambda sh: sh.replace('#', 'X'))
+    # A slug collision would merge two stats in the URL and in the picker while
+    # both stayed visible in the list -- the kind of failure that reads as a
+    # filter which "sometimes does nothing" rather than as a bug.
+    _slugs = collections.Counter(affix_slug(sh) for sh in _vocab)
+    assert max(_slugs.values()) == 1, \
+        'two stats share a slug: %s' % [s for s, c in _slugs.items() if c > 1]
+    AFFIX_ID.clear()
+    AFFIX_ID.update({sh: i for i, sh in enumerate(_vocab)})
+    AFFIX_STATS[:] = [[affix_slug(sh), sh.replace('#', 'X'),
+                       1 if (_shapes.get(sh) or _set_only.get(sh)) else 0]
+                      for sh in _vocab]
+
+    _pairs = 0
+    for o in out:
+        _lines = list(o.get('fx', ())) + [ln for a in o.get('aug', ())
+                                          for ln in a['fx']]
+        if _lines:
+            o['af'] = affix_pairs(_lines)
+            _pairs += len(o['af'])
+    # A set item carries its set's reachable bonuses too, so "show me items with
+    # 25% Attack Speed" can reach the 556 pieces whose only source of it is the
+    # ladder they belong to. A rung above the set's worn capacity is skipped:
+    # the card already dims those, because the game cannot be worn to them.
+    _setpairs = 0
+    for o in out:
+        _ladder = sets.get(o.get('setid'))
+        if not _ladder:
+            continue
+        _lines = [ln for thr, lines in _ladder['b'] if thr <= _ladder['cap']
+                  for ln in lines]
+        if _lines:
+            o['sf'] = affix_pairs(_lines)
+            _setpairs += len(o['sf'])
+    _noval = [s for s in AFFIX_STATS if not s[2]]
+    _idx = [o for o in out if 'af' in o]
+    _setidx = [o for o in out if 'sf' in o]
+    # The counts, each measured before it was written down. 154 is 152 shapes
+    # the 1,892 distinct effect lines reduce to, plus the two that exist only as
+    # set bonuses; 7,293 is every line plus 153 from 74 augments; 2,878 is the
+    # set-bonus index over the 556 pieces of the 80 sets.
+    assert len(AFFIX_STATS) == 154, \
+        'the affix vocabulary moved: %d entries' % len(AFFIX_STATS)
+    assert len(_shapes) == 152 and len(_set_only) == 2 and len(_noval) == 15, \
+        'the vocabulary changed shape: %d item, %d set-only, %d without a value' \
+        % (len(_shapes), len(_set_only), len(_noval))
+    assert _pairs == 7293 and len(_idx) == 2314, \
+        'the affix index moved: %d pairs on %d items' % (_pairs, len(_idx))
+    assert _setpairs == 2878 and len(_setidx) == 556, \
+        'the set-bonus index moved: %d pairs on %d items' \
+        % (_setpairs, len(_setidx))
+    # A shape is one stat, so a shape that appears on five items must have
+    # produced five pairs there and nowhere else. This is the assertion that
+    # catches a mis-keyed id -- the failure mode the whole index rests on, and
+    # the one that would otherwise show up as a filter quietly missing rows.
+    _drift = [o['id'] for o in _idx
+              if len(o['af']) != len(o.get('fx', ()))
+              + sum(len(a['fx']) for a in o.get('aug', ()))]
+    assert not _drift, 'the affix index does not line up with the lines: %s' \
+        % _drift[:3]
+    _sdrift = [o['id'] for o in _setidx
+               if len(o['sf']) != sum(len(ls) for thr, ls
+                                      in sets[o['setid']]['b'] if thr <=
+                                      sets[o['setid']]['cap'])]
+    assert not _sdrift, 'the set-bonus index does not line up: %s' % _sdrift[:3]
+    # The five commonest labels, pinned with their use counts, and the two
+    # set-only ones. The counts above all survive a corpus change that reshaped
+    # which stats exist -- 164 entries could still be 164 different entries --
+    # so these are the assertions that make the picker's contents, not just its
+    # size, a property the build checks.
+    _top = [(sh.replace('#', 'X'), c) for sh, c in _use.most_common(5)]
+    assert _top == [('X to Physical Armor', 375), ('X Knockback', 289),
+                    ('X increase in magic-finding Luck', 286),
+                    ('X Health', 278), ('X Ice Armor', 253)], \
+        'the commonest stats moved: %s' % _top
+    _only = sorted((sh.replace('#', 'X'), _use[sh]) for sh in _set_only)
+    assert _only == [('X Health stolen', 9), ('X Mana stolen', 12)], \
+        'the set-only stats moved: %s' % _only
+    print('  AFFIX: %d stats (%d item, %d set-only, %d without a value), '
+          '%d pairs on %d items, %d set-bonus pairs on %d'
+          % (len(AFFIX_STATS), len(_shapes), len(_set_only), len(_noval),
+             _pairs, len(_idx), _setpairs, len(_setidx)))
     # Every display string the page can print, checked for a decimal comma that
     # survived. _decimal() folds TIDBI's on the way in, but the affix text also
     # arrives from the DAT and that path is not wrapped -- the game ships
@@ -2002,7 +2237,7 @@ def write_page(items, coords, sheet_bytes, size, sets):
     elem = {k: i * ew for i, k in enumerate(DMG_TYPES)}
 
     data = json.dumps({'items': items, 'icons': coords, 'sheet': list(size),
-                       'elem': elem, 'sets': sets},
+                       'elem': elem, 'sets': sets, 'aff': AFFIX_STATS},
                       separators=(',', ':'), ensure_ascii=False)
     # The rail's grouping travels with the page rather than being re-declared in
     # app.js -- one list, so the CSV's category column and the sidebar cannot
