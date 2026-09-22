@@ -87,6 +87,22 @@
   // FocusRequirement and VitalityRequirement.
   var REQLABEL = { str: 'Strength', dex: 'Dexterity', mag: 'Focus', def: 'Vitality' };
 
+  // The socket counts the panel offers, one chip each. The corpus runs 1 to 5
+  // (`sk` is absent on the 4,453 items with none, which n() reads as 0), so
+  // five chips cover every item that can hold a socket at all. Written down
+  // rather than derived, because this is the *control* and not the data: the
+  // row must hold still when the corpus gains or loses a five-socket item.
+  // Every reader of a socket count -- matches(), readHash, writeHash, the panel
+  // -- goes through this list, so no spelling can name a chip that is not on
+  // screen.
+  //
+  // Zero is deliberately not a chip. It is reachable in the data but the row is
+  // "how many do you want", and a reader who wants none wants no filter -- which
+  // is the same reading the rest of this row follows. The cost is that the
+  // 4,453 socket-less items cannot be asked for *by count*; they are found by
+  // every filter that says nothing about sockets.
+  var SOCKCHIPS = [1, 2, 3, 4, 5];
+
   // ------------------------------------------------------------------ state
   // What the page opens on, what #reset restores, what readHash falls back to
   // when a URL names a sort it cannot read, and the value writeHash elides
@@ -100,18 +116,28 @@
   // "every weapon type is checked" are the same filter -- keeping both would
   // just reinstate the empty grid the grouping exists to remove. A legacy
   // #cat= link is expanded to its types on read; see readHash.
+  //
+  // Everything the rail used to carry beside the type facet is the panel's now,
+  // and each filter went with its own state rather than leaving a field behind
+  // that nothing could set: the damage *facet* is `dmgv` with a null bound, the
+  // socket min/max is the chip set, the four stat caps are a bound pair each,
+  // and a single player level is a pair. Every old spelling is expanded on read
+  // rather than dropped, and none of them is a filter without a control.
   var S = {
-    q: '', types: new Set(), tiers: new Set(), dmg: new Set(),
-    set: '', setOnly: false, sockMin: null, sockMax: null,
+    q: '', types: new Set(), tiers: new Set(),
+    set: '', setOnly: false,
+    // A set of counts, not a range. The panel's five chips are the only socket
+    // control there is, and a range cannot say {2, 4}.
+    sockSet: new Set(),
     lvlMin: null, lvlMax: null,
-    req: { str: null, dex: null, mag: null, def: null },
-    // The advanced panel's own state, kept apart from the rail's two
-    // near-neighbours on purpose. `plr` is "equippable at this level", which
-    // reads `lr` -- the same field the item's own level range reads, so the two
-    // narrow from opposite ends. `dmg` above is a *facet*: a set of types the
-    // item has. `dmgv` carries a bound per type, and an empty object means no
-    // filter -- which is why it is not a Set.
-    plr: null, cls: new Set(), dmgv: {}, armv: {}, aff: [], setfx: false,
+    // str/dex/mag/def -> [lo, hi], and *absent* when neither bound is set --
+    // the shape dmgv and armv already use, so one collector reads all three.
+    req: {},
+    // `plr` reads `lr`, the level an item *requires*; `lvl` reads `lv`, the
+    // item's own level. Two different fields, which is what makes two ranges
+    // worth having rather than one written twice.
+    plrMin: null, plrMax: null,
+    cls: new Set(), dmgv: {}, armv: {}, aff: [], setfx: false,
     sort: DEFAULT_SORT, dir: 1, item: ''
   };
 
@@ -248,17 +274,12 @@
     }
     if (skip !== 'types' && S.types.size && !S.types.has(o.t)) return false;
     if (skip !== 'tiers' && S.tiers.size && !S.tiers.has(ownTier(o))) return false;
-    if (skip !== 'dmg' && S.dmg.size) {
-      if (!o.dmg) return false;
-      var hit = false;
-      S.dmg.forEach(function (d) { if (o.dmg[d]) hit = true; });
-      if (!hit) return false;
-    }
-    // `sk` is omitted from the record entirely when an item has no sockets
-    // (see nonzero() in build.py), so n() reads a socket-less item as 0 -- which
-    // is what makes "1 or more" exclude them and "exactly 0" a way to find them.
-    if (S.sockMin != null && n(o.sk) < S.sockMin) return false;
-    if (S.sockMax != null && n(o.sk) > S.sockMax) return false;
+    // Exact counts, not a range: the reader ticks the socket counts they want
+    // and gets those. `sk` is omitted from the record entirely when an item has
+    // no sockets (see nonzero() in build.py), so n() reads a socket-less item
+    // as 0 -- and 0 is a chip this control does not offer, which is what makes
+    // such an item fall out of every setting rather than into one.
+    if (S.sockSet.size && !S.sockSet.has(n(o.sk))) return false;
     // Two independent narrowings: the toggle asks "is it in any set at all",
     // the select asks "which one". Picking a set implies the first, but they
     // are separate state so that clearing the select does not silently drop
@@ -267,13 +288,15 @@
     if (S.set && o.set !== S.set) return false;
     if (S.lvlMin != null && n(o.lv) < S.lvlMin) return false;
     if (S.lvlMax != null && n(o.lv) > S.lvlMax) return false;
-    for (var k in S.req) {
-      if (S.req[k] != null && n(o.rq && o.rq[k]) > S.req[k]) return false;
-    }
-    // "Equippable at level N": a ceiling, and an item naming no requirement
-    // passes it, which is what n() gives -- the 374 shown items with no `lr` at
-    // all are usable at any level, so they survive every setting.
-    if (S.plr != null && n(o.lr) > S.plr) return false;
+    if (!boundHit(o.rq, S.req)) return false;
+    // "Equippable between these levels". The ceiling is the old single field
+    // and an item naming no requirement passes it, which is what n() gives --
+    // the 374 shown items with no `lr` at all are usable at any level. The
+    // floor excludes them, and deliberately: an item that requires nothing
+    // requires nothing *of* level 20 either, so it is not one of the items a
+    // level 20 character has just grown into.
+    if (S.plrMin != null && n(o.lr) < S.plrMin) return false;
+    if (S.plrMax != null && n(o.lr) > S.plrMax) return false;
     // A class gate is a restriction rather than a property, so the four boxes
     // are asymmetric on purpose: an item that names no class is usable by all
     // four and survives every selection. 767 items are restricted, and the
@@ -281,6 +304,26 @@
     if (S.cls.size && o.cls && !S.cls.has(o.cls)) return false;
     if (!typeHit(o.dmg, S.dmgv) || !typeHit(o.arm, S.armv)) return false;
     if (S.aff.length && !affHit(o)) return false;
+    return true;
+  }
+
+  // A stat requirement against a bound pair: the item's own value for that stat
+  // has to land inside the filter's bounds, either of which may be open.
+  //
+  // Unlike typeHit a missing value is a real 0 and not "the item does not have
+  // it" -- n() reads an item that names no strength as requiring none, so a
+  // floor of 1 is the way to find the items that *do* gate on it, and a ceiling
+  // of 20 keeps the 5,000-odd items that ask for nothing. Neither end is a
+  // dropped clause; both are answers to "how much strength does this want".
+  //
+  // An absent pair is not iterated at all, which is why "no rows" needs no
+  // guard: the collector only stores a key whose pair has a bound in it.
+  function boundHit(map, want) {
+    for (var k in want) {
+      var b = want[k], v = n(map && map[k]);
+      if (b[0] != null && v < b[0]) return false;
+      if (b[1] != null && v > b[1]) return false;
+    }
     return true;
   }
 
@@ -387,9 +430,7 @@
     // it there so the strip carries four rarities rather than a fifth that is
     // not one. `uq` is the DAT's displaced rarity, which build.py emits only on
     // set items, so this is identity on every other item.
-    { k: 'tiers', title: 'Tier', get: function (o) { return [ownTier(o)]; } },
-    { k: 'dmg', title: 'Damage type', get: function (o) {
-        return o.dmg ? Object.keys(o.dmg) : []; } }
+    { k: 'tiers', title: 'Tier', get: function (o) { return [ownTier(o)]; } }
   ];
 
   function facetValues(key) {
@@ -550,53 +591,19 @@
     btn.innerHTML = 'Only Sets <span class="ct">' + SETCOUNT + '</span>';
   }
 
+  // The rail is the type facet and nothing else. Every other filter it carried
+  // -- damage, item level, the stat caps, sockets -- is in the advanced panel
+  // now, and the rail's own argument for a filter living in one place applies
+  // to itself: two controls for one narrowing is how a grid ends up empty with
+  // nothing on screen to explain why. What is left is the one facet worth
+  // having in front of you at all times, because it is a browse rather than a
+  // search -- you pick "Axes" the way you pick a shelf, not a number.
+  //
+  // The `tiers` skip is the same one it always was: the tier strip above the
+  // grid is that facet's control, and renderTiers() owns it.
   function renderRail() {
-    var h = '';
-    FACETDEF.forEach(function (f) {
-      if (f.k === 'tiers') return;   // renderTiers above owns this one
-      var fv = facetValues(f.k);
-      // The damage facet's values are the .DAT's own lowercase keys -- `fire`,
-      // `electric` -- and they stay that way, because they are what the URL
-      // carries and what matches() compares. The row prints a word, not a key,
-      // so it capitalises: the same `cap` the detail view's stat lines use, so
-      // the rail and the tooltip spell a type the same way.
-      var label = function (v) { return f.k === 'dmg' ? cap(v) : v; };
-      var body = f.k === 'types' ? typesBody()
-        : fv.arr.map(function (p) { return checkRow(f.k, p[0], label(p[0])); }).join('');
-      if (!fv.arr.length) body = '<div class="f off"><span class="lbl">nothing matches</span></div>';
-      h += section(f.k, f.title, body, fv.total);
-    });
-
-    // min="0" on everything here: these are counts, and the floor is stated to
-    // the browser as well as enforced in floor0 -- it is what limits the
-    // spinner and what :invalid keys off. See floor0 for why it is not enough
-    // on its own.
-    h += section('lvl', 'Item Level', '<div class="rng">' +
-      '<input type="number" min="0" id="lvmin" placeholder="min" value="' + (S.lvlMin == null ? '' : S.lvlMin) + '">' +
-      '<span>&ndash;</span>' +
-      '<input type="number" min="0" id="lvmax" placeholder="max" value="' + (S.lvlMax == null ? '' : S.lvlMax) + '">' +
-      '</div>');
-
-    // "Stat requirement", not "Requirement": with the either/or rule an item's
-    // level branch can be met while the stat branch is not, and these four
-    // inputs only ever test the stat branch. Naming them the same way the
-    // detail view does also matters more than it looks -- TL2 has no "Magic"
-    // or "Defense" stat, so MAG/DEF pointed at attributes that do not exist.
-    h += section('req', 'Stat requirement at most', ['str', 'dex', 'mag', 'def'].map(function (k) {
-      return '<div class="rng"><span class="rl">' + REQLABEL[k] + '</span>' +
-        '<input type="number" min="0" data-req="' + k + '" placeholder="any" value="' +
-        (S.req[k] == null ? '' : S.req[k]) + '"></div>';
-    }).join(''));
-
-    // A count range, not the "Has sockets" toggle it replaces. The toggle could
-    // only ask "any at all", which is one of the six answers here and the least
-    // useful of them -- the question is "2 or more", not "at least one". Same
-    // `.rng` pair as Item Level above, and for the same reasons.
-    h += section('sk', 'Sockets', '<div class="rng">' +
-      '<input type="number" min="0" id="skmin" placeholder="min" value="' + (S.sockMin == null ? '' : S.sockMin) + '">' +
-      '<span>&ndash;</span>' +
-      '<input type="number" min="0" id="skmax" placeholder="max" value="' + (S.sockMax == null ? '' : S.sockMax) + '">' +
-      '</div>');
+    var h = '', fv = facetValues('types');
+    h += section('types', 'Type', typesBody(), fv.total);
 
     var rb = document.getElementById('railbody');
     rb.innerHTML = h;
@@ -694,10 +701,10 @@
     // Array.from, not [].slice.call -- a Set has no .length, so slice() on one
     // silently yields [] and every facet would look unchanged.
     var s = function (set) { return Array.from(set).sort(); };
-    return JSON.stringify([S.q, s(S.types), s(S.tiers), s(S.dmg),
-      S.set, S.setOnly, S.sockMin, S.sockMax, S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
-      ['str', 'dex', 'mag', 'def'].map(function (k) { return S.req[k]; }),
-      S.plr, s(S.cls), typeSig(S.dmgv), typeSig(S.armv), S.setfx,
+    return JSON.stringify([S.q, s(S.types), s(S.tiers),
+      S.set, S.setOnly, s(S.sockSet), S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
+      typeSig(S.req),
+      S.plrMin, S.plrMax, s(S.cls), typeSig(S.dmgv), typeSig(S.armv), S.setfx,
       S.aff.map(function (c) { return [c.stat, c.lo, c.hi]; })]);
   }
 
@@ -1165,11 +1172,11 @@
   // set's filter, and arriving still narrowed by whatever happened to be on
   // would answer a different question than the one that was asked.
   function resetState() {
-    S.types = new Set(); S.tiers = new Set(); S.dmg = new Set();
-    S.set = ''; S.setOnly = false; S.sockMin = S.sockMax = null;
+    S.types = new Set(); S.tiers = new Set();
+    S.set = ''; S.setOnly = false; S.sockSet = new Set();
     S.lvlMin = S.lvlMax = null; S.item = '';
-    S.req = { str: null, dex: null, mag: null, def: null };
-    S.plr = null; S.cls = new Set(); S.dmgv = {}; S.armv = {};
+    S.req = {};
+    S.plrMin = S.plrMax = null; S.cls = new Set(); S.dmgv = {}; S.armv = {};
     S.aff = []; S.setfx = false;
     S.q = ''; S.sort = DEFAULT_SORT; S.dir = 1;
     // The tier facet starts fully selected, unlike the rail's other facets,
@@ -1226,28 +1233,72 @@
       });
       else if (k === 'type') S.types = new Set(list);
       else if (k === 'tier') S.tiers = new Set(list);
-      else if (k === 'dmg') S.dmg = new Set(list);
+      // `dmg=` was the rail's damage facet -- a set of types the item *has* --
+      // until the panel's per-type bounds replaced it. A type named with no
+      // bound is exactly that presence test (see typeHit), so the old spelling
+      // expands into the new one through the same parser, and a stale bookmark
+      // still asks its own question.
+      else if (k === 'dmg') parseBounds(v, S.dmgv);
       else if (k === 'set') S.set = v;
       else if (k === 'setonly') S.setOnly = v === '1';
-      // `sock=1` was the "Has sockets" toggle's key until that became a count
-      // range. Expanded rather than dropped, the way `cat=` is above: an old
-      // bookmark should still filter instead of quietly doing nothing. It is
-      // read-only -- the control writes `sk=` and never this, so the two spellings
-      // can never both appear in one hash.
-      else if (k === 'sock') { if (v === '1') S.sockMin = 1; }
+      // `sock=1` was the "Has sockets" toggle's key, and `sk=lo-hi` was the
+      // count range that replaced it. Both are expanded rather than dropped,
+      // the way `cat=` is above: an old bookmark should still filter instead of
+      // quietly doing nothing. "Has sockets" is every chip from 1 up. Neither
+      // spelling is ever written back; see writeHash.
+      //
+      // A range collapses to its intersection with the chip row, one rule for
+      // every case. `sk=2-` is the four chips at or above 2, `sk=-4` is the four
+      // at or below it, and `sk=0-` -- a floor below every chip -- is the whole
+      // row, which is what "no floor" has to mean in a row that starts at 1.
+      // Two of those are not the ranges they were: `sk=0-0` asked for the
+      // socket-*less* items and `sk=3-2` asked for nothing, and neither answer
+      // is a subset of the five chips, so both collapse to the empty selection.
+      // An empty selection is no filter, which is the shipped reading of a
+      // retired name that matches nothing (`#cat=Nonsense` shows the whole
+      // corpus for the same reason) rather than a second, silent spelling of
+      // "match nothing" that no control could ever show or clear.
+      else if (k === 'sock') { if (v === '1') S.sockSet = new Set(SOCKCHIPS); }
+      else if (k === 'sk') {
+        if (v.indexOf('-') < 0) list.forEach(function (c) {
+          c = floor0(c);
+          if (SOCKCHIPS.indexOf(c) >= 0) S.sockSet.add(c);
+        });
+        else {
+          var sp = v.split('-'), lo = floor0(sp[0]), hi = floor0(sp[1]);
+          SOCKCHIPS.forEach(function (c) {
+            if (lo != null && c < lo) return;
+            if (hi != null && c > hi) return;
+            S.sockSet.add(c);
+          });
+        }
+      }
       else if (k === 'q') S.q = v.toLowerCase();
       else if (k === 'item') S.item = v;
       else if (k === 'sort') S.sort = v || DEFAULT_SORT;
       else if (k === 'dir') S.dir = v === 'desc' ? -1 : 1;
       else if (k === 'lvl') { var p = v.split('-'); S.lvlMin = floor0(p[0]);
                               S.lvlMax = floor0(p[1]); }
-      else if (k === 'sk') { var sp = v.split('-'); S.sockMin = floor0(sp[0]);
-                             S.sockMax = floor0(sp[1]); }
+      // `req=str:50,dex:30:40`. A row is `key`, `key:hi` or `key:lo:hi`, split
+      // on `:` -- the same three shapes an affix row has, and two bounds are
+      // read the same way in both. One number is the *ceiling* it used to be:
+      // until the panel gave these fields a floor, a single value meant "at
+      // most", and reading `req=str:50` as a floor would invert every old link.
       else if (k === 'req') list.forEach(function (r) {
-        var q = r.split(':'); if (q[0]) S.req[q[0]] = floor0(q[1]); });
+        var q = r.split(':');
+        if (!q[0]) return;
+        var b = q.length > 2 ? [num(q[1]), num(q[2])] : [null, num(q[1])];
+        if (b[0] != null || b[1] != null) S.req[q[0]] = b;
+      });
       // The advanced panel's keys. Every one is read with the same tolerance the
       // rail's are: an empty or unreadable bound is *no* bound, never NaN.
-      else if (k === 'plr') S.plr = floor0(v);
+      //
+      // `plr=50` was "equippable at level 50" -- a ceiling, which is what a lone
+      // number still reads as. `plr=10-50` is the pair.
+      else if (k === 'plr') {
+        if (v.indexOf('-') < 0) S.plrMax = floor0(v);
+        else { var pp = v.split('-'); S.plrMin = floor0(pp[0]); S.plrMax = floor0(pp[1]); }
+      }
       else if (k === 'cls') list.forEach(function (c) { if (c) S.cls.add(c); });
       else if (k === 'setfx') S.setfx = v === '1';
       else if (k === 'dmgv') parseBounds(v, S.dmgv);
@@ -1324,14 +1375,24 @@
     });
     if (S.set) p.push('set=' + encodeURIComponent(S.set));
     if (S.setOnly) p.push('setonly=1');
-    if (S.sockMin != null || S.sockMax != null)
-      p.push('sk=' + (S.sockMin == null ? '' : S.sockMin) + '-' + (S.sockMax == null ? '' : S.sockMax));
+    // Ascending, so the URL does not depend on which chip was ticked first.
+    // SOCKCHIPS order rather than the Set's, which is insertion order.
+    if (S.sockSet.size)
+      p.push('sk=' + SOCKCHIPS.filter(function (c) { return S.sockSet.has(c); }).join(','));
     if (S.lvlMin != null || S.lvlMax != null)
       p.push('lvl=' + (S.lvlMin == null ? '' : S.lvlMin) + '-' + (S.lvlMax == null ? '' : S.lvlMax));
-    var rq = ['str', 'dex', 'mag', 'def'].filter(function (k) { return S.req[k] != null; })
-      .map(function (k) { return k + ':' + S.req[k]; });
+    // In the four stats' own order, and each row as `key:lo:hi` with an open
+    // side left blank -- the spelling `req=str::50` reads as the old ceiling
+    // and round-trips through the same parser. Only a row with a bound in it is
+    // carried, which is the same rule dmgv and armv follow.
+    var rq = ['str', 'dex', 'mag', 'def'].filter(function (k) { return S.req[k]; })
+      .map(function (k) {
+        var b = S.req[k];
+        return k + ':' + (b[0] == null ? '' : b[0]) + ':' + (b[1] == null ? '' : b[1]);
+      });
     if (rq.length) p.push('req=' + rq.join(','));
-    if (S.plr != null) p.push('plr=' + S.plr);
+    if (S.plrMin != null || S.plrMax != null)
+      p.push('plr=' + (S.plrMin == null ? '' : S.plrMin) + '-' + (S.plrMax == null ? '' : S.plrMax));
     // Elided when all four are on, for the same reason a facet is elided when
     // all of its boxes are: no item fails a test every class passes. `all`
     // order first, so the URL is stable whatever order the boxes were ticked.
@@ -1379,10 +1440,9 @@
   // into S and closes; Reset empties the draft; Escape, the ✕ and the scrim
   // throw it away. Two things fall out of that, and both are the point:
   //
-  //   * S stays the single source of filter truth. The panel writes lvlMin and
-  //     sockMin exactly where the rail does -- it does not own a second copy of
-  //     them, and the two controls cannot disagree, because opening the panel
-  //     reads the rail's numbers out of S and Search writes them back.
+  //   * S stays the single source of filter truth -- the panel does not own a
+  //     second copy of anything, and opening it reads S back into the controls,
+  //     so a filter set by a URL shows up in the fields that would set it.
   //   * nothing filters while the panel is open, which is the interaction that
   //     was asked for: set the filters, hit Search, see the results.
   //
@@ -1391,6 +1451,10 @@
   // that is read once, at commit, never has to.
   var advS = null;
   var advOn = false;
+  // Which tab the Type section is showing. View state, not filter state: it
+  // chooses whose boxes are on screen and never enters the draft, so switching
+  // tabs cannot change what a search would return.
+  var advTab = 'All';
 
   // The four class names, read off the corpus rather than written down here: a
   // fifth would otherwise be unselectable without a code change, and `cls` is
@@ -1404,18 +1468,29 @@
     return out.sort();
   })();
 
-  // One `label | min | max` row, the shape the rail's level and socket fields
-  // already use. `hi` left undefined gives a single box -- a ceiling, which is
-  // what a requirement cap and the player level both are. `attr` is the draft
-  // path the boxes write to, so collecting them needs no table of field names.
+  // The tab strip's labels: every category TAXONOMY names, in its declared
+  // order, behind "All". Read off the taxonomy rather than written down, so a
+  // category added to the build's groups is a tab without a code change -- the
+  // same reason ALLCLASSES is read and not listed.
+  var TGROUPS = (function () {
+    var out = ['All'];
+    TAXONOMY.forEach(function (e) { if (out.indexOf(e.g) < 0) out.push(e.g); });
+    return out;
+  })();
+
+  // One `label | min | max` row. Both ends, always: every field left on this
+  // panel is a range, and a row that sometimes showed one box and sometimes two
+  // -- which is what `hi === undefined` used to produce for a damage type with
+  // no bound yet -- reads as a different control each time the panel is opened.
+  // `attr` is the draft path the boxes write to, so collecting them needs no
+  // table of field names.
   function advRange(attr, label, lo, hi) {
-    var h = hi === undefined;
     return '<div class="rng"><span class="rl">' + esc(label) + '</span>' +
       '<input type="number" min="0" data-a="' + attr + '" data-end="lo" value="' +
       (lo == null ? '' : lo) + '" placeholder="any">' +
-      (h ? '' : '<span>&ndash;</span><input type="number" min="0" data-a="' + attr +
-        '" data-end="hi" value="' + (hi == null ? '' : hi) + '" placeholder="any">') +
-      '</div>';
+      '<span>&ndash;</span>' +
+      '<input type="number" min="0" data-a="' + attr + '" data-end="hi" value="' +
+      (hi == null ? '' : hi) + '" placeholder="any"></div>';
   }
 
   // A fresh draft off S. Everything is copied, not shared -- the panel mutates
@@ -1424,10 +1499,11 @@
     var d = {}, a = {}, r = {}, k;
     for (k in S.dmgv) d[k] = S.dmgv[k].slice();
     for (k in S.armv) a[k] = S.armv[k].slice();
-    for (k in S.req) r[k] = S.req[k];
+    for (k in S.req) r[k] = S.req[k].slice();
     return {
-      q: S.q, lvlMin: S.lvlMin, lvlMax: S.lvlMax, plr: S.plr,
-      sockMin: S.sockMin, sockMax: S.sockMax, req: r,
+      q: S.q, lvlMin: S.lvlMin, lvlMax: S.lvlMax,
+      plrMin: S.plrMin, plrMax: S.plrMax, req: r,
+      types: new Set(S.types), sockSet: new Set(S.sockSet),
       cls: new Set(S.cls), dmgv: d, armv: a, setfx: S.setfx,
       aff: S.aff.map(function (c) {
         return { text: c.text, stat: c.stat, lo: c.lo, hi: c.hi };
@@ -1450,22 +1526,22 @@
       // own box does it (see #q's keydown): matches() indexes the name with
       // S.q as typed, so a `Fire` that reached it unfolded would match nothing.
       if (p[0] === 'q') advS.q = el.value.trim().toLowerCase();
-      // floor0 throughout, because these are the same S members the rail's
-      // boxes write: a floor on one side and not the other would make one typed
-      // value mean two things depending on which control it went through.
-      else if (p[0] === 'plr') advS.plr = floor0(el.value);
-      else if (p[0] === 'req') advS.req[p[1]] = floor0(el.value);
-      else if (p[0] === 'lvl' || p[0] === 'sock')
+      // floor0 throughout, because these are the same S members a URL writes: a
+      // floor on one side and not the other would make one typed value mean two
+      // things depending on which way it came in.
+      else if (p[0] === 'lvl' || p[0] === 'plr')
         advS[p[0] + (end === 'lo' ? 'Min' : 'Max')] = floor0(el.value);
     }
-    // Rebuilt rather than merged, so a type whose two boxes were both cleared
+    // The three bound maps -- dmgv, armv and the four stat requirements -- are
+    // rebuilt rather than merged, so a row whose two boxes were both cleared
     // drops out of the filter. Two empty boxes are the only way the panel can
-    // say "no constraint" -- there is no third state to confuse it with.
-    advS.dmgv = {}; advS.armv = {};
+    // say "no constraint" -- there is no third state to confuse it with -- and
+    // an empty map is what matches() reads as no filter at all.
+    advS.dmgv = {}; advS.armv = {}; advS.req = {};
     for (i = 0; i < boxes.length; i++) {
       el = boxes[i];
       var q = el.getAttribute('data-a').split('.');
-      if (q[0] !== 'dmgv' && q[0] !== 'armv') continue;
+      if (!q[1] || (q[0] !== 'dmgv' && q[0] !== 'armv' && q[0] !== 'req')) continue;
       var b = advS[q[0]][q[1]] || [null, null];
       b[el.getAttribute('data-end') === 'lo' ? 0 : 1] = num(el.value);
       if (b[0] != null || b[1] != null) advS[q[0]][q[1]] = b;
@@ -1473,6 +1549,25 @@
     advS.cls = new Set();
     var cls = root.querySelectorAll('[data-acls]');
     for (i = 0; i < cls.length; i++) if (cls[i].checked) advS.cls.add(cls[i].value);
+    // The type boxes only carry the tab that is on screen; the draft holds every
+    // tab. So the ones the reader cannot see are kept as they stand and only the
+    // visible ones are rewritten -- which is what makes switching tabs a view
+    // change and not a filter change. Cleared first so unticking works.
+    var seen = root.querySelectorAll('[data-atype]');
+    for (i = 0; i < seen.length; i++) {
+      if (seen[i].checked) advS.types.add(seen[i].value);
+      else advS.types.delete(seen[i].value);
+    }
+    // The chip's number is its data-achip, not a `value` attribute: one
+    // spelling of it, and the same one advChips() renders from. Reading
+    // .value here would collect "on" from every chip -- a checkbox with no
+    // value attribute reports the browser's default -- and +"on" is NaN, which
+    // is a Set of one member that matches nothing and writes `sk=` as an empty
+    // list on the way out.
+    advS.sockSet = new Set();
+    var chips = root.querySelectorAll('[data-achip]');
+    for (i = 0; i < chips.length; i++)
+      if (chips[i].checked) advS.sockSet.add(+chips[i].getAttribute('data-achip'));
     var fx = root.querySelector('[data-asetfx]');
     advS.setfx = !!(fx && fx.checked);
 
@@ -1507,20 +1602,109 @@
     h.querySelector('.tog').textContent = SEC[k] === false ? '+' : '−';
   }
 
+  // The Type section: one checkbox per type, grouped by the taxonomy, behind a
+  // strip of tabs that choose which group is on screen.
+  //
+  // The tab strip is a *view*. It is built from TAXONOMY's own category names
+  // so a fifth category is a tab without a code change, and it never touches the
+  // draft -- "All" is every group stacked, with each group's header above its
+  // boxes, and any other tab is that one group's rows. Switching re-renders from
+  // the draft (advCollect first, so the tab being left keeps its ticks), which
+  // is why a selection can span tabs.
+  //
+  // The rows are deliberately not checkRow(): that writes data-f and data-ct,
+  // and the document's change handler owns data-f while paintCounts() walks
+  // every data-ct span and would throw on one outside the rail. data-atype is
+  // this panel's own name for the same box.
+  //
+  // The boxes are the *corpus's* types, not the current answer's, which is where
+  // this parts company with the rail. typesBody() builds from the filtered facet
+  // counts, so a type drops out of the rail when another filter excludes it --
+  // right for a browse list whose counts are beside it, and wrong for a form: a
+  // checkbox that disappears because of a filter the same form set is a box the
+  // reader cannot tick, so a query could never be widened from here. ALLTYPES
+  // is fixed at load and does not move with S.
+  var ALLTYPES = (function () {
+    var seen = Object.create(null);
+    for (var i = 0; i < ITEMS.length; i++) seen[ITEMS[i].t] = 1;
+    return seen;
+  })();
+
+  function advTypes() {
+    var seen = ALLTYPES;
+    var placed = Object.create(null);
+    var h = '<div class="ttabs">' + TGROUPS.map(function (g) {
+      return '<button class="ttab' + (advTab === g ? ' on' : '') + '" data-atab="' +
+        esc(g) + '">' + esc(g) + '</button>';
+    }).join('') + '</div>';
+    var box = function (t) {
+      var on = advS.types.has(t);
+      return '<label class="f' + (on ? '' : ' off') + '">' +
+        '<input type="checkbox" data-atype value="' + esc(t) + '"' +
+        (on ? ' checked' : '') + '><span class="lbl">' + esc(t) + '</span></label>';
+    };
+    var rows = '', lastG = null;
+    TAXONOMY.forEach(function (e) {
+      if (advTab !== 'All' && e.g !== advTab) return;
+      if (e.g !== lastG) { rows += '<div class="tgh">' + esc(e.g) + '</div>'; lastG = e.g; }
+      if (e.s) rows += '<div class="tgh s">' + esc(e.s) + '</div>';
+      e.t.forEach(function (t) {
+        if (!seen[t]) return;          // a type the corpus does not carry
+        placed[t] = 1;
+        rows += box(t);
+      });
+    });
+    // Belt and braces, the same one the rail keeps for the same reason: build.py
+    // asserts every type it emits is in TYPE_GROUPS, but losing a type silently
+    // is the one failure this could hide, so anything unnamed still renders
+    // rather than vanishing. Only under "All" -- an unnamed type belongs to no
+    // tab. `rest` walks the corpus's types rather than the taxonomy, so a type
+    // the taxonomy forgot is found here rather than nowhere.
+    var rest = Object.keys(ALLTYPES).filter(function (t) { return !placed[t]; }).sort();
+    if (rest.length && advTab === 'All') {
+      rows += '<div class="tgh">Other</div>';
+      rest.forEach(function (t) { rows += box(t); });
+    }
+    if (!rows) rows = '<div class="f off"><span class="lbl">nothing matches</span></div>';
+    return h + '<div class="tgrid">' + rows + '</div>';
+  }
+
+  // The socket counts, as a row of chips. Multi-select: ticking 2 and 4 asks for
+  // items with two sockets or four, which is the whole reason this is not the
+  // min/max pair it replaces -- a range cannot leave a hole in the middle.
+  function advChips() {
+    return '<div class="tgrid chips">' + SOCKCHIPS.map(function (c) {
+      var on = advS.sockSet.has(c);
+      return '<label class="chip' + (on ? ' on' : '') + '">' +
+        '<input type="checkbox" data-achip="' + c + '"' + (on ? ' checked' : '') + '>' +
+        '<span>' + c + '</span></label>';
+    }).join('') + '</div>';
+  }
+
   function renderAdv() {
     var g = '<div class="rng"><span class="rl">Name</span>' +
       '<input type="text" data-a="q" value="' + esc(advS.q) +
       '" placeholder="name, id or type"></div>';
     g += advRange('lvl', 'Item Level', advS.lvlMin, advS.lvlMax);
-    g += advRange('plr', 'Player Level', advS.plr);
-    g += advRange('sock', 'Sockets', advS.sockMin, advS.sockMax);
+    g += advRange('plr', 'Player Level', advS.plrMin, advS.plrMax);
+    // A row of its own rather than a pair: the label column is the same 84px
+    // the rows above use, so the chips line up under the boxes they replace.
+    g += '<div class="rng"><span class="rl">Sockets</span>' + advChips() + '</div>';
 
-    var rq = '<div class="agrid">';
-    ['str', 'dex', 'mag', 'def'].forEach(function (k) {
-      rq += advRange('req.' + k, REQLABEL[k], advS.req[k]);
-    });
-    rq += '</div>';
-    rq += '<div class="agrid">' + ALLCLASSES.map(function (c) {
+    // "Stat Requirements", because that is what these four are: an item's
+    // requirement is met either by its level or by its stats, and these rows
+    // only ever test the stat branch. The label is the same one the detail view
+    // prints, and TL2 has no "Magic" or "Defense" stat, so MAG and DEF point at
+    // attributes that exist.
+    var rq = '<div class="agrid">' + ['str', 'dex', 'mag', 'def'].map(function (k) {
+      var b = advS.req[k] || [null, null];
+      return advRange('req.' + k, REQLABEL[k], b[0], b[1]);
+    }).join('') + '</div>';
+
+    // Class is its own section, not a tail on the requirements: it is a
+    // different kind of question -- a restriction the item carries rather than a
+    // number it asks for -- and it reads that way.
+    var cl = '<div class="agrid">' + ALLCLASSES.map(function (c) {
       var on = advS.cls.has(c);
       // No data-ct: paintCounts() writes a count into every [data-ct] span and
       // would throw on one outside the rail. No data-f either -- the document's
@@ -1530,12 +1714,16 @@
     }).join('') + '</div>';
 
     var body = section('advgen', 'General', g) +
-      section('advreq', 'Requirements & Class', rq);
+      section('advtype', 'Type', advTypes()) +
+      section('advreq', 'Stat Requirements', rq) +
+      section('advcls', 'Class', cl);
     body += section('advdmg', 'Damage', DMGTYPES.map(function (t) {
-      return advRange('dmgv.' + t, cap(t), (advS.dmgv[t] || [])[0], (advS.dmgv[t] || [])[1]);
+      var b = advS.dmgv[t] || [null, null];
+      return advRange('dmgv.' + t, cap(t), b[0], b[1]);
     }).join(''));
     body += section('advarm', 'Armor', DMGTYPES.map(function (t) {
-      return advRange('armv.' + t, cap(t), (advS.armv[t] || [])[0], (advS.armv[t] || [])[1]);
+      var b = advS.armv[t] || [null, null];
+      return advRange('armv.' + t, cap(t), b[0], b[1]);
     }).join(''));
 
     var rows = advS.aff.map(function (c, i) {
@@ -1595,20 +1783,23 @@
 
   // Reset empties the *draft*. It is a form reset, not an undo of the page's
   // filters: nothing has been applied yet, so there is nothing to take back
-  // until Search.
+  // until Search. The tab goes back to All for the same reason -- it is part of
+  // what the panel looks like when it opens, and Reset leaves it as it found it.
   function advReset() {
     advS = {
-      q: '', lvlMin: null, lvlMax: null, plr: null, sockMin: null, sockMax: null,
-      req: { str: null, dex: null, mag: null, def: null },
+      q: '', lvlMin: null, lvlMax: null, plrMin: null, plrMax: null,
+      req: {}, types: new Set(), sockSet: new Set(),
       cls: new Set(), dmgv: {}, armv: {}, setfx: false, aff: []
     };
+    advTab = 'All';
     renderAdv();
   }
 
   function advCommit() {
     advCollect();
     S.q = advS.q; S.lvlMin = advS.lvlMin; S.lvlMax = advS.lvlMax;
-    S.plr = advS.plr; S.sockMin = advS.sockMin; S.sockMax = advS.sockMax;
+    S.plrMin = advS.plrMin; S.plrMax = advS.plrMax;
+    S.sockSet = advS.sockSet; S.types = advS.types;
     S.setfx = advS.setfx;
     // The draft is built fresh by advCopy() on every open and never touched
     // again after this line, so handing S its members outright shares nothing
@@ -1625,9 +1816,9 @@
     // item card would close and leave the card exactly where it was.
     //
     // Then onRoute() rather than apply(): only onRoute() rebuilds the rail, and
-    // the rail is where the item-level and socket boxes the panel just wrote
-    // live. Without it they would keep showing the old numbers beside a grid
-    // filtered by the new ones.
+    // the panel now writes S.types, which is the rail's one remaining facet.
+    // Without it the rail would show the old tick marks beside a grid filtered
+    // by the new ones.
     S.item = '';
     showAll = false;
     writeHash();
@@ -1646,6 +1837,7 @@
   document.getElementById('advbtn').addEventListener('click', function () {
     if (advOn) { advShow(false); return; }
     advS = advCopy();
+    advTab = 'All';
     renderAdv();
     advShow(true);
     var f = document.querySelector('#advb [data-a="q"]');
@@ -1670,6 +1862,15 @@
     if (del != null) {
       advCollect();          // read the other rows before this one renumbers them
       advS.aff.splice(+del, 1);
+      renderAdv();
+      return;
+    }
+    var tab = t.getAttribute && t.getAttribute('data-atab');
+    if (tab != null) {
+      // Collected first: the tab being left is about to be taken off screen, and
+      // without this its ticks would go with it.
+      advCollect();
+      advTab = tab;
       renderAdv();
       return;
     }
@@ -1752,34 +1953,7 @@
       // them all would look like the filter had been thrown away
       showAll = false; writeHash(); render(); paintCounts();
     } else if (t.id === 'setsel') { S.set = t.value; showAll = false; writeHash(); render(); paintCounts(); }
-    else if (t.id === 'skmin' || t.id === 'skmax') {
-      var skmin = document.getElementById('skmin'), skmax = document.getElementById('skmax');
-      S.sockMin = floor0(skmin.value);
-      S.sockMax = floor0(skmax.value);
-      skmin.value = S.sockMin == null ? '' : S.sockMin;   // see the stat box above
-      skmax.value = S.sockMax == null ? '' : S.sockMax;
-      showAll = false; writeHash(); render(); paintCounts();
-    }
     else if (t.id === 'sort') { S.sort = t.value; apply(); }
-    else if (t.getAttribute && t.getAttribute('data-req')) {
-      var k = t.getAttribute('data-req');
-      S.req[k] = floor0(t.value);
-      // The field is floored in place, and this is the only place that can do
-      // it: a control moving goes through apply(), which repaints the grid in
-      // place rather than rebuilding the rail (onRoute() is the rebuild, and it
-      // runs on a URL move). So the box keeps whatever was typed into it, and no
-      // later render will correct it -- without this line a typed "-5" would sit
-      // in the field looking like a bound while the state filtered at 0.
-      t.value = S.req[k] == null ? '' : S.req[k];
-      showAll = false; writeHash(); render(); paintCounts();
-    } else if (t.id === 'lvmin' || t.id === 'lvmax') {
-      var lvmin = document.getElementById('lvmin'), lvmax = document.getElementById('lvmax');
-      S.lvlMin = floor0(lvmin.value);
-      S.lvlMax = floor0(lvmax.value);
-      lvmin.value = S.lvlMin == null ? '' : S.lvlMin;   // see the stat box above
-      lvmax.value = S.lvlMax == null ? '' : S.lvlMax;
-      showAll = false; writeHash(); render(); paintCounts();
-    }
   });
 
   // A search is a question about the whole corpus, so it replaces whatever is on

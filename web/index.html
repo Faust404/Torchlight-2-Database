@@ -59,11 +59,6 @@
     <div id="grid-wrap">
       <div id="bar">
         <button id="railbtn" title="Filters">&#9776;</button>
-        <!-- First in the bar on purpose: it is the one control that changes
-             *which* items match, where everything beside it decides which of
-             the matches are shown. -->
-        <button id="advbtn" aria-expanded="false" aria-controls="adv"
-                title="Search by stats, affixes and properties">Advanced Search</button>
         <span class="count" id="count"></span>
         <button id="onlyset" aria-pressed="false" title="Show only set items">Only Sets</button>
         <select id="setsel" title="Show one set"><option value="">any set</option></select>
@@ -75,6 +70,13 @@
              first. -->
         <a class="bar-nav" href="socketables.html">Socketables Table</a>
         <span class="sp"></span>
+        <!-- Last in the bar before Sort, and the only control here that opens
+             something rather than narrowing what is already on screen. It wore
+             the toolbar's plain chrome while it sat first among the filters;
+             down here, beside a label and a select, it has to read as the way
+             into the search rather than as one more filter. -->
+        <button id="advbtn" aria-expanded="false" aria-controls="adv"
+                title="Search by stats, affixes and properties">Advanced Search</button>
         <label for="sort">Sort</label>
         <select id="sort">
           <option value="tier">Tier</option>

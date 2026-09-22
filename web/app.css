@@ -221,6 +221,19 @@ button,input,select{font:inherit; color:inherit}
    (1,1,0) -- the toolbar's rule would win. */
 #bar #onlyset:hover,#bar #onlyset.on{border-color:var(--t-set); color:var(--t-set)}
 #bar #onlyset.on{background:color-mix(in srgb,var(--t-set) 20%,#1b1917)}
+/* Advanced Search is the way *into* a search, not one more filter, and it sits
+   among the controls that decide how the matches are shown rather than which
+   ones match. So it keeps the gold at rest instead of only on hover -- the same
+   treatment `#advgo` gives the panel's own Search button, so the door and the
+   button behind it are visibly the same idea. Two ids deep for the reason just
+   above: `#bar button` is (1,1,1) and a bare `#advbtn` would lose to it. */
+#bar #advbtn{
+  background:#2a2216; border-color:var(--label); color:var(--gold);
+  white-space:nowrap;
+}
+#bar #advbtn:hover,#bar #advbtn.on{
+  background:#3a2f1c; border-color:var(--gold); color:var(--gold);
+}
 
 /* ------------------------------------------------------------- tier strip
    The rarity filter, out of the rail and onto its own row under the toolbar --
@@ -684,6 +697,41 @@ button,input,select{font:inherit; color:inherit}
 #adv .arow.bad input[type=text]{border-color:var(--t-legendary); color:var(--t-legendary)}
 #adv .aadd{margin:6px 10px 2px}
 
+/* The Type section. A strip of view tabs over a grid of type boxes -- the tabs
+   choose whose boxes are on screen and never change the selection, so they are
+   styled as tabs (a row of chips, the active one lit) and not as checkboxes. */
+#adv .ttabs{display:flex; flex-wrap:wrap; gap:4px; padding:2px 10px 7px}
+#adv .ttab{padding:3px 10px; font-size:12px; color:var(--label)}
+#adv .ttab.on{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+/* Two columns, the way the taxonomy's own screens read. The header spans both,
+   so a group never breaks across the gutter mid-list. */
+#adv .tgrid{
+  display:grid; grid-template-columns:1fr 1fr; gap:0 10px;
+  padding:0 10px 4px; align-items:start;
+}
+#adv .tgh{
+  grid-column:1 / -1; margin-top:5px; padding:2px 0;
+  color:var(--head); font-size:10px; letter-spacing:.13em; text-transform:uppercase;
+}
+#adv .tgh.s{padding-left:10px; color:var(--label); letter-spacing:.11em}
+#adv .tgrid .f{padding:2px 0}
+
+/* The socket counts. A checkbox each, visually reduced to the number: the box
+   itself is clipped rather than hidden, so it keeps its place in the tab order
+   and the focus ring can be drawn on the span beside it. */
+#adv .tgrid.chips{display:flex; flex:1 1 auto; gap:4px; padding:0}
+#adv .chip{position:relative; display:inline-flex}
+#adv .chip input{position:absolute; width:1px; height:1px; opacity:0; margin:0}
+#adv .chip span{
+  display:block; min-width:26px; text-align:center; padding:4px 0;
+  background:#0e0d0c; border:1px solid var(--div); border-radius:3px;
+  color:var(--muted); font-size:12px; cursor:pointer;
+  font-variant-numeric:tabular-nums;
+}
+#adv .chip:hover span{border-color:var(--label); color:var(--gold)}
+#adv .chip.on span{background:#3a2f1c; border-color:var(--gold); color:var(--gold)}
+#adv .chip input:focus-visible + span{outline:2px solid var(--gold); outline-offset:1px}
+
 /* --------------------------------------------------------------- empty/msg */
 .msg{padding:40px 6px; color:var(--label); text-align:center}
 
@@ -707,6 +755,7 @@ button,input,select{font:inherit; color:inherit}
     border:0; border-radius:0;
   }
   #adv .agrid{grid-template-columns:1fr}
+  #adv .tgrid{grid-template-columns:1fr}
   .card{flex:1 1 auto; width:auto; min-width:0}
   /* the group headers are controls now, not just captions -- give them a
      finger-sized target on the drawer */

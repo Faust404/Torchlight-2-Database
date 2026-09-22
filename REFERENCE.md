@@ -1669,6 +1669,11 @@ and the site hides that tier, so those three render no row either — a type wit
 nothing visible to match is not worth a checkbox. The rail therefore shows 36
 rows against the 39 types the data emits.
 
+Those same 36 are the advanced panel's Type section, and there the count does not
+move: the rail drops a row when nothing matching carries that type, and the panel
+keeps every box whatever the rest of the query says — see §7's advanced search,
+where the two figures are asserted on one line.
+
 ### Icons
 
 Better than expected: **6,242 of 6,262** items resolve an icon — 6,213 from the
@@ -1704,11 +1709,18 @@ available at no cost to the pixels, so that is what shipped.
 
 ### The browser
 
-`out\index.html` opens from `file://` with no server and no network. Filters live
-in the rail with live counts — type, damage type, level range, stat-requirement
-caps, sockets — except for the two that sit with the results they order: the
+`out\index.html` opens from `file://` with no server and no network. **The rail
+carries the type facet and nothing else** — the grouped, counted list of every
+type — except for the two controls that sit with the results they order: the
 **rarity strip** of count-bearing pills between the toolbar and the grid, and
-the toolbar's own **set** toggle and set select. The default sort is
+the toolbar's own **set** toggle and set select. The four rows that used to be
+under Type — item level, stat-requirement caps, sockets and damage — are gone
+from it, and are fields in the **Advanced Search** panel instead. A rail is a
+browse list with counts beside each row; those four are not browsed, they are
+chosen, and six of them stacked was a browse list that had stopped being one.
+What a reader loses by their absence is picked up in the panel, and the panel
+writes the same `S` members the rail's rows did, so there is still exactly one
+copy of every filter. The default sort is
 tier-then-level, the same order the strip reads in. **Type is grouped** into the three-level
 taxonomy above rather than listed flat, and each group header is itself a
 control — clicking it checks or clears every type beneath it, and it carries a
@@ -1873,8 +1885,8 @@ the attack speed in the game's wording (`Very Fast Attack Speed (0.72 seconds)`)
 Requirements are labelled with the game's names — **Focus** and **Vitality**,
 which the DAT still calls `MAGIC_REQUIRED` and `DEFENSE_REQUIRED`. The level and
 stat branches are shown as the alternatives they are, joined by an `or`, with any
-class restriction named underneath as `<Class> only`; the rail's stat-cap filters
-use the same four names. On the 74 **augmented weapons** the kill-count task and
+class restriction named underneath as `<Class> only`; the advanced panel's **Stat
+Requirements** rows use the same four names, spelled out rather than abbreviated. On the 74 **augmented weapons** the kill-count task and
 the stats it unlocks are their own block, ahead of the affixes and marked as
 locked until the task is done (§7).
 
@@ -2093,6 +2105,64 @@ the dialog closes and the filtered grid renders. Nothing filters while it is
 open, which is the interaction that was asked for and the reason the panel is
 built the way it is.
 
+**The button sits at the toolbar's right end**, after the search box's spacer
+and immediately before the Sort control, and it is the one control up there that
+is painted rather than plain: gold at rest, filled and lit while the panel is
+open. That is not decoration. It is the only control in the toolbar that opens
+another surface instead of changing the view in place, and it is where six
+filters go; when the grid comes back with three items in it, the toolbar has to
+say where the rest of the corpus went.
+
+**Sections, in order:** General (name, item level, player level), **Type**,
+**Stat Requirements**, **Class**, Damage, Armor, Stats. Class is a section of
+its own rather than a row inside the requirements block, because it is not one:
+a requirement is what the *item* asks of a player who wants to wear it, and the
+class gate is a restriction the game enforces before any requirement is
+consulted (§7). The block above it is named **Stat Requirements** for the same
+reason — one word, "Requirements", was covering both, and they are different
+kinds of thing.
+
+**Every numeric filter is a pair of boxes**, `min` and `max`, on the same
+pattern as item level: player level, all five damage types, all five armor
+types, and each of the four stat requirements (Strength, Dexterity, Focus,
+Vitality). A single box cannot say "between 20 and 40", which is the question a
+player actually has, and damage and armor are ranges in the data to begin with —
+the filter compares range against range (§7's `ends()`), so one box would have
+had to nominate an end the data does not have. An empty box is an open bound at
+that end; both empty is no constraint at all, which is also how the field is
+cleared.
+
+**Sockets are five chips, 1–5.** A tick means "an item with this many sockets is
+a match", so 2 and 4 ticked answer the items with 2 sockets or with 4 — a pair
+of counts in one control, which the min–max pair it replaced could not express
+(the old range form could only bracket, and bracketing 2–4 would have dragged 3
+in with it). The chips live in `SOCKCHIPS`; the URL writes them sorted and
+comma-joined, `sk=2,4`. **Zero is deliberately not a chip.** 4,453 items have no
+sockets and there is no way to ask for them by count, on purpose: "no sockets"
+is not a number of sockets, it is the absence of the property, and every filter
+that says nothing about sockets already returns them — including unticking every
+chip, which is the panel's own way of clearing the field.
+
+**The Type section is a tab strip over 36 checkboxes** — `All`, then one tab per
+category in the taxonomy's order (Armor, Weapons, Accessories, Misc) — which is
+the shape the reference screenshot has. The strip is read off `TAXONOMY`, so a
+fifth category is a tab with no code change, and it is a **view**: it chooses
+whose boxes are on screen and never what a search returns. A selection can
+therefore span tabs, and a tick made under Weapons is still ticked after a look
+at Accessories. Types the taxonomy does not name collect under **Other**, which
+is empty in this corpus but is the difference between a type the panel cannot
+offer and one it offers in the wrong place.
+
+**The panel's Type list is the whole corpus, always.** `advTypes()` reads its
+types from `ALLTYPES` — a set built once from every item in `DB.items` — rather
+than from the *filtered* facet the rail is built from. The rail drops a row when
+nothing matching carries that type (a search for one name leaves it with a
+single row), which is right for a counted browse list and wrong for a form: a
+checkbox that disappears because of a filter the same form set is a box the
+reader cannot tick again. With `#aff=x-attack-speed:10:` on, the rail carries 16
+rows and the panel carries 36, and the suite asserts both numbers on one line so
+that a later "unify the two" has to argue with a count rather than a comment.
+
 **The panel edits a draft, never `S`.** Opening copies the fields into a
 module-level `advS`; `+ Add stat` and the per-row `×` re-render from that draft;
 Search reads the panel back into `S` and closes; **Reset** empties the draft;
@@ -2116,12 +2186,20 @@ onRoute();` — the route the search box's Enter takes.
 
 | filter | `S` field | reading |
 |---|---|---|
-| item level, sockets | `lvlMin/Max`, `sockMin/Max` | the rail's own fields, edited from the panel |
-| player level | `plr` | **equippable at N** — `LEVEL_REQUIRED <= N`, and an item naming no requirement passes |
+| item level | `lvlMin/Max` | the item's own level, either end open |
+| player level | `plrMin/Max` | **equippable in that band** — `LEVEL_REQUIRED` between the two, and an item naming no requirement passes |
+| sockets | `sockSet` | a tick per count in `SOCKCHIPS`; **or** across ticks |
+| stat requirements | `req` | `{str\|dex\|mag\|def: [min, max]}`, either end open |
 | class | `cls` | **usable by** — an item with no `cls`, or `cls` in the set |
 | damage / armor type and value | `dmgv`, `armv` | per-type `[min, max]`, either end open |
 | stats | `aff` | `[{text, stat, lo, hi}]`, **ANDed** |
 | set bonuses | `setfx` | `false` by default; the box widens the stat pool |
+
+A stat requirement is a scalar on the item, so it is compared against the pair
+with a missing value read as 0 — `boundHit()`, beside the range-against-range
+`typeHit()` the damage and armor maps use. The two are not interchangeable and
+the suite pins both: a weapon rolling 14–28 satisfies "fire ≥ 20" through
+`typeHit` overlapping the two ranges, where `boundHit` would compare 14.
 
 Type and value are compared **range against range, overlapping** — a weapon
 rolling 14–28 satisfies "at least 20" at its top end, and nominating one end as
@@ -2147,11 +2225,29 @@ alternative — silently discarding the clause — would turn a URL that looks l
 filter into a URL showing all 6,048 items.
 
 **Hash grammar**, following the file's preference for legible `key=value`:
-`plr=50`, `cls=Embermage,Outlander` (elided when all four are on), `setfx=1`,
-`dmgv=fire:10:20,physical::`, `armv=…`, `aff=x-attack-speed:10:,x-health::`.
-A stat row is `slug:lo:hi`, split on `:` so a negative bound needs no escaping
-(`x-all-armor-per-hit:-4:5`) and an empty side is an open bound. Rows keep the
-reader's order and are never sorted. **A known stat is written as its slug**, not
+`sk=2,4`, `lvl=10-50`, `plr=10-50`, `req=str::50,dex:30:40` (elided when all four
+are on), `cls=Embermage,Outlander`, `setfx=1`, `dmgv=fire:10:20,physical::`,
+`armv=…`, `aff=x-attack-speed:10:,x-health::`. A stat row is `slug:lo:hi`, split
+on `:` so a negative bound needs no escaping (`x-all-armor-per-hit:-4:5`) and an
+empty side is an open bound — the same three shapes a `req=` row has. Rows keep
+the reader's order and are never sorted.
+
+**Retired spellings are expanded, never dropped**, the way a retired facet name
+has always been (`#cat=Armor` resolves the group, `#cat=Nonsense` is no filter
+rather than an empty grid). `sock=1` — the old "Has sockets" toggle — is every
+chip from 1 up. `sk=` was the count range the chips replaced, and it now follows
+one rule for every case: **a range collapses to its intersection with the chip
+row.** `sk=2-` is the four chips at or above 2; `sk=-4` is the four at or below
+it; `sk=0-` is the whole row, because in a row that starts at 1 there is no
+floor below the first chip. Two of them are not the ranges they were: `sk=0-0`
+asked for the socket-*less* items and `sk=3-2` asked for nothing, and neither
+answer is a subset of the five chips, so both collapse to the **empty
+selection**. Empty is no filter — the same reading as `#cat=Nonsense` — rather
+than a second, silent spelling of "match nothing" that no control on the page
+could show or clear. `req=str:50` is the ceiling it used to be: until these
+fields had a floor, one number meant "at most", and reading it as a floor would
+invert every old link. The panel's own player level opens on the *ceiling* box
+for the same reason. **A known stat is written as its slug**, not
 as the label the panel hands back: a label carries spaces and `%` that arrive
 percent-encoded, and the two resolve to the same row on the way in. A row the
 vocabulary does not know has no slug and is written back verbatim.
@@ -2363,7 +2459,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 207
+`verify\check_page.js` goes further and drives the built page in a real DOM — 293
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
@@ -2374,8 +2470,14 @@ group's count equals the sum of its rows, that a group header checks the boxes
 it stands in for, that a retired `#cat=` link still resolves, that the four
 categories carry a fold glyph and a subgroup none, that folding takes a
 category's subgroups and rows and nothing else, survives the rail being
-rebuilt, and is not a filter, and that the damage rows read as words while the
-keys underneath still filter), the set bonus
+rebuilt, and is not a filter, and that no damage rows are left in it), the
+advanced panel (the button and the four ways to close it, the draft being thrown
+away rather than applied, a commit going through `onRoute()` so the rail's own
+boxes carry the tick, the Type section's tabs and its 36 boxes against the
+rail's 16 under a live filter, the chips, both empty boxes meaning no constraint,
+a value-less stat's boxes switched off, the category tabs leaving a tick in
+place, and a cold-loaded URL putting every control back where it was spelled),
+the set bonus
 ladder in three shapes (a set that ships every piece it gates on, one that does
 not, one gated on more pieces than exist), and a set piece's rarity (the type
 line, the word that carries the colour, the card class for both rarities, and a
@@ -2396,14 +2498,22 @@ which is not a project dependency:
 
 ```
 npm i jsdom          # anywhere on NODE_PATH
-node --max-old-space-size=6144 verify\check_page.js
+node verify\check_page.js
 node verify\check_socketables.js
 ```
 
-The heap flag is not optional *for the first of those*. Twenty of its assertions
-build a fresh JSDOM over the whole built page, so the suite holds several
-gigabytes of live DOMs and node's default old-space runs out partway through,
-with no summary line. 5,120 MB completes; 4,096 MB does not.
+That first line used to need `--max-old-space-size=6144`, and no longer does.
+Forty-odd of its assertions build their own JSDOM over the whole built page —
+cold loads, which read a hash at boot rather than navigating to it — and each
+window parses its own copy of the 7.50 MB page, mostly the inlined icon sheet,
+plus its own copy of the inline corpus: **about 230 MB of live heap per open
+window**, and a document parked in the suite's own scope keeps its window for
+the rest of the run. Forty of them came to 7 GB. They now go through `read()`,
+which closes its window on the way out and returns what the assertion asked for
+— a count or a string, not a document — leaving `deep()` for the few blocks that
+go on querying. The peak is 2.9 GB and node's own default holds it.
+`TL2_MEM=1 node verify\check_page.js` prints the heap at five points along the
+run, so the next deep load can be measured rather than guessed at.
 
 `verify\check_socketables.js` is the second page's suite — 62 assertions, and it
 needs **no heap flag**, because that page is 209 KB and references the icon sheet

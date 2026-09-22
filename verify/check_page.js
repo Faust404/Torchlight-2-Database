@@ -1,16 +1,26 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 274
+ * view, provenance, the advanced-search panel and hash deep links -- 293
  * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
- *   node --max-old-space-size=6144 verify/check_page.js
+ *   node verify/check_page.js
  *
- * The heap flag is not optional. Twenty of these assertions build a fresh
- * JSDOM over the whole built page, and that page is 7.30 MB -- mostly a 4.8 MB
- * base64 icon sheet sitting in a <style> text node -- so the suite holds several
- * gigabytes of live DOMs and node's default old-space (about 4 GB) runs out
- * partway through. 5,120 MB completes; 4,096 MB does not.
+ * Forty-odd of those assertions need a *cold* page -- one that reads its hash
+ * at boot rather than navigating to it -- so each builds its own JSDOM over the
+ * built page. That page is 7.50 MB, mostly a 4.8 MB base64 icon sheet in a
+ * <style> text node, and every window parses its own copy of the inline corpus:
+ * one live window costs about 230 MB, and a document parked in this file's own
+ * scope keeps its window for the whole run. Forty of them came to 7 GB and a
+ * mandatory `--max-old-space-size` flag, which is why the two helpers below
+ * exist and why the distinction matters. `read()` -- the one to reach for --
+ * closes its window on the way out and returns what the caller asked for, which
+ * should be a string or a count rather than a document. `deep()` hands the
+ * document back and is for the few blocks that go on querying it. With that,
+ * the peak is 2.9 GB and node's default old-space holds it: no flag.
+ *
+ * TL2_MEM=1 prints the heap at five points along the run, so a new deep load can
+ * be measured rather than guessed at.
  *
  * jsdom fires a spurious second hashchange (with an empty hash) whenever code
  * assigns location.hash. That reproduces on a page with a single listener and
@@ -326,6 +336,10 @@ async function go(hash) {
   // detail view again, so render() was never reached and the grid never moved.
   // A search is a question about the whole corpus, so it takes the item and
   // every filter with it, exactly as the set-name link does.
+  //
+  // `dmg=fire` is the legacy spelling of the panel's fire row: it was the rail's
+  // damage facet, and a type named with no bound is the same presence test, so
+  // the old key still asks its own question through the new state.
   await go('#dmg=fire&lvl=20-&item=Zeraphi_01_shoulders_alt_set');
   ok('an item opens over a filtered grid', d.getElementById('app').classList.contains('item'),
      d.getElementById('app').className);
@@ -336,9 +350,20 @@ async function go(hash) {
      `${cards().length} cards, class=${d.getElementById('app').className}`);
   ok('...and it took the other filters and the item out of the hash',
      w.location.hash === '#q=aenigma', w.location.hash);
+  // ...and the controls agree with the state it left behind. There are two
+  // places a filter can be read off the page, and both are checked: the rail's
+  // type boxes, and the panel -- which is where the level, socket and damage
+  // controls went, so it is the panel that has to come up empty. Reading it
+  // through the open button is also the reader's own path.
+  d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  const lvlBox = d.querySelector('#advb [data-a="lvl"][data-end="lo"]');
+  const fireBox = d.querySelector('#advb [data-a="dmgv.fire"][data-end="lo"]');
   ok('...and the controls agree with the state it left behind',
-     d.getElementById('lvmin').value === '' && q.value === 'aenigma',
-     `lvmin=${d.getElementById('lvmin').value} q=${q.value}`);
+     q.value === 'aenigma' && lvlBox.value === '' && fireBox.value === '' &&
+     !d.querySelector('#advb [data-achip]:checked') &&
+     [].every.call(d.querySelectorAll('#railbody input[type=checkbox]'), b => !b.checked),
+     `q=${q.value} lvl=${lvlBox.value} fire=${fireBox.value}`);
+  d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
 
   // Escape clears through the same path, so it cannot leave a card standing
   // over a search box it just emptied.
@@ -351,135 +376,163 @@ async function go(hash) {
      `${cards().length} cards / ${w.location.hash}`);
 
   // ------------------------------------------------- numeric filter floors
-  // The level and stat-requirement boxes are counts and their floor is 0. The
-  // markup states that to the browser with min="0", which is what limits the
-  // spinner and what :invalid keys off -- but it does not stop a typed or
-  // pasted "-5", so the value is floored in the state as well.
+  // The level boxes are counts and their floor is 0. The markup states that to
+  // the browser with min="0", which is what limits the spinner and what
+  // :invalid keys off -- but it does not stop a typed or pasted "-5", so the
+  // value is floored in the state as well. Both level boxes live in the panel
+  // now, and Search is what carries them into S, so this drives the panel's own
+  // fields and its own button.
   //
   // Typing is the only path that can produce a negative, and that is a finding
   // rather than a simplification. In the deep link the '-' is the *delimiter*:
   // `lvl=MIN-MAX` splits on it, so `#lvl=-5-` reads as "no floor, ceiling 5" and
-  // a negative ceiling is unrepresentable. `req` carries a value after a colon,
-  // so `#req=str:-5` does parse as a negative -- and it is floored, but the URL
-  // is left as the reader wrote it, because a hashchange deliberately does not
-  // rewrite the hash (writeHash runs on interaction, not on load). The state
-  // and the grid are what must be right; the URL catches up on the next edit.
+  // a negative ceiling is unrepresentable. The URL is left as the reader wrote
+  // it, because a hashchange deliberately does not rewrite the hash (writeHash
+  // runs on interaction, not on load). The state and the grid are what must be
+  // right; the URL catches up on the next edit.
   await go('');
   {
-    const lo = d.getElementById('lvmin');
-    lo.value = '-5';
-    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    const open = () => d.getElementById('advbtn')
+      .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    const lo = () => d.querySelector('#advb [data-a="lvl"][data-end="lo"]');
+    open();
+    lo().value = '-5';
+    d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     // The filter must also still *work*: "level >= -5" floored to 0 is every
     // item, so a negative carried through -- or turned into NaN, which compares
     // false against everything -- would empty the grid rather than show 0.
     ok('a negative typed into the level floor is clamped to 0',
-       d.getElementById('lvmin').value === '0' && /lvl=0-/.test(w.location.hash) &&
-       cards().length === 500,
-       `field=${d.getElementById('lvmin').value} hash=${w.location.hash} cards=${cards().length}`);
-    // The case no re-render can fix, and it is not an edge case: a control
-    // moving goes through apply(), which repaints the grid *in place* rather
-    // than rebuilding the rail -- onRoute() is the rebuild, and that runs on a
-    // URL move. So the box keeps whatever was typed and nothing later corrects
-    // it; the handler has to floor the field itself. This is the assertion that
-    // fails if that write-back is dropped, on the first typed negative as much
-    // as on a repeat one.
-    lo.value = '-5';
-    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('...and the typed text is corrected in place, since nothing re-renders it',
-       d.getElementById('lvmin').value === '0' && /lvl=0-/.test(w.location.hash),
-       `field=${d.getElementById('lvmin').value} hash=${w.location.hash}`);
-    const hi = d.getElementById('lvmax');
-    hi.value = '-1';
-    hi.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('...and the level ceiling clamps the same way',
-       d.getElementById('lvmax').value === '0' && /lvl=0-0/.test(w.location.hash),
-       `field=${d.getElementById('lvmax').value} hash=${w.location.hash}`);
-    const sr = d.querySelector('input[data-req="str"]');
-    sr.value = '-5';
-    sr.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('...and a stat requirement clamps the same way',
-       d.querySelector('input[data-req="str"]').value === '0' &&
-       /str:0/.test(w.location.hash),
-       `field=${d.querySelector('input[data-req="str"]').value} hash=${w.location.hash}`);
+       /lvl=0-/.test(w.location.hash) && cards().length === 500,
+       `hash=${w.location.hash} cards=${cards().length}`);
+    // ...and the floored number is what the panel shows the next time it opens,
+    // which is the whole reason the panel's boxes are read back out of S rather
+    // than kept beside it: a draft holding the typed "-5" would go on showing it
+    // while the page filtered at 0.
+    open();
+    ok('...and the field shows the value that was actually applied',
+       lo().value === '0', `field=${JSON.stringify(lo().value)}`);
+    d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   }
-  await go('#req=str:-5');
-  ok('a negative stat bound in a deep link floors the state, not just the field',
-     d.querySelector('input[data-req="str"]').value === '0',
-     d.querySelector('input[data-req="str"]').value);
   await go('#lvl=-5-');
+  d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   ok('the level deep link cannot carry a negative at all: "-" is its own delimiter',
-     d.getElementById('lvmin').value === '' && d.getElementById('lvmax').value === '5',
-     `min=${d.getElementById('lvmin').value} max=${d.getElementById('lvmax').value}`);
+     d.querySelector('#advb [data-a="lvl"][data-end="lo"]').value === '' &&
+     d.querySelector('#advb [data-a="lvl"][data-end="hi"]').value === '5',
+     `lo=${d.querySelector('#advb [data-a="lvl"][data-end="lo"]').value} ` +
+     `hi=${d.querySelector('#advb [data-a="lvl"][data-end="hi"]').value}`);
+  d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  // Every number box on the panel states the same floor to the browser, which is
+  // what limits the spinner and what :invalid keys off -- the state floor above
+  // is the belt to this brace, not a substitute for it. 32 is all of them: two
+  // for the item level, two for the player level, two per stat requirement and
+  // two per damage and armor type.
   await go('');
   {
-    const nums = [].slice.call(d.querySelectorAll('#railbody input[type=number]'));
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    const nums = [].slice.call(d.querySelectorAll('#advb input[type=number]'));
     ok('every numeric filter field declares the same floor to the browser',
-       nums.length === 8 && nums.every(i => i.min === '0'),
-       nums.map(i => `${i.id || i.getAttribute('data-req')}=${i.min}`).join(' '));
-    ok('...and the two new ones are the socket range, not a leftover toggle',
-       !!d.getElementById('skmin') && !!d.getElementById('skmax') &&
-       !d.querySelector('#railbody input[type=checkbox][id=sock]'),
-       nums.map(i => i.id || i.getAttribute('data-req')).join(' '));
+       nums.length === 32 && nums.every(i => i.min === '0'),
+       nums.map(i => i.getAttribute('data-a') + '=' + i.min).join(' '));
+    d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   }
 
-  // ------------------------------------------------------------ socket range
-  // The control that replaced the "Has sockets" toggle. A boolean could only
-  // ask "any at all", which is the bottom of this range and the least useful
-  // answer in it -- the question is "2 or more", and sk=1- is exactly the set
-  // the old toggle produced, which is what makes it the compatibility check.
+  // ------------------------------------------------------- the stat bounds
+  // The four stat rows are bound *pairs* now -- each one is `key:lo:hi`, the
+  // same three shapes an affix row has -- and the one thing a retired spelling
+  // must not do is invert. A single number used to be the ceiling, so
+  // `req=str:50` has to keep meaning "asks for at most 50 strength"; reading it
+  // as a floor would silently turn every old bookmark into the strict opposite
+  // of itself, which is the one error a reader could not see in the numbers.
   //
-  // `sk` is omitted from a record with no sockets at all (build.py's nonzero()),
-  // so n() reads those as 0. That is what lets sk=1- exclude them and sk=0-0
-  // find them, and it is asserted rather than assumed.
+  // The floor is what the pair adds: an item that names no strength requires
+  // none, so n() reads it as 0 and a floor of 1 is the way to ask for the items
+  // that *do* gate on the stat. Both directions are asserted on the same key,
+  // and 4,993 + 1,072 = 6,065 is 17 over the corpus, so the two really are
+  // different questions rather than one count seen twice.
+  await go('#req=str::50');
+  ok('a lone number in req= is still the ceiling it has always been',
+     /4,993/.test(cnt()), cnt());
+  await go('#req=str:50:');
+  ok('...and the two-number form reads its first number as the floor',
+     /1,072/.test(cnt()), cnt());
+  await go('#req=str:20:50');
+  ok('...and a row closed at both ends keeps the items inside it',
+     /513/.test(cnt()), cnt());
+  await go('#req=str:');
+  ok('a stat named with neither bound is no constraint, not a floor of zero',
+     cnt() === '6,048 items', cnt());
+
+  // ------------------------------------------------------------ the sockets
+  // A row of five chips, one per count the corpus carries (build.py omits `sk`
+  // on an item with none, so n() reads those as 0). It replaces the min/max
+  // pair, and the reason is `{2, 4}`: a range cannot leave a hole in the middle,
+  // and "two or four, not three" is a question a player with two gems has.
+  //
+  // The legacy keys are expanded on read: `sock=1` was the old Has sockets
+  // toggle and `sk=lo-hi` was the range. A range collapses to the chips it
+  // contains, which is exact for `sk=2-` -- the four chips at or above 2 -- and
+  // is why `sk=0-` is the whole row rather than nothing. Two of them cannot
+  // survive that collapse at all: `sk=0-0` asked for the socket-*less* items and
+  // `sk=3-2` asked for nothing, and neither answer is a set of chips. Both fall
+  // out as the empty selection, which is no filter -- the same reading a retired
+  // *name* that matches nothing already has (`#cat=Nonsense` shows the whole
+  // corpus), and the alternative would be a state no control could show or
+  // clear. The cost is real and is asserted rather than hidden: a bookmark for
+  // the 4,453 socket-less items now shows everything. A "0" chip is what would
+  // buy that back.
   await go('#sk=1-');
   ok('sk=1- reproduces the old Has sockets toggle exactly', /1,703/.test(cnt()), cnt());
   await go('#sk=2-');
-  ok('sk=2- narrows past it, which is the question the toggle could not ask',
-     /269/.test(cnt()), cnt());
-  await go('#sk=0-0');
-  ok('sk=0-0 is the other end, and finds the socket-less items', /4,345/.test(cnt()), cnt());
+  ok('sk=2- is the four chips at or above two', /269/.test(cnt()), cnt());
   await go('#sk=1-4');
   ok('a range closed at both ends', /1,692/.test(cnt()), cnt());
   await go('#sk=-4');
-  ok('...while an empty floor means no floor, not a floor of one',
-     /6,037/.test(cnt()), cnt());
+  ok('...while the 0 the row has no chip for drops out of the answer',
+     /1,692/.test(cnt()), cnt());
+  await go('#sk=0-');
+  ok('a floor below every chip means no floor, so the row is the whole row',
+     /1,703/.test(cnt()), cnt());
+  await go('#sk=0-0');
+  ok('sk=0-0 names a count no chip can hold, so it collapses to no filter',
+     cnt() === '6,048 items', cnt());
   await go('#sk=3-2');
-  ok('a range the wrong way round matches nothing rather than everything',
-     /0 items/.test(cnt()), cnt());
-  // Flooring, both paths. The deep link cannot carry a negative for the reason
-  // the level box records -- '-' is the delimiter, so `sk=-5-` reads as "no
-  // floor, ceiling 5" -- while typing is the one path that can produce one, and
-  // it is floored in the state as well as in the field.
-  await go('#sk=-5-');
-  ok('the socket deep link cannot carry a negative at all',
-     d.getElementById('skmin').value === '' && d.getElementById('skmax').value === '5',
-     `min=${d.getElementById('skmin').value} max=${d.getElementById('skmax').value}`);
-  await go('');
-  {
-    const lo = d.getElementById('skmin');
-    lo.value = '-5';
-    lo.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('a typed negative socket bound floors the state, not just the field',
-       lo.value === '0' && w.location.hash === '#sk=0-', `${lo.value} / ${w.location.hash}`);
-  }
-  // The legacy key, tested for its own sake rather than left to the set-link
-  // assertion below, which still happens to carry `sock=1` on its way past.
+  ok('...and so does a range the wrong way round, rather than matching nothing',
+     cnt() === '6,048 items', cnt());
   await go('#sock=1');
   ok('a legacy #sock=1 bookmark still filters', /1,703/.test(cnt()), cnt());
-  ok('...and arrives as a floor in the new control',
-     d.getElementById('skmin').value === '1', d.getElementById('skmin').value);
-  // The URL is deliberately not rewritten on load -- writeHash runs on
-  // interaction, not on a hashchange -- so the old key survives until the
-  // control is touched and is replaced then. That is the documented behaviour
-  // for a floored state too, asserted at the level box above.
-  {
-    const skm = d.getElementById('skmin');
-    skm.value = '2';
-    skm.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('...and the old key is not carried forward once the control is touched',
-       w.location.hash === '#sk=2-', w.location.hash);
-  }
+  // The new grammar, and the whole reason for the change: two chips with a gap
+  // between them. 239 is 112 two-socket items plus 131 four-socket ones -- a
+  // range could only ever have answered 243 with three-socket items included.
+  await go('#sk=2,4');
+  ok('two counts with a gap between them, which no range could express',
+     /239/.test(cnt()), cnt());
+  await go('#sk=4,2');
+  ok('...and the same two whatever order they are written in', /239/.test(cnt()), cnt());
+  await go('#sk=5');
+  ok('a single chip is a single count', /11/.test(cnt()), cnt());
+  // The chips are the only socket control, so the panel is where they are
+  // driven: tick 2 and 4, Search, and read the URL the page writes for itself.
   await go('');
+  {
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    const chips = () => [].slice.call(d.querySelectorAll('#advb [data-achip]'));
+    ok('the socket row is five chips, one per count',
+       chips().map(c => c.getAttribute('data-achip')).join(',') === '1,2,3,4,5' &&
+       chips().every(c => !c.checked),
+       chips().map(c => c.getAttribute('data-achip')).join(','));
+    chips().forEach(c => { if (/[24]/.test(c.getAttribute('data-achip'))) c.checked = true; });
+    d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('ticking 2 and 4 arms both and writes them back as a list',
+       w.location.hash === '#sk=2,4' && /239/.test(cnt()),
+       `${w.location.hash} / ${cnt()}`);
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('...and the chips come back ticked, from the URL rather than the draft',
+       [].map.call(d.querySelectorAll('#advb [data-achip]'),
+         c => c.getAttribute('data-achip') + (c.checked ? '+' : '-')).join(' ') === '1- 2+ 3- 4+ 5-',
+       [].map.call(d.querySelectorAll('#advb [data-achip]'),
+         c => c.getAttribute('data-achip') + (c.checked ? '+' : '-')).join(' '));
+    d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  }
 
   // ----------------------------------------------------------------- sort
   // The default order, asserted before anything touches the select: rarity
@@ -524,15 +577,38 @@ async function go(hash) {
     await wait(40);
     return t.window.document;
   };
-  const d2 = await deep('#tier=Legendary&type=Axe&sock=1');
-  ok('a cold load of a filtered hash renders 6',
-     d2.querySelectorAll('#grid .card').length === 6,
-     `${d2.querySelectorAll('#grid .card').length}`);
-  const d3 = await deep('#item=legendary_axe01');
-  ok('deep link with item= opens the detail directly', /Aenigma/.test(d3.getElementById('detail').textContent));
-  const d4 = await deep('#q=aenigma');
-  ok('deep link with a search term renders 1', d4.querySelectorAll('#grid .card').length === 1,
-     `${d4.querySelectorAll('#grid .card').length}`);
+  // load, read, throw the page away. A deep load is a whole second page -- a
+  // fresh window, and with it a fresh parse of the inline corpus -- at 230 MB of
+  // live heap apiece, measured; the window object is what roots all of it, so a
+  // document parked in this function's scope holds its page for the rest of the
+  // run whether or not anything reads it again, and `close()` alone returns only
+  // about a third. There are forty-odd deep loads below and the ones that only
+  // want a number out of the page are the bulk of them, so those go through
+  // here: the answer is a string, and the page behind it is closed and dropped
+  // on the way out. `deep()` stays for the loads whose *document* the assertions
+  // go on querying.
+  const TRACE = process.env.TL2_MEM === '1';
+  const trace = tag => { if (TRACE) console.log('    [mem] ' + tag.padEnd(28) +
+    (process.memoryUsage().heapUsed / 1048576).toFixed(0) + ' MB'); };
+  const read = async (hash, fn) => {
+    const t = new JSDOM(html, { runScripts: 'dangerously',
+      url: URL_ + hash, pretendToBeVisual: true });
+    await wait(40);
+    try { return fn(t.window.document, t.window); }
+    finally { t.window.close(); }
+  };
+  await read('#tier=Legendary&type=Axe&sock=1', d2 => {
+    ok('a cold load of a filtered hash renders 6',
+       d2.querySelectorAll('#grid .card').length === 6,
+       `${d2.querySelectorAll('#grid .card').length}`);
+  });
+  await read('#item=legendary_axe01', d3 => {
+    ok('deep link with item= opens the detail directly', /Aenigma/.test(d3.getElementById('detail').textContent));
+  });
+  await read('#q=aenigma', d4 => {
+    ok('deep link with a search term renders 1', d4.querySelectorAll('#grid .card').length === 1,
+       `${d4.querySelectorAll('#grid .card').length}`);
+  });
   // `decodeURIComponent('50%')` throws URIError, and readHash runs from onRoute,
   // the last statement of app.js -- so one bare `%` in a hand-edited URL threw
   // out of the script and the page drew *nothing*: no cards, no rail, and an
@@ -542,15 +618,21 @@ async function go(hash) {
   // page finished rendering (the count is populated, which only paintGrid does)
   // and that both spellings agree. Not asserted on a captured error: the
   // suite's listener only sees the main window.
-  const pct = await deep('#q=50%');
-  const pctN = pct.getElementById('count').textContent;
-  ok('a hash with a bare percent renders the page instead of throwing',
-     /^0 items of 6,048$/.test(pctN) && pct.getElementById('railbody').children.length > 0,
-     `${pct.querySelectorAll('#grid .card').length} cards, count ${JSON.stringify(pctN)}`);
-  const pctOk = await deep('#q=50%25');
-  ok('...and the well-formed spelling of the same search reads the same way',
-     pctOk.getElementById('count').textContent === pctN,
-     `${pctOk.getElementById('count').textContent} vs ${pctN}`);
+  let pctN;
+  await read('#q=50%', pct => {
+    pctN = pct.getElementById('count').textContent;
+    ok('a hash with a bare percent renders the page instead of throwing',
+       /^0 items of 6,048$/.test(pctN) && pct.getElementById('railbody').children.length > 0,
+       `${pct.querySelectorAll('#grid .card').length} cards, count ${JSON.stringify(pctN)}`);
+  });
+  await read('#q=50%25', pctOk => {
+    // Both windows are closed by now, so this compares the two *strings*. The
+    // question is what each page read out of its own hash, and that is what
+    // survives the page.
+    ok('...and the well-formed spelling of the same search reads the same way',
+       pctOk.getElementById('count').textContent === pctN,
+       `${pctOk.getElementById('count').textContent} vs ${pctN}`);
+  });
   // The two fields that are built but not rendered, checked on a record that
   // actually carries both -- legendary2_sword05 has xl=999 and skm=4. Aenigma
   // (above) has neither, so asserting their absence there would prove nothing.
@@ -561,26 +643,28 @@ async function go(hash) {
   // xl is the opposite -- 999 is MAXLEVEL, it is where the item stops dropping,
   // and the card states it in the spawn band. So the two fields part company
   // here, and this asserts both directions on one record.
-  const d5 = await deep('#item=legendary2_sword05');
-  const d5t = d5.getElementById('detail').textContent;
-  ok('Cerulean Nightmare: a max-sockets field exists but is not rendered',
-     /2 Sockets/.test(d5t) && !/Max Sockets/i.test(d5t) && /Level 105/.test(d5t),
-     d5t.slice(0, 160));
-  ok('...while MAXLEVEL, which is a real drop-band fact, is stated',
-     /Min Level 99/.test(d5t) && /Max Level 999/.test(d5t), d5t.slice(0, 240));
+  await read('#item=legendary2_sword05', d5 => {
+    const d5t = d5.getElementById('detail').textContent;
+    ok('Cerulean Nightmare: a max-sockets field exists but is not rendered',
+       /2 Sockets/.test(d5t) && !/Max Sockets/i.test(d5t) && /Level 105/.test(d5t),
+       d5t.slice(0, 160));
+    ok('...while MAXLEVEL, which is a real drop-band fact, is stated',
+       /Min Level 99/.test(d5t) && /Max Level 999/.test(d5t), d5t.slice(0, 240));
+  });
   // The Axe of Throwing is why Weapon Range is worth a row at all. 93 of the
   // 101 Axes are 0.6 and it is 9, because the thing is thrown -- so a per-type
   // constant is not quite a constant, and the one item where it moves is the
   // one item where it means something. Its damage is a flat 228, so there is no
   // damage range anywhere on the page to confuse the row with.
-  const thr = await deep('#item=axe_u05x');
-  const frng = thr.querySelector('#detail .frng').textContent;
+  const axe = await read('#item=axe_u05x', thr => ({
+    rng: thr.querySelector('#detail .frng').textContent,
+    dtype: thr.querySelector('#detail .dtype').textContent
+  }));
   // Read off the row rather than the card: the range is the last thing in the
   // card's lead, and the damage line below it starts with a number, so on the
   // flattened text "Weapon Range 9" runs straight into "228Physical Damage".
   ok('The Axe of Throwing reads Weapon Range 9 against the Axe type\'s 0.6',
-     /^Weapon Range 9$/.test(frng) &&
-     !/range/i.test(thr.querySelector('#detail .dtype').textContent), frng);
+     /^Weapon Range 9$/.test(axe.rng) && !/range/i.test(axe.dtype), axe.rng);
 
   // A socketable's requirement, settled from the game files. Two candidates
   // looked like it and neither was it: MINLEVEL is the drop band (the Aenigma
@@ -597,8 +681,8 @@ async function go(hash) {
   // is worn at a level. The two labels are mutually exclusive by construction,
   // so the negative below is half the test -- a card that printed both would
   // otherwise pass.
-  const gem = await deep('#item=tl2_bloodember_rank3');
-  const gemt = gem.getElementById('detail').textContent;
+  const gemt = await read('#item=tl2_bloodember_rank3',
+    gem => gem.getElementById('detail').textContent);
   ok('a socketable states the game curve\'s number as the socketing requirement',
      /Required Item Level to Socket\s*28(?!\d)/.test(gemt) &&
      !/Player Level/.test(gemt), gemt.slice(0, 240));
@@ -620,11 +704,12 @@ async function go(hash) {
   // -- it is MINLEVEL, the band floor, stated below as a band -- which is why
   // this is a cell assertion and not a page-wide negative: a search for "1"
   // somewhere in the text would fail for the right answer.
-  const pogg = await deep('#item=tl2_eyeofkingpogg');
-  const poggt = pogg.getElementById('detail').textContent;
-  const poggRow = [].map.call(
-    pogg.querySelectorAll('#detail .ngt tbody tr:first-child td'),
-    td => td.textContent);
+  const pogg = await read('#item=tl2_eyeofkingpogg', doc => ({
+    t: doc.getElementById('detail').textContent,
+    row: [].map.call(doc.querySelectorAll('#detail .ngt tbody tr:first-child td'),
+      td => td.textContent)
+  }));
+  const poggt = pogg.t, poggRow = pogg.row;
   ok('an eye states its real requirement, not MINLEVEL\'s placeholder 1',
      poggRow[0] === '15' && poggRow[1] === '7' && poggRow[4] === 'Normal',
      poggRow.join(' / ') + '   card: ' + poggt.slice(0, 200));
@@ -637,6 +722,7 @@ async function go(hash) {
      poggt.slice(0, 240));
 
   // ------------------------------------------------- the five non-eye tables
+  trace('------------------------');
   // The same four-row table on the socketables that are not eyes. Rift Ember is
   // the one with an independent source: the wiki prints all four rows for it,
   // and the derivation matches the wiki in BOTH columns on all four. That is
@@ -648,11 +734,9 @@ async function go(hash) {
   // below NG+3's level of 100, and the naive reading of that says the top row is
   // unreachable; the wiki has in-game screenshots of it at LV65 and LV90. So
   // MAXLEVEL is the Normal drop band, not a cross-replay ceiling.
-  const riftRows = async (id) => {
-    const t = await deep(`#item=${id}`);
-    return [].map.call(t.querySelectorAll('#detail .ngt tbody tr'),
-      tr => [].map.call(tr.querySelectorAll('td'), td => td.textContent));
-  };
+  const riftRows = async (id) =>
+    read(`#item=${id}`, t => [].map.call(t.querySelectorAll('#detail .ngt tbody tr'),
+      tr => [].map.call(tr.querySelectorAll('td'), td => td.textContent)));
   const rift = await riftRows('Quest_ManaVent_Reward');
   ok('Rift Ember carries the four-row NG table', rift.length === 4, `${rift.length} rows`);
   ok('...at the levels and requirements the wiki prints for it',
@@ -688,9 +772,8 @@ async function go(hash) {
   for (const [id, why] of [['tl2_flameember_rank1', 'a tiered ember'],
                            ['tl2_skull002', 'a tiered skull'],
                            ['tl2_keltonsrock', 'a deferred socketable']]) {
-    const t = await deep(`#item=${id}`);
     ok(`${why} keeps its flat affix block and no NG table`,
-       t.querySelectorAll('#detail .ngt').length === 0);
+       await read(`#item=${id}`, t => t.querySelectorAll('#detail .ngt').length) === 0);
   }
 
   // A skull is where the curve and the wiki part company. The wiki's Gems (T2)
@@ -699,8 +782,8 @@ async function go(hash) {
   // with the nine that do not -- and that interleaving is what marks those nine
   // as bad cells rather than a different curve above level 80. Tibbeek is level
   // 81, so the curve gives 73 where the wiki's own cell reads 40.
-  const tib = await deep('#item=tl2_skull040');
-  const tibt = tib.getElementById('detail').textContent;
+  const tibt = await read('#item=tl2_skull040',
+    tib => tib.getElementById('detail').textContent);
   ok('a skull takes the game curve, not the wiki\'s bad cell',
      /Required Item Level to Socket\s*73(?!\d)/.test(tibt) &&
      !/Required Item Level to Socket\s*40(?!\d)/.test(tibt), tibt.slice(0, 240));
@@ -741,7 +824,7 @@ async function go(hash) {
   const showF = g => g.map(s => `${s.head}: ${s.lines.join('; ')}`).join('  ');
   // Blood Ember Speck, rank 1: two options a side, and the transcribed numbers
   // are the ones this rank rolls -- nothing on the card scales them.
-  const speck = poolOf(await deep('#item=tl2_bloodember_rank1'));
+  const speck = await read('#item=tl2_bloodember_rank1', poolOf);
   ok('a rare ember states both slots as their own "one of" list',
      speck.length === 2 &&
      speck[0].head === 'Armor / Trinket' && speck[0].count === 'one of 2' &&
@@ -751,7 +834,7 @@ async function go(hash) {
      show(speck));
   // The same two rolls at rank 7 are worth eight times as much, so a pool that
   // was built once and printed on every rank shows up here.
-  const giantBlood = poolOf(await deep('#item=tl2_bloodember_rank7'));
+  const giantBlood = await read('#item=tl2_bloodember_rank7', poolOf);
   ok('the pool carries the rank\'s own numbers, not a shared base',
      giantBlood[0].opts.indexOf('+384 Health') >= 0 &&
      giantBlood[1].opts.indexOf('90 Health stolen on hit') >= 0 &&
@@ -761,39 +844,44 @@ async function go(hash) {
   // list stops at a 6.5% Attack Speed the files never ship -- the band files
   // end at 70-83, so rank 7's fastest option is the flat 3%. The armor side
   // also pins the one line the game prints with a sign the wiki drops.
-  const giantChaos = (await deep('#item=tl2_chaosember_rank7')).getElementById('detail');
-  const chaos = poolOf(giantChaos);
+  const giantChaos = await read('#item=tl2_chaosember_rank7', doc => ({
+    chaos: poolOf(doc), slots: slotGroups(doc), text: doc.getElementById('detail').textContent
+  }));
+  const chaos = giantChaos.chaos;
   ok('a derived pool follows the files where the wiki differs',
      chaos[0].count === 'one of 9' && chaos[1].count === 'one of 10' &&
      chaos[0].opts.indexOf('+6% Dodge chance') >= 0 &&
      chaos[1].opts.indexOf('+3% Attack Speed') >= 0 &&
      chaos[0].opts.indexOf('Physical Damage Taken is reduced by -6%') >= 0 &&
-     !/6\.5%/.test(giantChaos.textContent), show(chaos));
+     !/6\.5%/.test(giantChaos.text), show(chaos));
   // And the two socketables that look like these but are not: a BASE template,
   // which no rank's level matches, and a normal ember, whose two bonuses are
   // fixed and arrive as ordinary affix lines.
-  const base = poolOf(await deep('#item=tl2_bloodember_BASE'));
-  const flame = await deep('#item=tl2_flameember_rank1');
-  const flameDetail = flame.getElementById('detail');
+  const base = await read('#item=tl2_bloodember_BASE', poolOf);
+  const flame = await read('#item=tl2_flameember_rank1', doc => ({
+    pools: doc.querySelectorAll('#detail ul.pool').length,
+    affs: doc.querySelectorAll('#detail .aff').length, groups: slotGroups(doc),
+    body: doc.querySelector('#detail .body').textContent.slice(0, 120),
+    text: doc.getElementById('detail').textContent
+  }));
   ok('only the 28 rare ranks carry a pool',
-     base.length === 0 && flame.querySelectorAll('#detail ul.pool').length === 0 &&
-     flame.querySelectorAll('#detail .aff').length === 2,
-     show(base) + ' | ' + flame.querySelector('#detail .body').textContent.slice(0, 120));
+     base.length === 0 && flame.pools === 0 && flame.affs === 2,
+     show(base) + ' | ' + flame.body);
   // ...and a rolled ember carries no fixed-slot heading, so the two blocks
   // cannot be confused for one another on the one card family that has either.
   ok('...and a rolled ember carries no fixed-slot heading',
-     slotGroups(giantChaos).length === 0, showF(slotGroups(giantChaos)));
+     giantChaos.slots.length === 0, showF(giantChaos.slots));
   // The normal ember's two bonuses are fixed, so they are facts under a slot
   // heading rather than a "one of" list. The heading also replaced the game's
   // own `Weapon:` prefix, which the card used to print as part of the effect --
   // so the check is both that the prefix is gone and that what it used to
   // encode is now carried by the structure instead.
-  const flameG = slotGroups(flame);
+  const flameG = flame.groups;
   ok('a fixed ember labels its slots instead of printing the game\'s prefix',
      flameG.length === 2 &&
      flameG[0].head === 'Armor / Trinket' && flameG[0].lines.join(' | ') === '+8 Fire Armor' &&
      flameG[1].head === 'Weapon' && flameG[1].lines.join(' | ') === '+7 Fire Damage' &&
-     !/Weapon:|Armor\/Trinket:/.test(flameDetail.textContent), showF(flameG));
+     !/Weapon:|Armor\/Trinket:/.test(flame.text), showF(flameG));
   // The flagship of the seven the files correct. TIDBI lost the heading between
   // Quato's two affixes, so its four `+64 <element> Armor` lines sat under the
   // freeze line's Weapon heading and were filed as weapon stats -- the wiki's
@@ -801,7 +889,7 @@ async function go(hash) {
   // blade here is real: the first heading was right and the lines under it were
   // not, so a page-wide search for "Armor" passes on the broken card too. Only
   // reading the groups catches it.
-  const quato = slotGroups(await deep('#item=tl2_skull033'));
+  const quato = await read('#item=tl2_skull033', slotGroups);
   ok('a lost heading is rebuilt from the files, not from the line above it',
      quato.length === 2 &&
      quato[0].head === 'Armor / Trinket' && quato[0].lines.length === 4 &&
@@ -814,7 +902,7 @@ async function go(hash) {
   // Lucky Coin rank 2, which TIDBI left with no prefix at all -- so this also
   // pins that a socketable is derived by being a socketable, not by whether the
   // export happened to label it.
-  const coin = slotGroups(await deep('#item=tl2_goldgem2'));
+  const coin = await read('#item=tl2_goldgem2', slotGroups);
   ok('an either-slot affix is shown once, under a heading that says so',
      coin.length === 1 && coin[0].head === 'Armor / Trinket or Weapon' &&
      coin[0].lines.join(' | ') === '2% increase in the amount of gold found',
@@ -851,7 +939,7 @@ async function go(hash) {
   // 16/60/87/100 and 8/52/79/92 are the band formula's, and +328 Health at
   // NG +2 is the number no page carries: the wiki's table stops at NG +1 and
   // NG +3 for this eye.
-  const kuru = ngRows(await deep('#item=tl2_eyeofelderkuru'));
+  const kuru = await read('#item=tl2_eyeofelderkuru', ngRows);
   // The two level columns are spelled out rather than abbreviated. They read
   // "Lv" and "Req" while a Requirements block below stated the requirement in
   // full and the header could lean on it; with that block gone the header is the
@@ -872,11 +960,15 @@ async function go(hash) {
      kuru.rows.map(r => r[3]).join(' | ') ===
        '+18 Electric Damage | +58 Electric Damage | +82 Electric Damage | +94 Electric Damage',
      showN(kuru));
-  const kuruDet = (await deep('#item=tl2_eyeofelderkuru')).getElementById('detail');
+  const kuruDet = await read('#item=tl2_eyeofelderkuru', doc => ({
+    aff: doc.querySelectorAll('#detail .aff').length,
+    fxh: doc.querySelectorAll('#detail .fxh').length,
+    ngt: doc.querySelectorAll('#detail .ngt').length,
+    rrow: doc.querySelectorAll('#detail .rrow').length,
+    rhead: doc.querySelectorAll('#detail .rhead').length
+  }));
   ok('...and the flat block it replaced is gone, not merely joined by a table',
-     kuruDet.querySelectorAll('.aff').length === 0 &&
-     kuruDet.querySelectorAll('.fxh').length === 0 &&
-     kuruDet.querySelectorAll('.ngt').length === 1);
+     kuruDet.aff === 0 && kuruDet.fxh === 0 && kuruDet.ngt === 1);
   // The table's first two columns ARE the requirement -- one per level, which is
   // more than a single chip could say -- so the block below is dropped on an eye.
   // It is never more than the one chip in any case: no socketable carries stat
@@ -884,8 +976,7 @@ async function go(hash) {
   // hold. Asserted on the elements rather than on the word "Requirements", which
   // would also match a heading left behind with nothing under it.
   ok('...and no Requirements block, which the table already states per level',
-     kuruDet.querySelectorAll('.rrow').length === 0 &&
-     kuruDet.querySelectorAll('.rhead').length === 0);
+     kuruDet.rrow === 0 && kuruDet.rhead === 0);
   // The Dark Alchemist carries both of this feature's corrections in one card.
   // Its mana line is `2 Mana recovery per second` in TIDBI and 1.4 on the
   // wiki's own table -- the one cell in the whole family where the card's number
@@ -893,7 +984,7 @@ async function go(hash) {
   // over time is the one column no graph explains, so it ships as the page's
   // published transcription, and the levels it was published at are asserted
   // against the band formula rather than assumed.
-  const alch = ngRows(await deep('#item=tl2_eyeofdarkalchemist'));
+  const alch = await read('#item=tl2_eyeofdarkalchemist', ngRows);
   ok('the card takes the wiki\'s number where TIDBI\'s own number is wrong',
      alch.rows.map(r => r[2]).join(' | ') ===
        '1.4 Mana recovery per second | 1.9 Mana recovery per second | ' +
@@ -917,7 +1008,7 @@ async function go(hash) {
   // -- no graph exists for the TYPE -- so the four rows carry the same text and
   // only the level and requirement move. That is what the table is for here,
   // and it is why the assertion is on the outer three columns.
-  const tiamat = ngRows(await deep('#item=tl2_eyeoftiamat'));
+  const tiamat = await read('#item=tl2_eyeoftiamat', ngRows);
   ok('the eye with no published table is predicted, not skipped',
      tiamat.rows.length === 4 &&
      tiamat.rows.map(r => r[0]).join('/') === '54/82/100/100' &&
@@ -929,7 +1020,7 @@ async function go(hash) {
   // already, so this pins only the negative -- that the table did not leak out
   // of the family it belongs to.
   ok('a socketable that is not an eye keeps its flat affix block',
-     !(await deep('#item=tl2_flameember_rank1')).querySelector('#detail .ngt'));
+     await read('#item=tl2_flameember_rank1', doc => !doc.querySelector('#detail .ngt')));
 
   // The three Torchlight 1 fishing socketables are out of the database. They
   // shipped inside the TL2 PAK, which is why TIDBI lists them -- so they were
@@ -946,6 +1037,7 @@ async function go(hash) {
   }
 
   // ---------------------------------------------------------------- set names
+  trace('------------------------');
   // An item's SET field is a DAT token, and a token is not a name: SENTINAL is
   // misspelled, U_GRAND_ARCHITECT and BERSERKER_FINAL are not words the game
   // prints anything like. The name lives in the set's own file under
@@ -954,10 +1046,9 @@ async function go(hash) {
   // nothing but the lookup can produce either -- one is a typo the display name
   // corrects, the other shares no word with its token.
   //
-  // One fresh document for all three, since jsdom's spurious empty-hashchange
-  // (see the header) makes navigating the shared one unreliable after a click.
-  const zs = await deep('#item=Zeraphi_01_shoulders_alt_set');
-  {
+  // Two cold loads rather than one, since jsdom's spurious empty-hashchange
+  // (see the header) makes navigating a shared page unreliable after a click.
+  await read('#item=Zeraphi_01_shoulders_alt_set', zs => {
     const opts = [].map.call(zs.querySelectorAll('#setsel option'), o => o.textContent);
     ok('the set facet offers names, not DAT tokens',
        opts.indexOf('Sentinel (9)') >= 0 && opts.indexOf('Cornerstone (7)') >= 0 &&
@@ -965,11 +1056,18 @@ async function go(hash) {
     ok('a set item names its set the way the game does',
        /Set:\s*Zeraphi Alchemy/.test(zs.getElementById('detail').textContent),
        zs.querySelector('#detail .sname').textContent);
-  }
-  const zf = await deep('#set=Zeraphi%20Alchemy');
-  ok('a set filter by display name returns the set',
-     zf.querySelectorAll('#grid .card').length === 9,
-     `${zf.querySelectorAll('#grid .card').length}`);
+  });
+  // The two pages are read and closed one after the other, and the assertion
+  // that compares a card from each is further down -- so what crosses the gap is
+  // the class name, which is all that assertion was ever asking about.
+  let zfCard = null;
+  await read('#set=Zeraphi%20Alchemy', zf => {
+    ok('a set filter by display name returns the set',
+       zf.querySelectorAll('#grid .card').length === 9,
+       `${zf.querySelectorAll('#grid .card').length}`);
+    const c = zf.querySelector('#grid .card');
+    zfCard = c ? c.className : null;
+  });
 
   // ------------------------------------------------------------ set bonuses
   // A set piece's most useful fact is not on the piece: what the other eight do
@@ -993,7 +1091,7 @@ async function go(hash) {
     .call(doc.querySelectorAll('#detail .rung .rn'), e => e.textContent.trim())
     .map(e => e.textContent);
 
-  {
+  await read('#item=Zeraphi_01_shoulders_alt_set', zs => {
     const sb = sname(zs), rungs = rungNums(zs);
     ok('a set piece carries the whole set\'s ladder, not just its own rungs',
        !!sb && rungs.join(',') === '2,3,4,5,6' &&
@@ -1012,9 +1110,8 @@ async function go(hash) {
     ok('the ladder header counts the records shipped and the pieces a full set needs',
        !!sb && /Zeraphi Alchemy\s*9 items · 6 piece set/.test(sb.textContent),
        sb && sb.textContent);
-  }
-  const arch = await deep('#item=engineer_05_amulet_alt_set');
-  {
+  });
+  await read('#item=engineer_05_amulet_alt_set', arch => {
     const sb = sname(arch);
     const over = [].map.call(arch.querySelectorAll('#detail .rung.over .rn'), e => e.textContent);
     // 7 records exist for Cornerstone and the ladder gates a rung on 9, so two
@@ -1045,9 +1142,8 @@ async function go(hash) {
        /\.rung\.over \.rn\{[^}]*color:/.test(css) &&
        !/\.fx\.over li\{/.test(css),
        overList && overList.className);
-  }
-  const twin = await deep('#item=z_wand_m01_set');
-  {
+  });
+  await read('#item=z_wand_m01_set', twin => {
     const sb = sname(twin);
     // This is the assertion that inverts, and it is the clearest single piece of
     // evidence that the port is right.
@@ -1079,7 +1175,7 @@ async function go(hash) {
     ok('the ladder is its own section, not extra affixes on the piece',
        !!sb && aff.length === 0,
        aff.length ? aff[0].textContent : '(clean)');
-  }
+  });
 
   // ----------------------------------------------------- a set piece's rarity
   // Set is a membership the DAT asserts, not a rarity: all 556 set items are
@@ -1092,8 +1188,7 @@ async function go(hash) {
   // shape that reads worst without this, since "Set Belt" gave no clue whether
   // the thing was worth picking up. Its 16 pieces against a 10-piece ladder is
   // also the "pieces to spare" shape the header has to state.
-  const mon = await deep('#item=engineer_06_belt_alt_set');
-  {
+  await read('#item=engineer_06_belt_alt_set', mon => {
     const typ = mon.querySelector('#detail .dtype');
     const em = typ.querySelector('em');
     ok('a set piece\'s type line leads with its real rarity and keeps the Set tag',
@@ -1110,21 +1205,19 @@ async function go(hash) {
     ok('...and not one of its rungs is dimmed, because all ten can be worn',
        mon.querySelectorAll('#detail .rung.over').length === 0,
        mon.querySelectorAll('#detail .rung.over').length + ' marked');
-  }
-  const mset = await deep('#set=Mondon%E2%80%99s%20Vestment');
-  {
+  });
+  await read('#set=Mondon%E2%80%99s%20Vestment', mset => {
     const card = sel => mset.querySelector('#grid .card[data-id="' + sel + '"]');
     const u = card('engineer_06_belt_alt_set');
     // every piece of Mondon's is Unique; Zeraphi is the Rare half, from the
     // document already open on that set above, so both rarities are covered
-    const zcard = zf.querySelector('#grid .card');
+    const zcard = zfCard;
     ok('a set item\'s card wears its real rarity\'s colour, not the Set tier\'s',
        !!u && u.className.indexOf('q-unique') >= 0 && u.className.indexOf('q-set') < 0,
        u && u.className);
     ok('...and a Rare set piece is blue, where the two rarities differ',
-       !!zcard && zcard.className.indexOf('q-rare') >= 0,
-       zcard ? zcard.className : '(no card)');
-  }
+       !!zcard && zcard.indexOf('q-rare') >= 0, zcard || '(no card)');
+  });
   // The recolour is paint, not classification: the 556 set items must still be
   // reachable as a group, or they would have been re-filed as Rare/Unique just
   // to get a colour and the facet would have quietly changed meaning. What
@@ -1135,12 +1228,13 @@ async function go(hash) {
   // four dimmed pills and an empty grid read as "no tier selected", which is
   // what the hash says. Translating it to setonly would be inventing a filter
   // the link never asked for.
-  const stier = await deep('#tier=Set');
-  ok('a stale #tier=Set selects no tier and matches nothing',
-     [].every.call(stier.querySelectorAll('#tiers input'), i => !i.checked) &&
-     /Nothing matches/.test(stier.getElementById('more').textContent),
-     stier.getElementById('count').textContent + ' | ' +
-     stier.getElementById('more').textContent);
+  await read('#tier=Set', stier => {
+    ok('a stale #tier=Set selects no tier and matches nothing',
+       [].every.call(stier.querySelectorAll('#tiers input'), i => !i.checked) &&
+       /Nothing matches/.test(stier.getElementById('more').textContent),
+       stier.getElementById('count').textContent + ' | ' +
+       stier.getElementById('more').textContent);
+  });
 
   // ------------------------------------------------ the three reported bugs
   // Reported against heavy_g_amulet_f_alt_b: fire armor should be 140-174, the
@@ -1150,7 +1244,8 @@ async function go(hash) {
   // -- the 140-174 here is the derived range, and TIDBI's rendered number for
   // the same item agrees with it to the point. Requirements still come from
   // TIDBI: the DAT has no field for them.
-  const amu = (await deep('#item=heavy_g_amulet_f_alt_b')).getElementById('detail').textContent;
+  const amu = await read('#item=heavy_g_amulet_f_alt_b',
+    doc => doc.getElementById('detail').textContent);
   ok('amulet: fire armor is the 140-174 range', /140-174Fire Armor/.test(amu), amu.slice(0, 300));
   ok('amulet: Focus requirement 79 is present', /Focus\s*79/.test(amu), amu.slice(0, 300));
   ok('amulet: player level required 81 is present',
@@ -1163,20 +1258,24 @@ async function go(hash) {
   // where the game files give the spread the game prints, so the derived range
   // is the thing to show. Runemaster Signet and Runemaster Amulet are the pair
   // reported by name; cloth_g_amulet_alt_set is the widest case in the corpus.
-  const sig = (await deep('#item=sturm_01_ring_alt_set')).getElementById('detail').textContent;
+  const sig = await read('#item=sturm_01_ring_alt_set',
+    doc => doc.getElementById('detail').textContent);
   ok('Runemaster Signet: ice armor is the derived 4-6 range',
      /4-6Ice Armor/.test(sig), sig.slice(0, 300));
-  const run = (await deep('#item=sturm_01_amulet_alt_set')).getElementById('detail').textContent;
+  const run = await read('#item=sturm_01_amulet_alt_set',
+    doc => doc.getElementById('detail').textContent);
   ok('Runemaster Amulet: ice armor is the derived 7-8 range',
      /7-8Ice Armor/.test(run), run.slice(0, 300));
-  const wid = (await deep('#item=cloth_g_amulet_alt_set')).getElementById('detail').textContent;
+  const wid = await read('#item=cloth_g_amulet_alt_set',
+    doc => doc.getElementById('detail').textContent);
   ok('the widest set-jewellery case renders all four types as ranges',
      (wid.match(/55-68/g) || []).length === 4, wid.slice(0, 400));
   // A base file whose weight and min-weight are equal has nothing to roll, so
   // both ends collapse to one number. 1,300 derived items are flat for that
   // reason -- every one of them chaining to a _UNIQUE base. A range there would
   // be invented, so the flatness is the assertion.
-  const flt = (await deep('#item=caster_03_boots')).getElementById('detail').textContent;
+  const flt = await read('#item=caster_03_boots',
+    doc => doc.getElementById('detail').textContent);
   ok('a single-weight base file still renders one number',
      /20Physical Armor/.test(flt) && !/\d+-\d+Physical Armor/.test(flt), flt.slice(0, 400));
 
@@ -1187,7 +1286,8 @@ async function go(hash) {
   // cannot reach. That has to be disclosed, not passed off as an in-game
   // number. The Unclassified monster shields the badge used to cover are still
   // hidden from the site, so shield_dwarven remains unreachable by deep link.
-  const bas = (await deep('#item=Witch_Boots')).getElementById('detail').textContent;
+  const bas = await read('#item=Witch_Boots',
+    doc => doc.getElementById('detail').textContent);
   ok('an item with only base values says so',
      /base values, not rendered/.test(bas) && /PAK \.DAT base value/.test(bas), bas.slice(0, 300));
 
@@ -1195,8 +1295,12 @@ async function go(hash) {
   // A class item carries both a player level and stat requirements, and the
   // game grants equip if you meet either branch -- so the detail must show the
   // "or". A flat list would state the opposite of how equipping works.
-  const bdoc = await deep('#item=caster_04_helmet_alt_c');
-  const bmh = bdoc.getElementById('detail').textContent;
+  const bdoc = await read('#item=caster_04_helmet_alt_c', doc => ({
+    text: doc.getElementById('detail').textContent,
+    pill: doc.querySelector('#detail .corner').textContent,
+    row: doc.querySelector('#detail .rrow').textContent
+  }));
+  const bmh = bdoc.text;
   ok('class item: level 65 / Focus 87 / Vitality 101',
      /Player Level\s*65/.test(bmh) && /Focus\s*87/.test(bmh) &&
      /Vitality\s*101/.test(bmh), bmh.slice(0, 400));
@@ -1210,30 +1314,29 @@ async function go(hash) {
   // equip this by meeting the stats. Read off the two elements rather than the
   // card's text, because "REQUIREMENTS" is uppercased by CSS -- splitting the
   // string on it would silently find nothing and pass on an empty remainder.
-  {
-    const pill = bdoc.querySelector('#detail .corner').textContent;
-    const row = bdoc.querySelector('#detail .rrow').textContent;
-    ok('class item: the Embermage gate is a corner restriction, not a requirement branch',
-       /Embermage Only/.test(pill) && !/Embermage/.test(row), pill + '  //  ' + row);
-  }
+  ok('class item: the Embermage gate is a corner restriction, not a requirement branch',
+     /Embermage Only/.test(bdoc.pill) && !/Embermage/.test(bdoc.row),
+     bdoc.pill + '  //  ' + bdoc.row);
 
   // ------------------------------------------- augmented weapons (unlockable)
   // 74 uniques carry a kill-count task that unlocks 1-3 further stats. The
   // whole point is that they are conditional, so they must not be rendered as
   // affixes the weapon already has -- which is exactly what happened while the
   // tooltip arrived as one flat list.
-  const gw = await deep('#item=wand_u02b');
-  const gwd = gw.getElementById('detail');
-  const txt = sel => { const e = gwd.querySelector(sel); return e ? e.textContent : ''; };
-  const list = sel => [].map.call(gwd.querySelectorAll(sel), l => l.textContent);
   // The plain affixes are `.aff` paragraphs now: the card dropped the list the
   // `.fx:not(.locked) li` selector reached, and the locked group is the only
   // `<ul>` left on it. The locked side keeps its selector unchanged.
-  const locked = list('.fx.locked li'), plain = list('.aff');
+  const gw = await read('#item=wand_u02b', gwd => {
+    const txt = sel => { const e = gwd.querySelector(sel); return e ? e.textContent : ''; };
+    const list = sel => [].map.call(gwd.querySelectorAll(sel), l => l.textContent);
+    return { task: txt('.task'), cond: txt('.cond'),
+             locked: list('.fx.locked li'), plain: list('.aff') };
+  });
+  const locked = gw.locked, plain = gw.plain;
   ok('augmented weapon: the task is shown',
-     /Kill 50 Ezrohir to Upgrade/.test(txt('.task')), txt('.task'));
+     /Kill 50 Ezrohir to Upgrade/.test(gw.task), gw.task);
   ok('augmented weapon: the condition is spelled out, not implied',
-     /locked until the task above is complete/.test(txt('.cond')), txt('.cond'));
+     /locked until the task above is complete/.test(gw.cond), gw.cond);
   ok('augmented weapon: both unlocked stats are in the locked group',
      locked.length === 2 && /Acid Rain/.test(locked[0]) && /Stun target/.test(locked[1]),
      locked.join(' | '));
@@ -1243,16 +1346,18 @@ async function go(hash) {
   // Rat Killer is the one item whose divider row sorts before its header. Its
   // twin carries the same '90% Interrupt chance', which the divider puts
   // outside the block there -- so it is an affix here too, not an unlock.
-  const rk = await deep('#item=ratkiller');
-  const rkd = rk.getElementById('detail');
-  const rkl = [].map.call(rkd.querySelectorAll('.fx.locked li'), l => l.textContent);
-  const rkp = [].map.call(rkd.querySelectorAll('.aff'), l => l.textContent);
+  const rk = await read('#item=ratkiller', rkd => ({
+    l: [].map.call(rkd.querySelectorAll('#detail .fx.locked li'), l => l.textContent),
+    p: [].map.call(rkd.querySelectorAll('#detail .aff'), l => l.textContent)
+  }));
+  const rkl = rk.l, rkp = rk.p;
   ok('augmented weapon: the inverted-divider item splits the same way',
      rkl.length === 1 && /\+2 Physical Damage/.test(rkl[0]) &&
      rkp.length === 1 && /90% Interrupt chance/.test(rkp[0]),
      rkl.join(' | ') + '  //  ' + rkp.join(' | '));
 
   // ------------------------------------------------------------- tier strip
+  trace('------------------------');
   // The rarity filter moved out of the rail onto its own row between the
   // toolbar and the grid. It is the same facet -- same key, same values, same
   // counts -- rendered by a different function, so what has to be asserted is
@@ -1453,12 +1558,13 @@ async function go(hash) {
      /^9 items/.test(cnt()) && ssel().value === 'Zeraphi Alchemy' && sbtn().classList.contains('on'),
      `${cnt()} / ${ssel().value}`);
   // And a cold load of a hash naming both, which is the path a shared link takes.
-  const both = await deep('#set=Zeraphi%20Alchemy&setonly=1');
-  ok('a hash naming a set and the toggle lands with both set',
-     both.getElementById('setsel').value === 'Zeraphi Alchemy' &&
-     both.getElementById('onlyset').classList.contains('on') &&
-     /^9 items/.test(both.getElementById('count').textContent),
-     both.getElementById('count').textContent + ' / ' + both.getElementById('setsel').value);
+  await read('#set=Zeraphi%20Alchemy&setonly=1', both => {
+    ok('a hash naming a set and the toggle lands with both set',
+       both.getElementById('setsel').value === 'Zeraphi Alchemy' &&
+       both.getElementById('onlyset').classList.contains('on') &&
+       /^9 items/.test(both.getElementById('count').textContent),
+       both.getElementById('count').textContent + ' / ' + both.getElementById('setsel').value);
+  });
   // #reset restores them the way it restores everything else: readHash clears
   // S before its early return, so both controls come back to their defaults.
   d.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
@@ -1491,7 +1597,6 @@ async function go(hash) {
     ok('...and the search box, the rail and the set controls all say so',
        d.getElementById('q').value === '' && ssel().value === 'Zeraphi Alchemy' &&
        !sbtn().classList.contains('on') &&
-       d.getElementById('skmin').value === '' && d.getElementById('skmax').value === '' &&
        [].every.call(d.querySelectorAll('#railbody input[type=checkbox]'), b => !b.checked),
        `${ssel().value} / ${d.getElementById('q').value}`);
     await go('');
@@ -1500,12 +1605,41 @@ async function go(hash) {
 
   // ------------------------------------------------------------ rail labels
   // The rail filter must use TL2's own stat names too. MAG/DEF are Torchlight
-  // 1's words and name attributes that do not exist in this game. Scoped to the
-  // label column itself -- the rail's text as a whole contains "EMBERMAGE", so
-  // a bare /MAG/ over it would fail on the Set facet for the wrong reason.
-  const rl = [].map.call(d.querySelectorAll('#rail .rng .rl'), s => s.textContent);
-  ok('rail labels the requirements Focus / Vitality, not MAG / DEF',
+  // 1's words and name attributes that do not exist in this game. The four stat
+  // rows are the panel's now, so this reads them there -- scoped to the
+  // requirement section, which is also what keeps it from picking up the class
+  // boxes' labels, since those are the other `.agrid` in the panel.
+  d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  const rl = [].map.call(d.querySelectorAll('#advb [data-sec="advreq"] .rng .rl'), s => s.textContent);
+  ok('the stat rows label the requirements Focus / Vitality, not MAG / DEF',
      rl.join(',') === 'Strength,Dexterity,Focus,Vitality', rl.join(','));
+  ok('...and Class is a section of its own, not a tail on them',
+     !!d.querySelector('#advb [data-sec="advcls"]') &&
+     !d.querySelector('#advb [data-sec="advreq"] [data-acls]') &&
+     [].map.call(d.querySelectorAll('#advb [data-sec="advcls"] [data-acls]'), i => i.value).length === 4,
+     [].map.call(d.querySelectorAll('#advb .sec'), s => s.getAttribute('data-sec')).join(' '));
+  d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  // The rail is the type facet and nothing else. Every other filter it used to
+  // carry -- damage, item level, the four stat caps, sockets -- is in the panel
+  // now, and leaving a second control behind for any of them is how a grid ends
+  // up empty with nothing on screen to explain why. The type facet and the tier
+  // strip above the grid are the two the page keeps in front of the reader.
+  await go('');
+  ok('the rail is the type facet alone',
+     [].map.call(d.querySelectorAll('#railbody .sec'), s => s.getAttribute('data-sec')).join(' ') === 'types' &&
+     d.querySelectorAll('#railbody input[type=number]').length === 0 &&
+     d.querySelectorAll('#railbody input[data-f="dmg"]').length === 0 &&
+     !d.querySelector('#railbody input[type=checkbox][id=sock]'),
+     [].map.call(d.querySelectorAll('#railbody .sec'), s => s.getAttribute('data-sec')).join(' '));
+  // ...and the filters it gave up are still reachable, which is the half that
+  // matters: a control removed without a replacement is a filter removed. The
+  // damage facet's old key still asks its own question through the panel's own
+  // state -- a type named with no bound is a presence test -- and the count is
+  // the facet row's count to the item.
+  await go('#dmg=fire');
+  ok('a legacy #dmg=fire link still asks for the items that deal fire',
+     /230/.test(cnt()), cnt());
 
   // ------------------------------------------- the grouped type rail
   // The rail's counts are over the 6,048 the site shows, not items.json's
@@ -1644,40 +1778,48 @@ async function go(hash) {
     await go('');
   }
 
-  // The damage facet's values are the .DAT's own lowercase keys: they are what
+  // The damage rows' values are the .DAT's own lowercase keys: they are what
   // matches() compares and what the URL carries. The row prints a word, so it
-  // capitalises it, the same way the detail view's stat lines already do.
+  // capitalises it, the same way the detail view's stat lines already do. The
+  // rows are the panel's now -- the rail's damage facet asked only "has this
+  // type", which the panel's row still asks when both its boxes are left blank,
+  // and the pair on top of it is what the facet could not say.
   {
-    const rows = [].map.call(rb.querySelectorAll('input[data-f="dmg"]'), i => ({
-      label: i.closest('.f').querySelector('.lbl').textContent, value: i.value }));
+    d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    const rows = [].map.call(d.querySelectorAll('#advb [data-sec="advdmg"] [data-end="lo"]'), i => ({
+      label: i.closest('.rng').querySelector('.rl').textContent,
+      value: i.getAttribute('data-a').slice(5) }));
     ok('the damage rows read as words, not as the keys they filter on',
        rows.length === 5 &&
        rows.every(r => r.label === r.value.charAt(0).toUpperCase() + r.value.slice(1) &&
                        r.value === r.value.toLowerCase()),
        rows.map(r => r.label + '=' + r.value).join(' '));
+    ok('...and each is a pair of boxes, so a type can be bounded at either end',
+       d.querySelectorAll('#advb [data-sec="advdmg"] input[type=number]').length === 10 &&
+       d.querySelectorAll('#advb [data-sec="advarm"] input[type=number]').length === 10,
+       `${d.querySelectorAll('#advb [data-sec="advdmg"] input[type=number]').length} damage boxes`);
     // and the word must not follow the label into the URL: the key underneath is
     // still what filters, so a link keeps working whatever the row calls it
-    const fire = rb.querySelector('input[data-f="dmg"][value="fire"]');
-    fire.checked = true;
-    fire.dispatchEvent(new w.Event('change', { bubbles: true }));
-    ok('...and the key underneath is still what filters',
-       /(^|[#&])dmg=fire/.test(w.location.hash), w.location.hash);
-    await wait(30);
-    fire.checked = false;
-    fire.dispatchEvent(new w.Event('change', { bubbles: true }));
-    await wait(30);
+    d.querySelector('#advb [data-a="dmgv.fire"][data-end="hi"]').value = '10';
+    d.getElementById('advgo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    ok('...and the key underneath is still what a URL carries',
+       w.location.hash === '#dmgv=fire::10', w.location.hash);
+    d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   }
 
   // a legacy #cat= link named a facet that no longer exists; it must still
-  // resolve, to the group it now names
-  const dc = await deep('#cat=Armor');
-  ok('a legacy #cat=Armor link resolves to the Armor group',
-     /1,827/.test(dc.getElementById('count').textContent),
-     dc.getElementById('count').textContent);
-  const dj = await deep('#cat=Jewelry');
-  ok('a legacy #cat=Jewelry link resolves to Accessories',
-     /2,042/.test(dj.getElementById('count').textContent),
-     dj.getElementById('count').textContent);
+  // resolve, to the group it now names. A name that resolves to nothing at all
+  // is no filter rather than an empty grid -- the same reading the retired
+  // socket keys get, and the one this page is built on: a URL that looks like a
+  // filter and shows the whole corpus is bad, but a URL that looks like a filter
+  // and shows *nothing* is worse, because there is no way back from it.
+  const catCount = h => read(h, doc => doc.getElementById('count').textContent);
+  const dc = await catCount('#cat=Armor');
+  ok('a legacy #cat=Armor link resolves to the Armor group', /1,827/.test(dc), dc);
+  const dj = await catCount('#cat=Jewelry');
+  ok('a legacy #cat=Jewelry link resolves to Accessories', /2,042/.test(dj), dj);
+  const dn = await catCount('#cat=Nonsense');
+  ok('...and one that names nothing leaves every item standing', /6,048/.test(dn), dn);
 
   // ------------------------------------------------------- card stat line
   // The card used to show one "primary" type and its value, chosen as the
@@ -1770,22 +1912,21 @@ async function go(hash) {
   // the corpus carrying all five types, and the Hammer is the only weapon
   // carrying five plus a dps.
   {
-    const one = async (hash, id) => {
-      const doc = await deep(hash);
-      return doc.querySelector(`#grid .card[data-id="${id}"]`);
-    };
+    const one = async (hash, id) => read(hash, doc => {
+      const c = doc.querySelector(`#grid .card[data-id="${id}"]`);
+      return c && { stv: c.querySelectorAll('.st .stv').length,
+                    marks: [].map.call(c.querySelectorAll('.st .stv i'),
+                      i => i.getAttribute('style') || ''),
+                    st: c.querySelector('.st').textContent };
+    });
     const bit = await one('#q=bitterbite', 'collar_unique_spiked');
     ok('an armor card shows all five types side by side, marks and numbers only',
-       bit && bit.querySelectorAll('.st .stv').length === 5 &&
-       [].every.call(bit.querySelectorAll('.st .stv i'), i =>
-         /background-position/.test(i.getAttribute('style') || '')) &&
-       !/Armor/.test(bit.querySelector('.st').textContent),
-       bit ? bit.querySelector('.st').textContent : '(no card)');
+       bit && bit.stv === 5 && bit.marks.every(s => /background-position/.test(s)) &&
+       !/Armor/.test(bit.st), bit ? bit.st : '(no card)');
     const ham = await one('#q=official%20rebuke', 'hammer_u07b');
     ok('the densest weapon reads dps then all five damage types',
-       ham && /^878\s*dps/.test(ham.querySelector('.st').textContent.replace(/\s+/g, ' ')) &&
-       ham.querySelectorAll('.st .stv').length === 6,
-       ham ? ham.querySelector('.st').textContent : '(no card)');
+       ham && /^878\s*dps/.test(ham.st.replace(/\s+/g, ' ')) && ham.stv === 6,
+       ham ? ham.st : '(no card)');
   }
 
   // ---------------------------------------------------------------- icons
@@ -1834,6 +1975,7 @@ async function go(hash) {
   }
 
   // ------------------------------------------------------ the advanced panel
+  trace('------------------------');
   //
   // Driven on its own DOM rather than the shared one: these checks open a
   // dialog and commit filters through it, and doing that to the window every
@@ -1862,9 +2004,10 @@ async function go(hash) {
        ad.getElementById('advscrim').classList.contains('on') &&
        abtn.getAttribute('aria-expanded') === 'true',
        `panel ${adv.className} btn ${abtn.className}`);
-    ok('it opens on the five groups the plan named, in order',
+    ok('it opens on the seven sections the panel is laid out in',
        [].map.call(ad.querySelectorAll('#advb .sec'), s => s.getAttribute('data-sec'))
-         .join(' ') === 'advgen advreq advdmg advarm advaff');
+         .join(' ') === 'advgen advtype advreq advcls advdmg advarm advaff',
+       [].map.call(ad.querySelectorAll('#advb .sec'), s => s.getAttribute('data-sec')).join(' '));
     ok('the stat picker is the build\'s own vocabulary, offered as a datalist',
        ad.querySelectorAll('#advstats option').length === 154,
        `${ad.querySelectorAll('#advstats option').length}`);
@@ -1874,19 +2017,69 @@ async function go(hash) {
     ok('it opens with no stat rows, and says so',
        arows().length === 0 && /No stat filters yet/.test(ad.getElementById('advb').textContent));
 
-    // The panel and the rail share two fields -- item level and sockets -- and
-    // write the same S members. So a number set on the rail has to be in the
-    // panel the moment it opens: a panel keeping its own copy would show `any`
-    // here and then silently overwrite the reader's filter on Search.
-    click(ad.getElementById('advx'));                  // close, to reopen it
-    const rlvl = ad.getElementById('lvmin');
-    rlvl.value = '60';
-    fire(rlvl, 'change');
+    // --- the Type section --------------------------------------------------
+    // A tab strip over one checkbox per type, which is the shape the reference
+    // screenshot has. The strip is read off the taxonomy -- "All", then one tab
+    // per category -- so a fifth category is a tab without a code change, and it
+    // is a *view*: it chooses whose boxes are on screen and never what a search
+    // returns, which is what makes a selection able to span tabs.
+    const tabs = () => [].map.call(ad.querySelectorAll('#advb .ttab'), b => b.textContent);
+    const tboxes = () => [].map.call(ad.querySelectorAll('#advb [data-atype]'), b => b.value);
+    const tab = (name) => click([].filter.call(ad.querySelectorAll('#advb .ttab'),
+      b => b.textContent === name)[0]);
+    ok('the Type section offers every category as a tab, behind All',
+       tabs().join(' ') === 'All Armor Weapons Accessories Misc', tabs().join(' '));
+    ok('...and All shows every type the corpus carries, in one grid',
+       tboxes().length === 36 && tboxes().indexOf('Axe') >= 0 &&
+       tboxes().indexOf('Chest Armor') >= 0, `${tboxes().length} boxes`);
+    tab('Armor');
+    ok('a tab narrows the grid to its own group',
+       tboxes().length === 6 && tboxes().indexOf('Helmet') >= 0 && tboxes().indexOf('Axe') < 0 &&
+       ad.querySelector('#advb .ttab.on').textContent === 'Armor',
+       `${tboxes().length} boxes under Armor`);
+    // A tick has to survive a tab change or the panel is a filter that forgets
+    // what it was told: the draft holds every tab and only the visible boxes are
+    // rewritten, which is asserted here rather than left to the code's comment.
+    box('[data-atype][value="Helmet"]').checked = true;
+    tab('Weapons');
+    ok('...and a tick made on one tab is still there after a second one',
+       tboxes().indexOf('Sword') >= 0 && box('[data-atype][value="Sword"]') &&
+       !box('[data-atype][value="Helmet"]'),
+       `${tboxes().length} boxes under Weapons`);
+    box('[data-atype][value="Sword"]').checked = true;
+    tab('All');
+    ok('...and both are ticked when All puts them on screen together',
+       box('[data-atype][value="Helmet"]').checked && box('[data-atype][value="Sword"]').checked);
+    click(ad.getElementById('advgo'));
+    // The rail's own boxes for the two types are the witness that the commit
+    // went through onRoute() rather than apply(): apply() repaints the grid in
+    // place and leaves the rail alone, so a commit through it would filter by
+    // Helmet and Sword while the rail went on showing its old ticks. With only
+    // the type facet on, the rail still carries all 36 rows -- its counts are
+    // taken with that facet skipped -- so both boxes are there to be read.
+    ok('Search commits a selection that spans two tabs',
+       aw.location.hash === '#type=Helmet%2CSword' && an() === '408 items of 6,048' &&
+       !!ad.querySelector('#railbody input[data-f="types"][value="Helmet"]:checked') &&
+       !!ad.querySelector('#railbody input[data-f="types"][value="Sword"]:checked'),
+       `${aw.location.hash} / ${an()}`);
+    // Clear it again: the rest of this block is about the affix rows.
+    click(abtn);
+    click(ad.getElementById('advrst'));
+    click(ad.getElementById('advgo'));
+
+    // The panel and the rail share one field now -- the type facet -- and write
+    // the same S member. So a type ticked on the rail has to be in the panel the
+    // moment it opens: a panel keeping its own copy would show it unticked here
+    // and then silently drop the reader's filter on Search.
+    const railAxe = [].filter.call(ad.querySelectorAll('#railbody input[data-f="types"]'),
+      i => i.value === 'Axe')[0];
+    railAxe.checked = true;
+    fire(railAxe, 'change');
     click(abtn);
     ok('a filter already on the page is in the panel when it opens',
-       box('[data-a="lvl"][data-end="lo"]').value === '60',
-       `panel shows ${JSON.stringify(box('[data-a="lvl"][data-end="lo"]').value)}`);
-    box('[data-a="lvl"][data-end="lo"]').value = '';   // put it back
+       box('[data-atype][value="Axe"]').checked,
+       `Axe box ${box('[data-atype][value="Axe"]').checked}`);
+    box('[data-atype][value="Axe"]').checked = false;   // put it back
     click(ad.getElementById('advgo'));
 
     // --- Search commits, closes, and repaints in the same turn -------------
@@ -1907,19 +2100,53 @@ async function go(hash) {
        an() === '33 items of 6,048',
        `${an()} / panel ${adv.className}`);
 
-    // --- the panel's numbers reach the rail -------------------------------
-    // This is the trap the commit path was chosen for. apply() repaints the
-    // grid in place and leaves the rail alone; only onRoute() rebuilds it, and
-    // the rail is where the item-level and socket boxes live. So a panel
-    // committing through apply() would filter by 100 while the rail went on
-    // showing the reader's old number.
+    // --- a second filter ANDs, it does not replace -------------------------
+    // This is the trap the commit path was chosen for. apply() repaints the grid
+    // in place and leaves the rail alone; only onRoute() rebuilds it, and the
+    // type facet is the rail. So a panel committing through apply() would filter
+    // the grid by its own box while the rail went on showing the reader's old
+    // ticks -- two controls for one filter, disagreeing.
+    //
+    // The affix filter from the step above is still on (33 items), and a type
+    // ticked here narrows *that* rather than replacing it: neither the rail nor
+    // the URL may forget either one. It lands on 0 -- no helmet carries +10
+    // attack speed -- which is the honest answer to the pair, and the reason the
+    // rail, the URL and the count are asserted together rather than the count
+    // alone.
     click(abtn);
-    box('[data-a="lvl"][data-end="lo"]').value = '100';
+    // ...and the Type section still offers the whole corpus while that filter is
+    // on. The rail builds its rows from the *filtered* facet counts, so a type
+    // drops out of it when another filter excludes it -- a search for one name
+    // leaves it with a single row, and this filter leaves it with sixteen. That
+    // is right for a browse list with counts beside it and wrong for a form: a
+    // checkbox that disappears because of a filter the same form set is a box
+    // the reader cannot tick, so this is the assertion that catches the rail's
+    // rule being copied into the panel. Both numbers, one line: the difference
+    // between the panel's 36 and the rail's 16 is the whole reason ALLTYPES
+    // exists, and it is asserted here so that a later "unify the two" has to
+    // argue with a count rather than with a comment.
+    var pbox = ad.querySelectorAll('#advb [data-atype]').length;
+    var rbox = ad.querySelectorAll('#railbody input[data-f="types"]').length;
+    ok('the Type section keeps every type while a filter is on',
+       pbox === 36 && rbox === 16,
+       `panel ${pbox} boxes, rail ${rbox} rows, under ${an()}`);
+    box('[data-atype][value="Helmet"]').checked = true;
     click(ad.getElementById('advgo'));
-    ok('a number typed in the panel lands in the rail\'s own box, not beside it',
-       ad.getElementById('lvmin').value === '100' &&
-       /lvl=100-/.test(aw.location.hash),
-       `rail ${JSON.stringify(ad.getElementById('lvmin').value)} hash ${aw.location.hash}`);
+    // The type narrows the affix filter rather than replacing it -- both keys
+    // survive in the URL -- and it lands on 0, because no helmet carries +10
+    // attack speed. That empty answer is the honest one for the pair, and it is
+    // also why the rail's own box for Helmet cannot be the witness here: with
+    // nothing matching, the rail has no rows at all. The rail's ticks are
+    // witnessed one block up, on a commit that has an answer.
+    ok('a type ticked in the panel narrows that filter rather than replacing it',
+       aw.location.hash === '#type=Helmet&aff=x-attack-speed:10:' && an() === '0 items of 6,048',
+       `${aw.location.hash} / ${an()}`);
+    click(abtn);
+    box('[data-atype][value="Helmet"]').checked = false;
+    click(ad.getElementById('advgo'));
+    ok('...and unticking it puts the affix filter\'s own answer back',
+       an() === '33 items of 6,048' && !/type=/.test(aw.location.hash),
+       `${an()} / ${aw.location.hash}`);
 
     // --- a draft is discarded, three ways --------------------------------
     click(abtn);
@@ -1928,12 +2155,22 @@ async function go(hash) {
        `${arows().length} rows`);
     click(ad.getElementById('advadd'));
     box('[data-arow="1"] [data-aaff]').value = 'X Health';
+    // A tick thrown away with the draft too, and on a control the commit path
+    // has to write the same way: chips and type boxes are S members like any
+    // other, so a discard that left them behind would be a filter that survived
+    // the reader saying no.
+    box('[data-achip="3"]').checked = true;
+    box('[data-atype][value="Boots"]').checked = true;
     ad.dispatchEvent(new aw.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     ok('Escape closes it and throws the draft away',
-       !adv.classList.contains('on') && /lvl=100-/.test(aw.location.hash));
+       !adv.classList.contains('on') && /aff=x-attack-speed:10:/.test(aw.location.hash) &&
+       !/sk=/.test(aw.location.hash), aw.location.hash);
     click(abtn);
     ok('...the discarded row is not there when it reopens', arows().length === 1,
        `${arows().length} rows`);
+    ok('...and neither is the chip or the type tick that went with it',
+       !box('[data-achip="3"]').checked && !box('[data-atype][value="Boots"]').checked,
+       `chip3 ${box('[data-achip="3"]').checked} boots ${box('[data-atype][value="Boots"]').checked}`);
     box('[data-aaff]').value = 'X Health';
     click(ad.getElementById('advx'));
     ok('the ✕ throws it away too', !adv.classList.contains('on'));
@@ -1948,7 +2185,8 @@ async function go(hash) {
     click(ad.getElementById('advrst'));
     ok('Reset empties the draft and leaves the page alone until Search',
        arows().length === 0 && box('[data-a="q"]').value === '' &&
-       adv.classList.contains('on') && /lvl=100-/.test(aw.location.hash),
+       !box('[data-atype][value="Helmet"]').checked &&
+       adv.classList.contains('on') && /aff=x-attack-speed:10:/.test(aw.location.hash),
        `hash ${aw.location.hash}`);
 
     // --- a value-less stat is a presence test, not a broken range ---------
@@ -1965,15 +2203,20 @@ async function go(hash) {
   }
 
   // --- the hash grammar, measured -----------------------------------------
+  trace('--- the hash grammar, me');
   {
     const eq = async (h, want) => {
-      const got = (await deep('#' + h)).getElementById('count').textContent.trim();
+      const got = await read('#' + h, doc => doc.getElementById('count').textContent.trim());
       ok(`#${h} is ${want}`, got === want, got);
     };
     // Level 50 and 10: the plan's own figures, and the pair that shows the
-    // ceiling moving rather than a count that happens to look right.
+    // ceiling moving rather than a count that happens to look right. A lone
+    // number is still a ceiling -- see readHash on why it cannot be a floor --
+    // and the two-number form brackets the same field at both ends: 2,499 is
+    // the 3,376 that "50 or under" answers, less everyone below level 10.
     await eq('plr=50', '3,376 items of 6,048');
     await eq('plr=10', '915 items of 6,048');
+    await eq('plr=10-50', '2,499 items of 6,048');
     // Usable-by, not restricted-to. 5,475 of 6,048, so the 573 excluded are the
     // items restricted to another class -- an implementation reading `cls` as
     // "restricted to" would answer 194, the count of Embermage-only items.
@@ -2006,17 +2249,31 @@ async function go(hash) {
 
     // A cold load leaves the panel closed. Opening it there is the only path
     // where the draft is born from readHash rather than from the panel's own
-    // last state, so it is the one that has to be checked for it.
-    const c = await deep('#plr=50&cls=Embermage&aff=x-attack-speed:10:&setfx=1');
-    c.getElementById('advbtn').dispatchEvent(
-      new c.defaultView.MouseEvent('click', { bubbles: true }));
-    ok('a panel opened over a deep link shows the link\'s own filters',
-       c.querySelector('#advb [data-a="plr"][data-end="lo"]').value === '50' &&
-       c.querySelector('#advb [data-acls][value="Embermage"]').checked &&
-       c.querySelector('#advb [data-asetfx]').checked &&
-       c.querySelectorAll('#advb [data-arow]').length === 1 &&
-       c.querySelector('#advb [data-arow] [data-aaff]').value === 'X Attack Speed',
-       c.getElementById('advb').textContent.replace(/\s+/g, ' ').slice(0, 100));
+    // last state, so it is the one that has to be checked for it. Every kind of
+    // control is named in the URL here -- a bound pair, a checkbox set, a chip
+    // set and a repeatable row -- and each has to come back on the control that
+    // would have set it. The player level is on the *ceiling* box because that
+    // is what a lone number reads as.
+    await read('#plr=50&cls=Embermage&aff=x-attack-speed:10:&setfx=1&sk=2,4&type=Helmet',
+      (c, cw) => {
+      c.getElementById('advbtn').dispatchEvent(
+        new cw.MouseEvent('click', { bubbles: true }));
+      ok('a panel opened over a deep link shows the link\'s own filters',
+         c.querySelector('#advb [data-a="plr"][data-end="hi"]').value === '50' &&
+         c.querySelector('#advb [data-a="plr"][data-end="lo"]').value === '' &&
+         c.querySelector('#advb [data-acls][value="Embermage"]').checked &&
+         c.querySelector('#advb [data-asetfx]').checked &&
+         c.querySelectorAll('#advb [data-arow]').length === 1 &&
+         c.querySelector('#advb [data-arow] [data-aaff]').value === 'X Attack Speed',
+         c.getElementById('advb').textContent.replace(/\s+/g, ' ').slice(0, 100));
+      ok('...including the chip set and the type box, on their own controls',
+         [].map.call(c.querySelectorAll('#advb [data-achip]'),
+           b => b.getAttribute('data-achip') + (b.checked ? '+' : '')).join(' ') === '1 2+ 3 4+ 5' &&
+         c.querySelector('#advb [data-atype][value="Helmet"]').checked &&
+         !c.querySelector('#advb [data-atype][value="Axe"]').checked,
+         [].map.call(c.querySelectorAll('#advb [data-achip]'),
+           b => b.getAttribute('data-achip') + (b.checked ? '+' : '')).join(' '));
+    });
   }
 
 
