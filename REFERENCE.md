@@ -378,8 +378,11 @@ kill`.
    is the truth about *structure* — which items exist, what they inherit, what
    set they belong to — and §7 has since made it the truth about weapon damage
    **and armor** too, both recovered from the pre-scale fields TIDBI renders for
-   you. Stat and level requirements are still TIDBI's: the DAT has no field for
-   them at all. One of the 6,177 is withheld as unreconcilable and three more
+   you. The **stat** requirements are still TIDBI's: the DAT has no field for
+   them at all. The level requirement has one — the DAT states it for 844 items —
+   and the DAT is what the page reads, the one place it beats TIDBI on a
+   requirement (see *"A level requirement is not a magnitude"*). One of the 6,177
+   is withheld as unreconcilable and three more
    are Torchlight 1 content that shipped in the PAK without ever being wired
    into TL2 (`TL1_ITEMS`), so **6,173** ship (§7).
 5. Names are English in `DISPLAYNAME`, Russian in `iTRANSLATION`.
@@ -411,9 +414,11 @@ and items are built from it (§7). What remains:
    from affixes. The builder asserts this set stays exactly this small.
 5. ~~**Field values TIDBI disagrees with.**~~ **Resolved.** The disagreement was
    not a conflict to reconcile but a category error on our side: the DAT's
-   damage, armor and requirement fields are *pre-scale*, and TIDBI holds the
+   damage, armor and stat-requirement fields are *pre-scale*, and TIDBI holds the
    rendered values. The build now reads TIDBI first and flags the 114 items where
-   it has to fall back (§7).
+   it has to fall back (§7). **`LEVEL_REQUIRED` is the exception** — it was in
+   that group by name only, and the DAT wins it; see *"A level requirement is not
+   a magnitude"*.
 6. ~~**The ember scaling multiplier.**~~ **Resolved — and it was not a
    multiplier.** An affix's `0x0000BD6E` is a **percentage** of a by-level curve,
    and the game prints `ceil(pct x CURVE(level) / 100)` against a graph in
@@ -449,13 +454,17 @@ recovers them and moves the pair from Unclassified to Rare.
 
 ### The numbers are rendered, not raw — the correction that matters
 
-**The `.DAT` `DAMAGE_*`, `ARMOR_*` and `*_REQUIRED` fields hold *pre-scale* base
-values. The game multiplies them by level and difficulty at spawn time, and TIDBI
-holds the *rendered* result the player actually sees.** The two disagree on
-essentially every item: the DAT's `ARMOR_PHYSICAL` equals TIDBI's rendered max in
-**3 of 2,114** cases. The build originally read the DAT and was therefore showing
-wrong numbers for most of the corpus — not slightly wrong, a different layer of
-the data.
+**The `.DAT` `DAMAGE_*`, `ARMOR_*` and the four stat `*_REQUIRED` fields hold
+*pre-scale* base values. The game multiplies them by level and difficulty at
+spawn time, and TIDBI holds the *rendered* result the player actually sees.** The
+two disagree on essentially every item: the DAT's `ARMOR_PHYSICAL` equals TIDBI's
+rendered max in **3 of 2,114** cases. The build originally read the DAT and was
+therefore showing wrong numbers for most of the corpus — not slightly wrong, a
+different layer of the data.
+
+`LEVEL_REQUIRED` is deliberately **not** in that list: a level is not a magnitude,
+so there is nothing for a scaler to act on, and on this one field the DAT is the
+source that is right — see *"A level requirement is not a magnitude"* below.
 
 Concretely, on Aenigma the DAT says 70 physical / 30 electric and 120 STR / 50
 DEX; the game shows **169 / 72 and 163 / 68**. On `heavy_g_amulet_f_alt_b` the DAT
@@ -469,13 +478,17 @@ DAT's own formula where that reaches, TIDBI's rendered value otherwise:
 |---|---|---|---|---|---|
 | Armor | 3,969 | 3,983 | 3,966 | **17** | 3 |
 | Damage | 1,273 | 1,370 | 1,273 | **97** | 0 |
-| `LEVEL_REQUIRED` | 5,473 | 844 | 810 | 34 | 4,663 |
+| `LEVEL_REQUIRED` † | 5,473 | 844 | 810 | 34 | 4,663 |
+
+† The only row here the DAT wins. Coverage is unchanged by that; the 4,663
+TIDBI-only items are still read from TIDBI exactly as before.
 
 Weapon **damage and armor are no longer read from TIDBI**. Both are reconstructed
 from the DAT by the formulas in *"The damage formula, recovered"* and *"The armor
 formula, recovered"* below, which together reach 3,981 of the 3,986 armored items
-and 1,367 of the 1,370 damaged ones. Only stat and level **requirements** still
-come from TIDBI, and there because the DAT has no field for them. The 97 items
+and 1,367 of the 1,370 damaged ones. Only the **stat requirements** still come
+from TIDBI, and there because the DAT has no field for them at all — the level
+requirement has one, and the DAT wins it. The 97 items
 where only the DAT has damage are almost all monster, NPC and test weapons —
 skeletons, trolls, varkolyn, bandits — which a 2014 viewer of *player* items never
 listed.
@@ -499,6 +512,56 @@ the `base`, `armor_derived` and `damage_derived` columns.
 **`LEVEL_REQUIRED` is a third field**, distinct from both `LEVEL` and `MINLEVEL`.
 TIDBI's own `iLEVEL` is the item's level and agrees with the DAT's `LEVEL` in all
 5,945 cases where both exist, so `LEVEL` needed no such treatment.
+
+### A level requirement is not a magnitude
+
+The page said the Emberweave Shoulders (`caster_05_shoulders_alt_set`) needed
+player level **52**. The item is level 70, starts dropping at 65, and the game's
+own file says **67**. Two of those numbers were already on the card next to each
+other; the third was TIDBI's, and nothing about it looked wrong.
+
+`LEVEL_REQUIRED` had been sorted into the pre-scale group by name — it sits
+beside `STRENGTH_REQUIRED` and the rest in TIDBI's export, and it does look like
+them — and that was the mistake. The pre-scale rule was **measured on armor**,
+where the two sources agree in 3 of 2,114 cases: a base value against a rendered
+one, no argument. It was never re-measured on this field, where the two agree on
+**381 of the 810** items carrying both, or **47%** — and a base/rendered pair
+does not agree half the time. The fields around it genuinely do scale: this same
+item carries `MAGIC_REQUIRED` 100 and `DEFENSE_REQUIRED` 30, and the game shows
+170 and 51, both exactly ×1.7. A level requirement is a level, not a magnitude,
+and there is nothing in it for a scaler to act on.
+
+**`MINLEVEL` is the referee**, because it is the one field both sources carry
+*identically*: 2,359 items, **0 differences**. So it can say which of the two
+requirements is the level the game actually gates on. `MINLEVEL` is the level an
+item starts dropping at, and a requirement that lands on top of it is a
+requirement on an item that has just begun dropping — which is what a level
+requirement is for:
+
+| | within 4 levels of `MINLEVEL` | of |
+|---|---|---|
+| the DAT's `LEVEL_REQUIRED` | **832** (99%) | 841 |
+| TIDBI's | 501 (25%) | 1,983 |
+
+The DAT's is not merely close, it is a convention: **350** sit exactly two levels
+above `MINLEVEL` and **268** exactly on it, 618 of the 841 on those two offsets,
+and the whole tail past ±4 is **9 items** — 841 minus the 832. TIDBI's offset is
+a spread — 50 different gaps, from 24 below to 75 above — and its value tracks
+the item's *level* more than the item: at level 23 it prints 27 for 59 items
+spanning 27 types, claws and amulets alike.
+
+The Alchemical set makes the case on its own. TIDBI gives its nine pieces **two
+different requirements**: 11 for the seven armour pieces and 29 for the Signet
+and the Token. No sourcing rule produces that. The DAT says 29 for all nine,
+which is `MINLEVEL` 27 + 2, and the page shows 29.
+
+So the DAT is read first here and TIDBI is the fallback. **429 items change**,
+the 810 where both exist less the 381 that agree — and on every one of them the
+DAT's value is the **higher** of the pair: TIDBI undershoots this field, it never
+overshoots. The 4,663 TIDBI-only and 34 DAT-only items are untouched, and the
+`build()` assertion beside the derivation pins all of it: the coverage, both
+sides' fit against `MINLEVEL`, the offset histogram, and the "higher on every
+one" rule.
 
 ### Requirements are alternatives — and the class gate is not
 

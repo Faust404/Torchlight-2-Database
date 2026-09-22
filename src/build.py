@@ -1513,6 +1513,7 @@ def build():
     classified = set()             # UNITTYPE tokens the classifier actually saw
     set_tokens = set()             # SET tokens the items actually reference
     arm_drift = []                 # derived armor vs TIDBI, for the check below
+    lr_probe = []                  # both LEVEL_REQUIREDs + MINLEVEL, for the check
     for it in items:
         rec, t, a = it['rec'], it['tidbi'], it['alf']
         name = it['name']
@@ -1573,12 +1574,39 @@ def build():
         if (_num(o.get('xl')) or 0) > MAX_LEVEL_CEILING:
             o['xl'] = fmt(MAX_LEVEL_CEILING)
         # LEVEL_REQUIRED is its own field -- not LEVEL, not MINLEVEL. TIDBI has
-        # it for 5,474 items against the DAT's 844, and the two disagree in 429
-        # of the 810 cases where both exist, again because the DAT holds a
-        # pre-scale value. (TIDBI's iLEVEL is the item's level and matches the
-        # DAT's LEVEL in all 5,945 cases where both exist, so lv/ml need no
-        # such treatment.)
-        lr = _num(t.get('LEVEL_REQUIRED')) or _num(rec.get('LEVEL_REQUIRED'))
+        # it for 5,473 items against the DAT's 844, and the two disagree in 429
+        # of the 810 cases where both exist. (TIDBI's iLEVEL is the item's level
+        # and matches the DAT's LEVEL in all 5,945 cases where both exist, so
+        # lv/ml need no such treatment.)
+        #
+        # The DAT wins here, which is the reverse of the pre-scale rule the
+        # damage and armor fields follow. That rule was measured on armor, where
+        # the two sources agree in 3 of 2,114 cases -- unmistakably a base value
+        # against a rendered one -- and it does not carry to this field: here
+        # they agree on 381 of 810, or 47%, and a base/rendered pair does not
+        # agree half the time. Grouping LEVEL_REQUIRED with the `*_REQUIRED`
+        # fields beside it was the mistake; those really do scale (this item's
+        # MAGIC_REQUIRED 100 and DEFENSE_REQUIRED 30 both render at exactly
+        # x1.7), while a level requirement is a level, not a magnitude.
+        #
+        # MINLEVEL is the referee, because it is the one field both sources
+        # carry identically -- 2,359 items, 0 differences -- so it can say which
+        # of the two LEVEL_REQUIREDs is the level the game gates on. MINLEVEL is
+        # the level an item starts dropping at, and the DAT's requirement lands
+        # within 4 levels of it on 832 of the 841 items carrying both: 350 of
+        # them exactly two above MINLEVEL, 268 exactly on it, and 9 further out
+        # than 4. That is an authoring convention, not a coincidence.
+        #
+        # TIDBI lands that close on 501 of 1,983, and across 50 different gaps
+        # from 24 below to 75 above. Its value tracks the item's LEVEL more than
+        # the item: at level 23 it prints 27 for 59 items spanning 27 types,
+        # claws and amulets alike.
+        #
+        # TIDBI is still the only source for the 4,663 items whose DAT authors
+        # no requirement at all, and is read for them exactly as before.
+        lr = _num(rec.get('LEVEL_REQUIRED')) or _num(t.get('LEVEL_REQUIRED'))
+        lr_probe.append((name, _num(rec.get('LEVEL_REQUIRED')),
+                         _num(t.get('LEVEL_REQUIRED')), _num(o.get('ml'))))
         if not lr and typ == 'Socketable':
             # Neither table holds this for a socketable, so it comes from the
             # game's own curve (see GRAPH_SOCKET_LEVEL). A level the curve does
@@ -1911,6 +1939,49 @@ def build():
           % (sum(1 for o in out if 'da' in o), 3984 - len(arm_drift),
              len(arm_drift) - len(_far), _near, len(_far)))
     print('  SET RARITY: 210 Rare, 346 Unique (none unclassified)')
+
+    # LEVEL_REQUIRED's source rule, audited against MINLEVEL. MINLEVEL is the
+    # only field both tables carry identically (2,359 items, 0 differences), so
+    # it is the one referee available for the argument the derivation rests on --
+    # and that argument is load-bearing, being the reason the DAT outranks TIDBI
+    # on this field while losing to it on damage and armor.
+    #
+    # MINLEVEL is the level an item starts dropping at. A requirement landing
+    # within a few levels of it is a requirement on an item that has just begun
+    # dropping, which is what a level requirement is for. The DAT does that on
+    # 832 of its 841; TIDBI on 501 of its 1,983, and 50 gaps wide.
+    _dat = [p for p in lr_probe if p[1]]
+    _datml = [p for p in _dat if p[3] is not None]
+    _tidml = [p for p in lr_probe if p[2] and p[3] is not None]
+    _dnear = sum(1 for p in _datml if abs(p[1] - p[3]) <= 4)
+    _tnear = sum(1 for p in _tidml if abs(p[2] - p[3]) <= 4)
+    _hist = collections.Counter(int(p[1] - p[3]) for p in _datml)
+    _moved = [p for p in lr_probe if p[1] and p[2] and p[1] != p[2]]
+    _tidonly = [p for p in lr_probe if p[2] and not p[1]]
+    assert (len(_dat), len(_datml), _dnear) == (844, 841, 832), \
+        'DAT requirement coverage/MINLEVEL fit drifted: %d, %d, %d' % (
+            len(_dat), len(_datml), _dnear)
+    assert (len(_tidml), _tnear) == (1983, 501), \
+        'TIDBI requirement/MINLEVEL fit drifted: %d, %d' % (len(_tidml), _tnear)
+    # The DAT's offset from MINLEVEL is a spike, not a spread: 618 of the 841
+    # sit exactly on MINLEVEL or two levels above it, and the tail past +-4 is 9
+    # items, not a class. TIDBI's is the spread -- 1,983 items carrying 50
+    # different offsets between 24 below and 75 above -- which is the whole
+    # reason it cannot be the source here.
+    assert _hist.most_common(4) == [(2, 350), (0, 268), (-1, 114), (-2, 43)], \
+        'the DAT requirement left MINLEVEL\'s neighbourhood: %s' % _hist.most_common(6)
+    # Where the two disagree the DAT is always the higher of the pair -- 429
+    # items, no exceptions. TIDBI undershoots; it never overshoots.
+    assert len(_moved) == 429, 'the two requirements disagree on %d items' % len(_moved)
+    assert not [p for p in _moved if p[1] < p[2]], 'a DAT requirement below TIDBI\'s'
+    # And TIDBI is still read for every item whose DAT authors no requirement:
+    # 4,663 of them, the same population as before this rule changed.
+    assert len(_tidonly) == 4663, 'the TIDBI-only population drifted: %d' % len(_tidonly)
+    print('  REQ LEVEL: DAT states it for %d (%d of %d within 4 of MINLEVEL, '
+          'top offsets %s); TIDBI %d of %d; %d differ, DAT higher on every one; '
+          '%d TIDBI-only'
+          % (len(_dat), _dnear, len(_datml), _hist.most_common(2),
+             _tnear, len(_tidml), len(_moved), len(_tidonly)))
 
     # The set-bonus ladders the site prints. One entry per token an item names,
     # carrying the display name, how many pieces of it this corpus actually
@@ -2532,6 +2603,16 @@ def main():
     assert amu['arm'] == {'fire': '140-174'}, amu
     assert amu['rq'] == {'mag': '79'}, amu
     assert amu['lr'] == '81', amu
+
+    # Emberweave Shoulders, the item that turned the source rule over: the page
+    # said 52 for a level 70 item that starts dropping at 65, because TIDBI says
+    # 52 and TIDBI used to win. The DAT says 67. Its Focus and Defense sit two
+    # lines up at exactly 1.7x TIDBI's -- those really are pre-scale -- which is
+    # what made the level field look like one of them.
+    ews = [o for o in items if o['id'] == 'caster_05_shoulders_alt_set'][0]
+    assert ews['n'] == 'Emberweave Shoulders', ews
+    assert (ews['lv'], ews['ml'], ews['lr']) == ('70', '65', '67'), ews
+    assert ews['rq'] == {'mag': '170', 'def': '51'}, ews
 
     # A zero minimum is a value, not an absence. Both Sturm Shields carry fire
     # and ice armor of 0-1 in TIDBI, and reading the 0 through _num() collapsed

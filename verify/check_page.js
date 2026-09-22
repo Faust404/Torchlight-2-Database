@@ -2389,14 +2389,20 @@ async function go(hash) {
       const got = await read('#' + h, doc => doc.getElementById('count').textContent.trim());
       ok(`#${h} is ${want}`, got === want, got);
     };
-    // Level 50 and 10: the plan's own figures, and the pair that shows the
-    // ceiling moving rather than a count that happens to look right. A lone
-    // number is still a ceiling -- see readHash on why it cannot be a floor --
-    // and the two-number form brackets the same field at both ends: 2,499 is
-    // the 3,376 that "50 or under" answers, less everyone below level 10.
-    await eq('plr=50', '3,376 items of 6,048');
-    await eq('plr=10', '915 items of 6,048');
-    await eq('plr=10-50', '2,499 items of 6,048');
+    // Level 50 and 10: the pair that shows the ceiling moving rather than a
+    // count that happens to look right. A lone number is still a ceiling -- see
+    // readHash on why it cannot be a floor -- and the two-number form brackets
+    // the same field at both ends: 2,546 is the 3,308 that "50 or under"
+    // answers, less the 762 that sit below level 10.
+    //
+    // Both ceilings fell when LEVEL_REQUIRED started reading the DAT ahead of
+    // TIDBI. The two sources only ever disagree upward -- 429 items, the DAT
+    // higher on every one -- so 175 of them crossed one of these two lines, 107
+    // past level 10 and 68 past level 50. A requirement that reads lower than
+    // these is the old TIDBI number, and that is what these three pin.
+    await eq('plr=50', '3,308 items of 6,048');
+    await eq('plr=10', '808 items of 6,048');
+    await eq('plr=10-50', '2,546 items of 6,048');
     // Usable-by, not restricted-to. 5,475 of 6,048, so the 573 excluded are the
     // items restricted to another class -- an implementation reading `cls` as
     // "restricted to" would answer 194, the count of Embermage-only items.
