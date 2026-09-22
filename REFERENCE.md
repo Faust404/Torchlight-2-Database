@@ -2656,7 +2656,7 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 310
+`verify\check_page.js` goes further and drives the built page in a real DOM — 314
 assertions covering filtering, multi-select, search, sort, the detail view,
 provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance

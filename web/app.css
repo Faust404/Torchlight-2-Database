@@ -96,10 +96,23 @@ button,input,select{font:inherit; color:inherit}
   padding:12px 14px 10px; border-bottom:1px solid var(--line);
   color:var(--head); font-size:14px; letter-spacing:.02em;
 }
+/* The wordmark and `reset` share a flex row rather than the float this used.
+   A float followed by a block -- `small` -- is placed at the top of the
+   containing block only while it fits there, so the rule that held `reset` on
+   the wordmark's line was really a statement about how short the wordmark is.
+   The row also has to hold a second link's worth of alignment now. */
+.brow{display:flex; align-items:baseline; gap:10px}
+.brow a{margin-left:auto; color:var(--label); font-size:11px}
+.brow a:hover{color:var(--gold)}
 .brand small{display:block; color:var(--label); font-size:10px; letter-spacing:.14em;
   text-transform:uppercase; margin-top:3px}
-.brand a{float:right; color:var(--label); font-size:11px; margin-top:2px}
-.brand a:hover{color:var(--gold)}
+/* The source link, on its own line under the wordmark. --label is the page's
+   note colour, so it reads as provenance rather than as one more control, and
+   the arrow -- the same glyph idiom the bar's sort button uses -- is what
+   separates it from the rail's filters at a glance. */
+.bsrc{display:inline-block; margin-top:8px; color:var(--label); font-size:11px}
+.bsrc:hover{color:var(--gold)}
+.bsrc .up{font-size:9px; margin-left:4px; opacity:.75}
 
 .rsearch{padding:8px 10px; border-bottom:1px solid var(--line)}
 .rsearch input{

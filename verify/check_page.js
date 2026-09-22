@@ -1,6 +1,6 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 306
+ * view, provenance, the advanced-search panel and hash deep links -- 314
  * assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
@@ -99,6 +99,30 @@ async function go(hash) {
   ok('truncation is disclosed, not silent',
      /Showing the first 500 of 6,048/.test(d.getElementById('more').textContent));
   ok('offers a Show all escape hatch', !!d.getElementById('showall'));
+
+  // ------------------------------------------------------------ source link
+  // The masthead carries the page's only link off the site. It is asserted by
+  // href rather than by its label, so that rewording the link cannot quietly
+  // repoint it; by target/rel, because a same-tab nav would replace the
+  // database with GitHub and the page is opened from file:// as often as from
+  // a host; and by document order, since "above the search box" is a claim
+  // about the markup and not about which CSS rule wins a float.
+  {
+    const a = d.querySelector('.brand a.bsrc');
+    ok('the masthead links to the source repository', !!a, 'no .brand a.bsrc');
+    if (a) {
+      ok('the source link is the repository',
+         a.getAttribute('href') === 'https://github.com/Faust404/Torchlight-2-Database',
+         a.getAttribute('href'));
+      ok('the source link opens away from this page',
+         a.getAttribute('target') === '_blank'
+           && /noopener/.test(a.getAttribute('rel') || ''),
+         a.getAttribute('target') + ' / ' + a.getAttribute('rel'));
+      ok('the source link sits above the search box',
+         !!(a.compareDocumentPosition(d.getElementById('q'))
+            & w.Node.DOCUMENT_POSITION_FOLLOWING));
+    }
+  }
 
   // ----------------------------------------------------------- tier palette
   // The tier colours are sampled from the game's own quality-overlay art (see

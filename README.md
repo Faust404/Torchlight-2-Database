@@ -127,7 +127,7 @@ were reverse-engineered, every tool, and the reasoning behind every number the
 site displays. Read it before changing anything under `src\`.
 
 The build is checked by [`verify/check_page.js`](verify/check_page.js), which
-drives the built page in a real DOM and asserts 310 behaviours:
+drives the built page in a real DOM and asserts 314 behaviours:
 
 ```sh
 npm i jsdom

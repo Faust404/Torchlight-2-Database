@@ -21,9 +21,18 @@
 
   <aside id="rail">
     <div class="brand">
-      Torchlight II
+      <div class="brow">
+        <span class="bt">Torchlight II</span>
+        <a href="#reset" id="reset">reset</a>
+      </div>
       <small>Item Database</small>
-      <a href="#reset" id="reset">reset</a>
+      <!-- The repository this page is built from, in the masthead because that
+           is where a reader looks for who made the thing. It lives in the rail,
+           so below 769px it is reached by opening the drawer -- the same trade
+           the socketables link in #bar documents from the other side. The arrow
+           marks it as the page's only link that leaves the site. -->
+      <a class="bsrc" href="https://github.com/Faust404/Torchlight-2-Database"
+         target="_blank" rel="noopener noreferrer">Source on GitHub<span class="up">&#8599;</span></a>
     </div>
     <div class="rsearch">
       <input id="q" type="search" placeholder="Search name or type&hellip;" autocomplete="off">
