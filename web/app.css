@@ -48,6 +48,10 @@
   --doc:Bitter,Georgia,"Times New Roman",serif;
 
   --rail:220px;
+  /* The item panel: the width the card inside it was settled at -- .dwrap's
+     366px -- plus the panel's own 2x16px gutter. Not called --panel, which is
+     already the surface colour a few tokens up. */
+  --itemw:398px;
 }
 
 *{box-sizing:border-box}
@@ -90,6 +94,7 @@ button,input,select{font:inherit; color:inherit}
 }
 #main{flex:1 1 auto; display:flex; flex-direction:column; min-width:0; min-height:0}
 #grid-wrap{flex:1 1 auto; display:flex; flex-direction:column; min-height:0}
+#split{flex:1 1 auto; display:flex; flex-direction:row; min-height:0; min-width:0}
 
 /* ------------------------------------------------------------------- rail */
 .brand{
@@ -303,7 +308,10 @@ button,input,select{font:inherit; color:inherit}
 .tpill.off{opacity:.4; background:#1b1917}
 
 /* ------------------------------------------------------------------- grid */
-#scroll{flex:1 1 auto; overflow-y:auto; padding:12px 14px 60px}
+/* min-width:0 because #scroll is a flex item in a row now: without it the grid
+   refuses to shrink below its content and pushes the item panel off the screen
+   rather than sharing with it. */
+#scroll{flex:1 1 auto; min-width:0; overflow-y:auto; padding:12px 14px 60px}
 #grid{display:flex; flex-flow:row wrap; align-content:flex-start; margin:-4px}
 
 .card{
@@ -355,6 +363,12 @@ button,input,select{font:inherit; color:inherit}
 .q-legendary {border-left:3px solid var(--t-legendary)}
 .q-unclassified {border-left:3px solid var(--t-none)}
 
+/* The card the item panel is showing. An `outline`, not a border: the rule above
+   is this element's border-left, and a border colour set here would either lose
+   to it or take the tier stripe away. Inset by -1px so it reads as the card's own
+   edge rather than a box drawn around it. */
+.card.sel{outline:1px solid var(--gold); outline-offset:-1px}
+
 #more{padding:16px 4px; color:var(--label)}
 #more button{margin-left:8px; background:#22201d; border:1px solid var(--div);
   border-radius:3px; padding:5px 11px; cursor:pointer}
@@ -368,24 +382,47 @@ button,input,select{font:inherit; color:inherit}
 
    Four names are deliberately not the card's:
 
-     .dwrap     the card's own width, and the app's back-link container, which
-                the card has no equivalent of
+     .dwrap     the card's own width, and the item panel's body
      .dtype     where the card says .at. Four assertions and the tier-ink rules
                 below select it by name
-     .back      the app's route home
+     .back      the panel's close control -- a ✕ while the grid is beside it, the
+                route home on a phone, where it is not
      .prov .tag .task .cond .fx .locked
                 carried over verbatim; this block was lifted from the app in the
                 first place, so the port returns it unchanged
 
    .block, .row, .or, .thr, .seth and .dmg are gone with the renderer that
-   emitted them. */
-#detail{flex:1 1 auto; overflow-y:auto; padding:16px 18px 60px; display:none}
-#app.item #grid-wrap{display:none}
-#app.item #detail{display:block}
+   emitted them.
+
+   The panel is a column of two rows -- .dbar, then #dscroll -- rather than one
+   scroller, so the way out of it sits still while the card moves under it. A card
+   here is often taller than the screen (a set ladder, the eyes' four-level
+   table), and scrolling back to the top to dismiss one is the thing the fixed row
+   avoids. It is a header row beside the scroller and not a `position:sticky`
+   inside it, which needs no negative margins and cannot be defeated by a
+   scroll container's own padding. */
+/* No background of its own: the page's --bg is darker than the card's --panel,
+   and that gap is what makes the card read as a card. Painting the panel --panel
+   as well would flatten the card into its own ground. The border does the
+   separating instead, against a grid the reader can still see. */
+#detail{
+  flex:0 0 var(--itemw); display:none; flex-direction:column; min-width:0;
+  border-left:1px solid var(--div);
+}
+#app.item #detail{display:flex}
+
+/* justify-content:flex-end at this width -- the ✕ sits at the panel's top right,
+   the side of the screen nearest the scrollbar rather than the grid. */
+.dbar{display:flex; justify-content:flex-end; padding:9px 16px 4px}
+#dscroll{flex:1 1 auto; overflow-y:auto; padding:0 16px 60px}
 
 .dwrap{max-width:366px}
-.back{color:var(--label); font-size:12px; display:inline-block; margin-bottom:10px}
+.back{color:var(--label); font-size:12px; display:inline-block}
 .back:hover{color:var(--gold)}
+/* Which of the two labels is drawn: the ✕ here, the route home below 769px. Both
+   are in the markup at all times so the control's accessible name does not depend
+   on the viewport -- the anchor carries aria-label="Close". */
+.back .dn{display:none}
 
 /* The card's own font-size, a shade under the app's 13px: the card carries a lot
    of small print and reads too tight at the body size. */
@@ -837,6 +874,15 @@ button,input,select{font:inherit; color:inherit}
   }
   #adv .agrid{grid-template-columns:1fr}
   #adv .tgrid{grid-template-columns:1fr}
+  /* A phone has no room for a third column, so an open item takes the results
+     area the way it did before the panel moved beside them -- and the control at
+     the top of it becomes the route home again, because here it genuinely is
+     one. The grid is only hidden, not discarded: it stays where it was scrolled
+     to, which the old full swap could not promise. */
+  #app.item #scroll{display:none}
+  #detail{flex:1 1 auto; border-left:0}
+  .back .dw{display:none}
+  .back .dn{display:inline}
   .card{flex:1 1 auto; width:auto; min-width:0}
   /* the group headers are controls now, not just captions -- give them a
      finger-sized target on the drawer */

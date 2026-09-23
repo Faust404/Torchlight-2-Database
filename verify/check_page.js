@@ -1,7 +1,7 @@
 /* Drives the built page in a real DOM. This is the automated form of the
- * manual browser checks: filtering, multi-select, search, sort, the detail
- * view, provenance, the advanced-search panel and hash deep links -- 317
- * assertions.
+ * manual browser checks: filtering, multi-select, search, sort, the item
+ * panel beside the grid, provenance, the advanced-search panel and hash deep
+ * links -- 327 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node verify/check_page.js
@@ -327,10 +327,92 @@ async function go(hash) {
      !/TIDBI in-game value/.test(det()));
 
   d.querySelector('#detail .back').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
-  ok('back link returns to the same filtered set', cards().length === 6, `${cards().length}`);
+  // cards().length was 6 before the click too, once the grid stopped being
+  // swapped out for the panel, so on its own it stopped testing the control. The
+  // two halves that do move are asserted with it.
+  ok('back link returns to the same filtered set',
+     cards().length === 6 && !d.getElementById('app').classList.contains('item'),
+     `${cards().length}, class=${d.getElementById('app').className}`);
   ok('back link clears the item from the route', !/item=/.test(w.location.hash), w.location.hash);
 
   await wait(30);   // let jsdom's spurious hashchange settle before continuing
+
+  // -------------------------------------------------------------- item panel
+  // The panel stands beside the grid rather than in place of it, and that is the
+  // whole change: opening a card to read it no longer costs the reader their
+  // place in the list. What jsdom can see is the DOM -- the two panes existing at
+  // once, the mark tying them together, and the controls that reach the grid
+  // through apply() still reaching it. The flex row, the widths and the phone
+  // breakpoint are layout, and are checked in a browser.
+  const clickCard = id => {
+    d.querySelector(`#grid .card[data-id="${id}"]`)
+      .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  };
+  const marked = () => {
+    const m = d.querySelectorAll('#grid .card.sel');
+    return m.length === 1 ? m[0].getAttribute('data-id') : m.length + ' marked';
+  };
+  await go('#tier=Legendary&type=Axe');
+  const ids = [].map.call(cards(), c => c.getAttribute('data-id'));
+  clickCard(ids[0]);
+  ok('an open item leaves the grid standing behind it',
+     cards().length === 6 && d.getElementById('app').classList.contains('item'),
+     `${cards().length} cards, class=${d.getElementById('app').className}`);
+  ok('...and exactly the open card is marked', marked() === ids[0], marked());
+  clickCard(ids[1]);
+  ok('the mark moves to the card the panel is showing', marked() === ids[1], marked());
+
+  // The bug the standing grid would otherwise expose. paintGrid() used to skip
+  // render() whenever an item was open, which was invisible only because the grid
+  // was hidden; Sort and Reverse reach the panel through apply() without touching
+  // the grid at all, so they would have left the old order on screen.
+  //
+  // Reverse rather than a sort: the default order is tier, then level, then name,
+  // and tier is the same for all six of these, so switching to Sort=Level would
+  // ask for the order already on screen and assert nothing.
+  const order = () => [].map.call(cards(), c => c.getAttribute('data-id')).join(',');
+  const was = order();
+  d.getElementById('dir').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  ok('reversing under an open item re-sorts the grid, not just the panel',
+     cards().length === 6 && order() !== was, `${cards().length} cards, ${was === order() ? 'order unchanged' : 'reordered'}`);
+  ok('...and the mark survives the repaint', marked() === ids[1], marked());
+
+  // A second click on the marked card closes the panel: it is the one card where
+  // "open it" would otherwise mean doing what is already on screen.
+  clickCard(ids[1]);
+  ok('clicking the open card again closes the panel',
+     !d.getElementById('app').classList.contains('item') &&
+     !d.querySelector('#grid .card.sel') && !/item=/.test(w.location.hash),
+     `class=${d.getElementById('app').className} ${w.location.hash} ${marked()}`);
+
+  // A settle wait before each navigation from here on, and it is not optional:
+  // every assertion above writes the hash through apply(), and on file:// that
+  // falls back to assigning location.hash (jsdom refuses replaceState on a
+  // file:// origin, as Chrome does). The queued hashchange that follows lands
+  // *during* the next reconfigure and leaves the URL without its fragment, so
+  // `await go(...)` silently becomes a navigation to the unfiltered page -- the
+  // same jsdom behaviour the wait above the multi-select block documents.
+  await wait(30);
+  await go('#tier=Legendary&type=Axe');
+  clickCard(ids[0]);
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('Escape closes the panel',
+     !d.getElementById('app').classList.contains('item') && !/item=/.test(w.location.hash),
+     `class=${d.getElementById('app').className} ${w.location.hash}`);
+
+  // Escape with the advanced search open closes the dialog and leaves the panel:
+  // the dialog is modal and sits above it, so one keypress is one close.
+  await wait(30);
+  await go('#tier=Legendary&type=Axe');
+  clickCard(ids[0]);
+  d.getElementById('advbtn').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('Escape in the advanced search closes it without closing the panel',
+     d.getElementById('app').classList.contains('item') &&
+     !d.querySelector('#adv').classList.contains('on'),
+     `class=${d.getElementById('app').className} adv=${d.querySelector('#adv').className}`);
+  d.getElementById('advx').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(30);   // the same settle, for the navigation the next block opens with
 
   // ---------------------------------------------------- multi-select facet
   await go('#tier=Legendary&type=Axe');
@@ -654,6 +736,13 @@ async function go(hash) {
   });
   await read('#item=legendary_axe01', d3 => {
     ok('deep link with item= opens the detail directly', /Aenigma/.test(d3.getElementById('detail').textContent));
+    // ...over a grid the cold load still filled. This is the shape every link
+    // from the socketables table arrives in, and it is the difference between a
+    // panel and a page: the reader lands on the item and on the list it came out
+    // of, rather than on a card with nothing behind it.
+    ok('...with the grid populated behind it',
+       d3.querySelectorAll('#grid .card').length === 500,
+       `${d3.querySelectorAll('#grid .card').length}`);
   });
   await read('#q=aenigma', d4 => {
     ok('deep link with a search term renders 1', d4.querySelectorAll('#grid .card').length === 1,
@@ -1415,9 +1504,15 @@ async function go(hash) {
   // their counts, and that a click still does what a rail checkbox did.
   await go('');
   const strip = d.getElementById('tiers');
+  // The strip is full width and the results row is the only thing under it, so
+  // the item panel opens without the toolbar above it re-wrapping. The check
+  // follows the split: what comes after the strip must be the row that holds the
+  // grid's scroller, and nothing else.
   ok('the tier strip sits between the toolbar and the grid',
      !!strip && strip.previousElementSibling.id === 'bar' &&
-     strip.nextElementSibling.id === 'scroll',
+     strip.nextElementSibling.id === 'split' &&
+     strip.nextElementSibling.contains(d.getElementById('scroll')) &&
+     !d.getElementById('split').contains(d.getElementById('bar')),
      strip ? `${strip.previousElementSibling.id} / ${strip.nextElementSibling.id}` : 'no #tiers');
   const pills = () => [].slice.call(d.querySelectorAll('#tiers .tpill'));
   const pval = p => p.querySelector('input').value;
@@ -2043,6 +2138,21 @@ async function go(hash) {
        /\.card \.art i, \.tile i\{[^}]*background-image:url\(data:image\/webp;base64,[A-Za-z0-9+/]{1000}/
          .test(css) && !/var\(--sprite\)/.test(css),
        'a 4.8 MB data URI does not survive a custom property');
+  }
+
+  // The grid and the item panel stand side by side rather than one in place of
+  // the other, and no DOM assertion can see that: jsdom does no layout, so both
+  // panes "existing" is the same DOM whether the grid is drawn or hidden. What a
+  // regression would put back is the rule `#app.item #grid-wrap{display:none}`,
+  // and its absence is the change. Asserted on the stylesheet text, the way the
+  // icon-sheet guard above is and for the same reason.
+  {
+    const css = [].map.call(d.querySelectorAll('style'), s => s.textContent).join('\n');
+    ok('nothing hides the grid when an item is open',
+       !/#app\.item #grid-wrap/.test(css) &&
+       /#app\.item #detail\{display:flex\}/.test(css) &&
+       /#split\{[^}]*flex-direction:row/.test(css),
+       'the panel must open beside the grid, not instead of it');
   }
 
   // ------------------------------------------------------ the advanced panel

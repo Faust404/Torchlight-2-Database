@@ -751,6 +751,30 @@
     return out.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
   }
 
+  // The open item, marked in the grid it is shown beside. Without it the panel is
+  // over on the far side of the screen from the card that opened it and nothing
+  // ties the two together.
+  //
+  // Its own function, and not part of render(), because the mark follows S.item
+  // while the grid follows the filters: opening a second card changes no filter,
+  // so render() is deliberately skipped, and the mark would not move with it.
+  // Called from both -- render() whenever it rebuilds the grid and throws the old
+  // mark away with it, paintGrid() whenever it decides not to. Both calls are
+  // idempotent, so a repaint that does both costs one pass over the DOM.
+  //
+  // Not in cardHTML(), which is memoised per id: a key carrying the selection
+  // would fragment that cache, one entry per item ever opened.
+  function markOpen() {
+    var grid = document.getElementById('grid');
+    var was = grid.querySelector('.card.sel');
+    if (was) was.classList.remove('sel');
+    if (!S.item) return;
+    var kids = grid.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].getAttribute('data-id') === S.item) { kids[i].classList.add('sel'); return; }
+    }
+  }
+
   function render() {
     var list = filtered();
     lastList = list;
@@ -775,6 +799,7 @@
     var buf = new Array(shown.length);
     for (var i = 0; i < shown.length; i++) buf[i] = cardHTML(shown[i]);
     grid.innerHTML = buf.join('');
+    markOpen();   // innerHTML just dropped the mark, if there was one
 
     var more = document.getElementById('more');
     if (!showAll && list.length > CAP) {
@@ -1185,18 +1210,17 @@
   function renderDetail(id) {
     var o = null;
     for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) { o = ITEMS[i]; break; }
-    var d = document.getElementById('detail');
+    var d = document.getElementById('dscroll');
     if (!o) {
       d.innerHTML = '<div class="msg">No item called <b>' + esc(id) + '</b>.</div>';
       return;
     }
     // Everything the detail says about an item is the card's, and the card is
     // built in one string by tooltip() above. What is left here is the route:
-    // find the record, say so when there is none, and keep the back link and
-    // the width the card was settled at.
-    d.innerHTML = '<div class="dwrap">' +
-      '<a class="back" href="#">&larr; back to results</a>' +
-      tooltip(o) + '</div>';
+    // find the record, say so when there is none, and keep the width the card
+    // was settled at. The close control is not written here -- it does not change
+    // from one item to the next, so it is markup in the panel's fixed header.
+    d.innerHTML = '<div class="dwrap">' + tooltip(o) + '</div>';
     d.scrollTop = 0;
   }
 
@@ -2074,6 +2098,21 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    // The item panel is not modal, so Escape is a convenience rather than the
+    // only way out -- the ✕, the back link below 769px and a second click on the
+    // marked card all close it. It hangs off the document because this panel never
+    // holds focus. Tested before the advanced search's own Escape, which is modal
+    // and sits above it: one Escape closes the dialog and leaves the panel.
+    //
+    // The search box has its own Escape, and it fires first -- resetState() has
+    // already cleared S.item by the time this sees the event, so the two agree
+    // rather than both acting.
+    if (e.key === 'Escape' && S.item && !advOn) {
+      e.preventDefault();
+      S.item = '';
+      apply();
+      return;
+    }
     if (!advOn) return;
     if (e.key === 'Escape') { e.preventDefault(); advShow(false); }
     // Enter searches from anywhere in the panel except on a button, where it is
@@ -2099,10 +2138,13 @@
     // panel sits beside the grid now, and Sort, Reverse and the facet boxes all
     // leave the grid untouched by taking apply() straight to renderDetail().
     if (gridKey() !== lastGridKey) render();
+    // render() has just marked the open card, or the grid is the one already on
+    // screen and only S.item moved -- either way the mark is this line's to settle.
+    markOpen();
     if (S.item) {
       renderDetail(S.item);
     } else {
-      document.getElementById('detail').innerHTML = '';   // don't leave stale DOM behind
+      document.getElementById('dscroll').innerHTML = '';   // don't leave stale DOM behind
     }
     syncControls();
   }
@@ -2146,9 +2188,11 @@
   // performs, through the same resetState(), so the two cannot drift.
   //
   // Without the clear this was not merely a narrow search: it did nothing at
-  // all. apply() reaches paintGrid(), which branches on S.item and renders the
-  // detail view instead of the grid, and S.item was never cleared here -- so
-  // render() was never reached and Enter could not change the page.
+  // all. apply() reached paintGrid(), which branched on S.item and rendered the
+  // detail view *instead of* the grid, and S.item was never cleared here -- so
+  // render() was never reached and Enter could not change the page. The grid is
+  // no longer skipped that way, but the clear is still owed: without it the panel
+  // would stay open over a result set it was never opened from.
   //
   // Escape clears through the same path. It is not a new search, but leaving it
   // able to empty the box while the card it was narrowing stays up is the same
@@ -2208,11 +2252,19 @@
 
   // One delegated handler for every card, as grimtools does. Opening an item
   // goes through apply() rather than assigning location.hash, so the active
-  // filters stay in the URL and the back link returns to the same result set
-  // instead of dumping the user back on all 6,177 items.
+  // filters stay in the URL and closing the panel returns to the same result set
+  // instead of dumping the user back on all 6,173 items.
+  //
+  // A click on the card the panel is already showing closes it. That card is
+  // marked, and it is the only card where "open it" would otherwise mean doing
+  // again what is already on screen.
   document.getElementById('scroll').addEventListener('click', function (e) {
     var a = e.target.closest ? e.target.closest('.card') : null;
-    if (a) { e.preventDefault(); S.item = a.getAttribute('data-id'); apply(); }
+    if (!a) return;
+    e.preventDefault();
+    var id = a.getAttribute('data-id');
+    S.item = S.item === id ? '' : id;
+    apply();
   });
 
   document.getElementById('detail').addEventListener('click', function (e) {

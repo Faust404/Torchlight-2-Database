@@ -1816,8 +1816,9 @@ three damage types — the tightest of those 1,235 one-line cards
 four or five types take a second line, inside a 98px card with nothing clipped.
 The pair is `stv-dps`, not `dps`: the detail view names its own headline `.dps`
 as a bare selector, and a card pair sharing that name silently inherited its
-15px gold figure and stood taller than the numbers beside it. Clicking one opens a full detail view
-with the leader-dot stat rows, affix lines and a provenance footer naming the
+15px gold figure and stood taller than the numbers beside it. Clicking one opens the
+item in a panel **beside** the grid rather than in place of it, with the
+leader-dot stat rows, affix lines and a provenance footer naming the
 `.DAT` path and whether the numbers are TIDBI's rendered values or a flagged
 DAT base value. Its **Item** block lists Item Level, attack speed, **Weapon
 Range**, sockets and set. Three built fields are **deliberately not rendered**,
@@ -1855,6 +1856,38 @@ and all stay in `items.json` (none was ever a CSV column — that export carries
   unrelated levels on one item, and it is `lr` that gates equipping. It equals
   `lv` on 64 of the 2,245 records carrying one, and is 1 on 258 where `lr` is
   the real requirement, so a "Min level" row said nothing a player could use.
+
+**The item panel and the grid stand side by side.** `#split` is a row inside
+`#grid-wrap` holding `#scroll` and `#detail`, so clicking a card opens it to the
+right of the results rather than in place of them: a reader comparing two cards,
+or reversing the order under the one they are reading, never loses the list or
+its scroll position. `#bar` and `#tiers` sit outside that row and stay full
+width, so opening an item cannot re-wrap the toolbar. The open card is marked
+`.card.sel` — an `outline` and not a border, because the card's `border-left` is
+its tier stripe — since the panel is otherwise across the screen from the card
+that opened it. The panel is a column of a fixed `.dbar` over a scrolling
+`#dscroll`, so the way out stays put beneath a set ladder or one of the eyes'
+four-level tables.
+
+Three things about it are worth knowing before editing:
+
+- **The grid is painted from `gridKey()`, which is every filter and not
+  `S.item`.** `paintGrid()` used to skip `render()` outright while an item was
+  open, which was invisible only because opening one hid the grid. Sort and
+  Reverse reach the panel through `apply()` without touching the grid at all, so
+  with the grid still on screen that skip would leave the old order behind the
+  new panel. `gridKey()` is `showAll` plus `sigParts(false)`; `sig()` keeps
+  `S.item`, because routing between two items is still a route change.
+- **The mark is applied by `markOpen()`, not inside `render()`.** The mark
+  follows `S.item` while the grid follows the filters, and opening a second card
+  changes no filter — so `render()` is deliberately skipped exactly when the mark
+  needs to move. `render()` and `paintGrid()` both call it; it is idempotent, so
+  a repaint that runs both costs one pass over the grid.
+- **The close control keeps the class `.back` at every width**, wearing a ✕
+  beside the grid and `← back to results` below 769px — where the panel does take
+  the results area, as it always did. The class is load-bearing rather than
+  descriptive: `verify\check_page.js` dispatches a click on `#detail .back`, and
+  renaming it makes the suite throw rather than fail one assertion.
 
 `MINLEVEL` keeps its row on **socketables**, and there it is **the drop band,
 like everywhere else** — `ml`–`xl`, stated in plain text below the requirements.
@@ -2367,9 +2400,9 @@ because nothing is read until commit. It is also why opening the panel shows the
 rail's current numbers: they are read out of `S`.
 
 **Search commits through `onRoute()`, not `apply()`**, for two reasons the file
-already documents elsewhere. `apply()` ends in `paintGrid()`, which branches on
-`S.item` and renders the detail view — so a panel opened over an item card would
-close and leave the card exactly where it was. And only `onRoute()` rebuilds the
+already documents elsewhere. `apply()` leaves `S.item` alone, so the results would
+land underneath an item panel left standing over a set it was never opened from —
+and `onRoute()` is also the only path that rebuilds the
 rail, which is where the item-level and socket boxes the panel just wrote live;
 committing through `apply()` would filter by 100 while the rail went on showing
 the reader's old number. So: `S.item = ''`, then `writeHash(); lastSig = null;
@@ -2672,9 +2705,9 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 317
-assertions covering filtering, multi-select, search, sort, the detail view,
-provenance, hash deep links, the three reported bugs, the armor derivation (the
+`verify\check_page.js` goes further and drives the built page in a real DOM — 327
+assertions covering filtering, multi-select, search, sort, the item panel that
+stands beside the grid, provenance, hash deep links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
 line on a derived number, and the flatness a single-weight base file has to
 keep), the base-value badge, the

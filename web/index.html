@@ -98,9 +98,29 @@
         <button id="dir" title="Reverse order">&#8595;</button>
       </div>
       <div id="tiers"></div>
-      <div id="scroll"><div id="grid"></div><div id="more"></div></div>
+      <!-- The results row. #bar and #tiers are outside it and stay full width,
+           so opening an item cannot re-wrap the toolbar -- an item opening is
+           no reason for the Sort control to move. -->
+      <div id="split">
+        <div id="scroll"><div id="grid"></div><div id="more"></div></div>
+        <!-- The item panel. .dbar is a fixed row and #dscroll holds the card, so
+             a set ladder or one of the eyes' four-level tables does not have to
+             be scrolled back up before it can be dismissed.
+
+             The control wears two labels because it does two different things:
+             a close ✕ here, where the grid is still beside the panel, and the
+             route home on a phone, where opening an item really has replaced
+             the results. It keeps the `back` class either way -- the delegated
+             handler and verify/check_page.js both select it by that name. -->
+        <div id="detail">
+          <div class="dbar">
+            <a class="back" href="#" aria-label="Close"><span
+              class="dw">&#10005;</span><span class="dn">&larr; back to results</span></a>
+          </div>
+          <div id="dscroll"></div>
+        </div>
+      </div>
     </div>
-    <div id="detail"></div>
   </main>
 
 </div>
