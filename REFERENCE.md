@@ -1810,10 +1810,14 @@ carries**, each as an element mark and its own value, in the detail view's order
 — a weapon leads with its `dps` figure, which is the one value with no element
 and so the one that carries a word. Never a summed total, which the game never
 shows, and the row wraps rather than dropping a type. Measured against the built
-page at the card's fixed 350px, the stat column is 270px and holds `dps` plus
+page at the card's 350px, the stat column is 270px and holds `dps` plus
 three damage types — the tightest of those 1,235 one-line cards
 (`legendary_greathammer03`) fills exactly 270px — so the 38 weapons carrying
 four or five types take a second line, inside a 98px card with nothing clipped.
+That measurement is the card **at rest**; while the item panel is open the card
+divides the grid into three columns instead and this column is as narrow as
+162px, which still holds the three-type line and gives the five-type weapons a
+third. Nothing is dropped either way — the wrap is the design.
 The pair is `stv-dps`, not `dps`: the detail view names its own headline `.dps`
 as a bare selector, and a card pair sharing that name silently inherited its
 15px gold figure and stood taller than the numbers beside it. Clicking one opens the
@@ -1884,10 +1888,28 @@ Three things about it are worth knowing before editing:
   needs to move. `render()` and `paintGrid()` both call it; it is idempotent, so
   a repaint that runs both costs one pass over the grid.
 - **The close control keeps the class `.back` at every width**, wearing a ✕
-  beside the grid and `← back to results` below 769px — where the panel does take
+  beside the grid and `← back to results` below 1160px — where the panel does take
   the results area, as it always did. The class is load-bearing rather than
   descriptive: `verify\check_page.js` dispatches a click on `#detail .back`, and
   renaming it makes the suite throw rather than fail one assertion.
+- **The cards beside the panel are a third of the grid, not a width.** A fixed
+  width makes the column *count* a function of the window, which is the wrong way
+  round: at the settled 350px the panel left room for two columns at 1440, and
+  pinning the card to 240 instead gave a 1700px window four — narrower cards than
+  the fix was for. `#app.item .card` is therefore
+  `clamp(240px, calc((100% - 30px)/3), 350px)`: three cards and their margins are
+  the grid, so the count is three wherever three fit, the floor is what the
+  breakpoint below is computed from, and the cap at the settled 350 stops the
+  count climbing again past 2070px. The `30px` is slack — at `24px` the three
+  cards are the grid exactly, and a sub-pixel over is a wrap.
+
+  **The swap breakpoint is arithmetic, not taste.** The panel is 398px and the
+  rail 220px, so two cards at the 240px floor want 1157px of window before a
+  scrollbar is counted — hence `@media (max-width:1159px)` for the swap and
+  `@media (min-width:1160px)` for the wide layout, adjacent by construction. Four
+  tokens in four places have to keep agreeing, so `verify\check_page.js` reads
+  them back and does the sum rather than pinning the numbers (assertion: *the
+  panel stands beside the grid only where two narrowed cards fit*).
 
 `MINLEVEL` keeps its row on **socketables**, and there it is **the drop band,
 like everywhere else** — `ml`–`xl`, stated in plain text below the requirements.
@@ -2705,9 +2727,10 @@ styles those rungs differently and a change in the count would restyle them
 silently. It also asserts the set-item rarity split is exactly 210 Rare / 346
 Unique, since that number is what colours 556 cards.
 
-`verify\check_page.js` goes further and drives the built page in a real DOM — 327
+`verify\check_page.js` goes further and drives the built page in a real DOM — 329
 assertions covering filtering, multi-select, search, sort, the item panel that
-stands beside the grid, provenance, hash deep links, the three reported bugs, the armor derivation (the
+stands beside the grid and the three columns it leaves it, provenance, hash deep
+links, the three reported bugs, the armor derivation (the
 two set pieces reported by name, the widest set-jewellery case, the provenance
 line on a derived number, and the flatness a single-weight base file has to
 keep), the base-value badge, the

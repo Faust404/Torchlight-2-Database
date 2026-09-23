@@ -1,7 +1,7 @@
 /* Drives the built page in a real DOM. This is the automated form of the
  * manual browser checks: filtering, multi-select, search, sort, the item
  * panel beside the grid, provenance, the advanced-search panel and hash deep
- * links -- 327 assertions.
+ * links -- 329 assertions.
  *
  *   npm i jsdom          (anywhere that resolves, or set NODE_PATH)
  *   node verify/check_page.js
@@ -2153,6 +2153,45 @@ async function go(hash) {
        /#app\.item #detail\{display:flex\}/.test(css) &&
        /#split\{[^}]*flex-direction:row/.test(css),
        'the panel must open beside the grid, not instead of it');
+  }
+
+  // The third column beside the panel is arithmetic, and CSS cannot state that
+  // arithmetic -- four tokens in four places have to keep agreeing with each
+  // other. Read them back and do the sum here instead. The 15px is the classic
+  // Windows scrollbar, which #scroll wears inside its own content box; the 28px
+  // is its 2x14px gutter and the 8px is a card's 2x4px margin. If a card widens
+  // or the panel does, this fails at the breakpoint that no longer clears the
+  // cards, which is the failure a screenshot at one window size would miss.
+  {
+    const css = [].map.call(d.querySelectorAll('style'), s => s.textContent).join('\n');
+    const tok = name => {
+      const m = new RegExp('--' + name + ':(\\d+)px').exec(css);
+      return m && Number(m[1]);
+    };
+    const beside = /@media \(min-width:(\d+)px\)\{\s*#app\.item \.card/.exec(css);
+    const swap = /@media \(max-width:(\d+)px\)\{\s*#app\.item #scroll\{display:none\}/.exec(css);
+    const fits = tok('rail') + tok('itemw') + 28 + 15 + 2 * (tok('cardn') + 8);
+    ok('the panel stands beside the grid only where two narrowed cards fit',
+       !!beside && !!swap && Number(swap[1]) === Number(beside[1]) - 1 &&
+       Number(beside[1]) >= fits,
+       'the beside-grid breakpoint (' + (beside && beside[1]) +
+       'px) has to clear ' + fits + 'px of rail, panel and two ' +
+       tok('cardn') + 'px cards, and meet the swap at ' + (swap && swap[1]) + 'px');
+
+    // And the width those cards take is a third of the grid, not a number. A
+    // fixed width makes the column *count* a function of the window -- it was
+    // 350px and gave two columns at 1440, and a flat 240 fixed that and handed a
+    // 1700px window four -- so the rule has to divide, and it has to be bounded
+    // at both ends: floored at --cardn so a card is never narrower than the
+    // 1157px above was computed for, capped at the settled 350 so the count
+    // cannot climb again on a screen wide enough for four.
+    const rule = /#app\.item \.card\{[^}]*?flex:0 0 clamp\(var\(--cardn\), calc\(\(100% - (\d+)px\)\/3\), (\d+)px\)/
+      .exec(css);
+    ok('...and the cards beside it divide the grid into three columns',
+       !!rule && Number(rule[2]) === 350 && Number(rule[1]) >= 24,
+       'got ' + (rule ? 'a 3rd of the grid less ' + rule[1] + 'px, capped at ' +
+       rule[2] + 'px' : 'no clamp on the card beside the panel') +
+       '; the slack has to clear three cards\' 2x4px margins');
   }
 
   // ------------------------------------------------------ the advanced panel

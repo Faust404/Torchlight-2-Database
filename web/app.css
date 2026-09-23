@@ -52,6 +52,11 @@
      366px -- plus the panel's own 2x16px gutter. Not called --panel, which is
      already the surface colour a few tokens up. */
   --itemw:398px;
+  /* The narrowest a card may go while the panel is open -- the floor of the
+     clamp that sizes the grid's columns, not the width they take. It is what the
+     breakpoint below is computed from: two cards at this floor and the panel and
+     the rail want 1157px of window. */
+  --cardn:240px;
 }
 
 *{box-sizing:border-box}
@@ -335,8 +340,9 @@ button,input,select{font:inherit; color:inherit}
   text-overflow:ellipsis; white-space:nowrap}
 .card .sub{display:block; color:var(--muted); font-size:11.5px; margin-top:1px}
 /* The stat line: one mark-and-value pair per type, wrapping. Five types do not
-   fit the ~272px the meta column gets, so the row wraps to a second line rather
-   than clipping or dropping any -- the whole point is that every type is
+   fit the ~272px the meta column gets at the card's settled 350px -- nor the
+   162px it gets while the panel is open -- so the row wraps to a second line
+   rather than clipping or dropping any -- the whole point is that every type is
    visible. Aligned on `center`, not `baseline`: the mark is a flex item with no
    text in it, so it has no baseline to align a number against. */
 .card .st{display:flex; flex-wrap:wrap; align-items:center; gap:3px 10px;
@@ -368,6 +374,39 @@ button,input,select{font:inherit; color:inherit}
    to it or take the tier stripe away. Inset by -1px so it reads as the card's own
    edge rather than a box drawn around it. */
 .card.sel{outline:1px solid var(--gold); outline-offset:-1px}
+
+/* Only where the panel stands beside the grid, and only while it is open. Closed,
+   the grid has the window to itself and the card keeps its settled 350px; open, it
+   is sharing with the panel, and there the count of columns matters more than the
+   width of a card.
+
+   A fixed width gets that count wrong, because the count is the width's quotient:
+   the card was 350px and gave two columns at 1440, and a flat 240 fixed that but
+   handed a 1700px window four. So the card is a third of the grid instead -- a
+   `clamp`, floored at --cardn and capped at the settled 350. Three of them plus
+   their margins are exactly the grid, so the count is three wherever three fit,
+   and where a third would not fit the clamp rides its floor and the row wraps to
+   two. The cap is what stops the count climbing again on a very wide screen: past
+   2070px the cards are all at 350 and a fourth joins, which is the layout the
+   grid has with the panel closed.
+
+   `- 30px`, not `- 24px`: three cards and their 2x4px margins are the grid
+   exactly, and a sub-pixel over is a wrap, so the row is given 6px of slack.
+
+   The stat line is what pays for the narrower card: its meta column goes from
+   272px to 162px at the floor, which still holds the common three types on one
+   line and gives the five-type weapons a third. Nothing is dropped -- .card .st
+   wraps by design -- the columns just get denser.
+
+   Scoped to the width rather than overridden at the narrow ones: below 1160px the
+   panel has the results area to itself and the grid is `display:none`, so a rule
+   that narrowed cards there could only ever be a trap for a later edit. */
+@media (min-width:1160px){
+  #app.item .card{
+    flex:0 0 clamp(var(--cardn), calc((100% - 30px)/3), 350px);
+    width:clamp(var(--cardn), calc((100% - 30px)/3), 350px);
+  }
+}
 
 #more{padding:16px 4px; color:var(--label)}
 #more button{margin-left:8px; background:#22201d; border:1px solid var(--div);
@@ -412,16 +451,19 @@ button,input,select{font:inherit; color:inherit}
 #app.item #detail{display:flex}
 
 /* justify-content:flex-end at this width -- the ✕ sits at the panel's top right,
-   the side of the screen nearest the scrollbar rather than the grid. */
+   the side of the screen nearest the scrollbar rather than the grid. Where the
+   panel takes the whole results area it starts the row instead, so the route home
+   reads from the edge the reader came in from. */
 .dbar{display:flex; justify-content:flex-end; padding:9px 16px 4px}
 #dscroll{flex:1 1 auto; overflow-y:auto; padding:0 16px 60px}
 
 .dwrap{max-width:366px}
 .back{color:var(--label); font-size:12px; display:inline-block}
 .back:hover{color:var(--gold)}
-/* Which of the two labels is drawn: the ✕ here, the route home below 769px. Both
-   are in the markup at all times so the control's accessible name does not depend
-   on the viewport -- the anchor carries aria-label="Close". */
+/* Which of the two labels is drawn: the ✕ here, the route home below 1160px,
+   where the panel has replaced the grid and closing it means going back to it.
+   Both are in the markup at all times so the control's accessible name does not
+   depend on the viewport -- the anchor carries aria-label="Close". */
 .back .dn{display:none}
 
 /* The card's own font-size, a shade under the app's 13px: the card carries a lot
@@ -855,6 +897,26 @@ button,input,select{font:inherit; color:inherit}
 
 /* -------------------------------------------------------------- responsive */
 #railbtn{display:none}
+
+/* Below this the panel stops standing beside the grid and takes the results area
+   instead, the way it did before it moved. It is arithmetic, not taste: the panel
+   is 398px and the rail 220px, so two of the narrowed cards and both gutters want
+   1142px of window before a scrollbar is even in the count, and there is nothing
+   left over for a third column at any width this side of 1380.
+
+   What the swap costs is the thing the panel was built to avoid -- the grid goes
+   away and comes back at the scroll position it was left at -- so the control at
+   the top of the panel becomes the route home again, because here it genuinely is
+   one. The grid is only hidden, not discarded, which the old full swap could not
+   promise. */
+@media (max-width:1159px){
+  #app.item #scroll{display:none}
+  #detail{flex:1 1 auto; border-left:0}
+  .dbar{justify-content:flex-start}
+  .back .dw{display:none}
+  .back .dn{display:inline}
+}
+
 @media (max-width:768px){
   #rail{
     position:absolute; left:0; top:0; bottom:0; z-index:20;
@@ -874,15 +936,6 @@ button,input,select{font:inherit; color:inherit}
   }
   #adv .agrid{grid-template-columns:1fr}
   #adv .tgrid{grid-template-columns:1fr}
-  /* A phone has no room for a third column, so an open item takes the results
-     area the way it did before the panel moved beside them -- and the control at
-     the top of it becomes the route home again, because here it genuinely is
-     one. The grid is only hidden, not discarded: it stays where it was scrolled
-     to, which the old full swap could not promise. */
-  #app.item #scroll{display:none}
-  #detail{flex:1 1 auto; border-left:0}
-  .back .dw{display:none}
-  .back .dn{display:inline}
   .card{flex:1 1 auto; width:auto; min-width:0}
   /* the group headers are controls now, not just captions -- give them a
      finger-sized target on the drawer */
