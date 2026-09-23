@@ -2625,17 +2625,25 @@ async function go(hash) {
     // Level 50 and 10: the pair that shows the ceiling moving rather than a
     // count that happens to look right. A lone number is still a ceiling -- see
     // readHash on why it cannot be a floor -- and the two-number form brackets
-    // the same field at both ends: 2,546 is the 3,308 that "50 or under"
-    // answers, less the 762 that sit below level 10.
+    // the same field at both ends: 2,571 is the 3,414 that "50 or under"
+    // answers, less the 843 that name no gate at all or one below level 10.
     //
-    // Both ceilings fell when LEVEL_REQUIRED started reading the DAT ahead of
-    // TIDBI. The two sources only ever disagree upward -- 429 items, the DAT
-    // higher on every one -- so 175 of them crossed one of these two lines, 107
-    // past level 10 and 68 past level 50. A requirement that reads lower than
-    // these is the old TIDBI number, and that is what these three pin.
-    await eq('plr=50', '3,308 items of 6,048');
-    await eq('plr=10', '808 items of 6,048');
-    await eq('plr=10-50', '2,546 items of 6,048');
+    // Both ceilings fell twice. First when LEVEL_REQUIRED started reading the
+    // DAT ahead of TIDBI: the two sources only ever disagree upward -- 429
+    // items, the DAT higher on every one -- so 107 crossed level 10 and 68
+    // crossed level 50. Then when a Normal-tier item that states no requirement
+    // took the game's own ITEM_LEVEL_REQUIREMENTS_NORMAL rather than falling
+    // through to TIDBI's rendering of the general curve: 1,145 items changed
+    // the gate they render, 956 of them moving and every one of those down --
+    // the other 189 stated none before -- 95 crossing level 10 and 106 level
+    // 50. Level 50's ceiling carries all 106 of its crossings, since the curve
+    // tops out at 44 and no new gate can land above it; level 10's carries 74,
+    // because 21 of the newly gated items were passing on n()'s coerced zero.
+    // A requirement that reads lower than these is the old TIDBI number, and
+    // that is what these three pin.
+    await eq('plr=50', '3,414 items of 6,048');
+    await eq('plr=10', '882 items of 6,048');
+    await eq('plr=10-50', '2,571 items of 6,048');
     // Usable-by, not restricted-to. 5,475 of 6,048, so the 573 excluded are the
     // items restricted to another class -- an implementation reading `cls` as
     // "restricted to" would answer 194, the count of Embermage-only items.

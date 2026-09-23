@@ -480,8 +480,11 @@ DAT's own formula where that reaches, TIDBI's rendered value otherwise:
 | Damage | 1,273 | 1,370 | 1,273 | **97** | 0 |
 | `LEVEL_REQUIRED` † | 5,473 | 844 | 810 | 34 | 4,663 |
 
-† The only row here the DAT wins. Coverage is unchanged by that; the 4,663
-TIDBI-only items are still read from TIDBI exactly as before.
+† The only row here the DAT wins, and the only one where *which source answers*
+has moved since. Coverage is unchanged: the 4,663 TIDBI-only items still exist
+as a set, but for a Normal-tier item the DAT's own graph reaches, the fallback
+is the game's curve rather than TIDBI's rendering of it — 956 of the 4,663,
+leaving 3,707 read out of TIDBI. See *"A level requirement is not a magnitude"*.
 
 Weapon **damage and armor are no longer read from TIDBI**. Both are reconstructed
 from the DAT by the formulas in *"The damage formula, recovered"* and *"The armor
@@ -558,10 +561,50 @@ which is `MINLEVEL` 27 + 2, and the page shows 29.
 So the DAT is read first here and TIDBI is the fallback. **429 items change**,
 the 810 where both exist less the 381 that agree — and on every one of them the
 DAT's value is the **higher** of the pair: TIDBI undershoots this field, it never
-overshoots. The 4,663 TIDBI-only and 34 DAT-only items are untouched, and the
-`build()` assertion beside the derivation pins all of it: the coverage, both
-sides' fit against `MINLEVEL`, the offset histogram, and the "higher on every
-one" rule.
+overshoots. The 4,663 TIDBI-only and 34 DAT-only items keep their *coverage*
+either way, and both sides' populations are unchanged — but the source that
+answers has since moved for 956 of them; see below. The `build()` assertion
+beside the derivation pins all of it: the coverage, both sides' fit against
+`MINLEVEL`, the offset histogram, and the "higher on every one" rule.
+
+**Where the DAT states nothing, the game's own curve answers it** — for a
+Normal-tier item. `MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_NORMAL.DAT` is a
+50-point curve over item levels 1 to 50 that ends at **44**, and it is what the
+tooltip renders when the item file authors no `LEVEL_REQUIRED`. Nine readings
+off the user's own tooltips — all Normal tier, item levels 6 to 13 — land on it
+exactly, where TIDBI's general curve runs 5 high across that band. The two are
+not a constant offset: they differ by 2 at level 1, 5 from level 4 to 14 and 12
+by level 50, and only the general one keeps going past 50. Each of the nine is
+pinned by name in `build()`, so a curve that drifts fails on the row that moved
+rather than hiding inside a count.
+
+The corroboration is independent of TIDBI: of the **405** items whose own file
+authors a `LEVEL_REQUIRED` at level ≤ 50, the mean distance to this curve is
+**2.25** (52 exact) against **8.97** to the general one (none exact). The
+authored value is a designer's number, not the curve, so that is agreement
+rather than proof.
+
+**1,145 items take the curve** — 956 that read TIDBI's number before it, and 189
+that named no requirement at all, which is why the page's gateless count falls
+**374 → 185**. On all 956 the number falls and none rises: 95 cross level 10 and
+106 cross level 50, taking the "50 or under" ceiling from 3,308 to 3,414 and the
+bracket at 10-50 from 2,546 to 2,571. Level 50's ceiling moves by exactly its
+106 crossings, since the curve tops out at 44 and no new gate can land above it;
+level 10's moves by 74 rather than 95, because a requirement the item never
+named reads as 0 to the filter's `n()`, so 21 of the newly gated items were
+passing and are now above 10.
+
+**Normal tier only, deliberately.** Nothing measures what the game does for
+another tier — every reading is Normal — and TIDBI cannot settle it: its armour
+requirement columns are `floor(base × curve[LEVEL]/100)` on 5,755 of 5,759
+cells, and alfgeir's `LevelRequirement` is byte-identical to TIDBI's on all
+1,770 items carrying both. The two are one source that *renders* these formulas
+rather than capturing the game, so an item of any other tier keeps the fallback
+it had. `_NORMAL` is a type marker, not a difficulty: where this game varies a
+graph by difficulty it names the variants `_EASY`/`_HARD`/`_VERYHARD` and they
+genuinely differ (monster armour at level 20 is 83 / 50 / 121.67 / 185.84), no
+item requirement graph has such a sibling, and `_NORMAL` sits in the same naming
+slot as `_SOCKETABLE`.
 
 ### Requirements are alternatives — and the class gate is not
 
@@ -2451,7 +2494,7 @@ count that would have to be re-measured.
 | filter | `S` field | reading |
 |---|---|---|
 | item level | `lvlMin/Max` | the item's own level, either end open |
-| player level | `plrMin/Max` | **equippable in that band** — `LEVEL_REQUIRED` between the two, and an item naming no requirement passes |
+| player level | `plrMin/Max` | **equippable in that band** — `LEVEL_REQUIRED` between the two; an item naming no requirement reads as 0, so it passes a ceiling but not a floor |
 | type | `types` | a box per type in `ALLTYPES`; **or** across boxes; all (or none) ticked = no filter |
 | rarity | `tiers` | the four pills (the strip's own `.tpill`); the same `S.tiers` the strip above the grid writes; all ticked = no filter |
 | sockets | `sockSet` | a tick per count in `SOCKCHIPS`; **or** across ticks |

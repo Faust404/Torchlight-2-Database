@@ -297,7 +297,7 @@
     if (!boundHit(o.rq, S.req)) return false;
     // "Equippable between these levels". The ceiling is the old single field
     // and an item naming no requirement passes it, which is what n() gives --
-    // the 374 shown items with no `lr` at all are usable at any level. The
+    // the 185 shown items with no `lr` at all are usable at any level. The
     // floor excludes them, and deliberately: an item that requires nothing
     // requires nothing *of* level 20 either, so it is not one of the items a
     // level 20 character has just grown into.

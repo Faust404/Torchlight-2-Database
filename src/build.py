@@ -560,6 +560,12 @@ GRAPH_ARMOR = 'MEDIA/GRAPHS/STATS/ARMOR_PLAYER_BYLEVEL_FORSET.DAT'
 # number for a socketable under the socketing vocabulary, and that is a display
 # choice, not a claim the files make.
 GRAPH_SOCKET_LEVEL = 'MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_SOCKETABLE.DAT'
+
+# The curve the game renders an item's level gate from when the item's own DAT
+# authors no LEVEL_REQUIRED -- see the derivation in build() for the in-game
+# readings it is pinned to. 50 points, so it covers item levels 1-50; above that
+# it says nothing and the old TIDBI fallback still answers.
+GRAPH_LEVEL_NORMAL = 'MEDIA/GRAPHS/STATS/ITEM_LEVEL_REQUIREMENTS_NORMAL.DAT'
 _graphs = {}
 
 # MAXLEVEL above this is a sentinel for "never stops dropping", not a band. 259
@@ -611,6 +617,10 @@ def armor_curve():
 
 def socket_level_curve():
     return graph_points(GRAPH_SOCKET_LEVEL)
+
+
+def level_normal_curve():
+    return graph_points(GRAPH_LEVEL_NORMAL)
 
 
 def derived_range(rec, curve):
@@ -1602,17 +1612,45 @@ def build():
         # the item: at level 23 it prints 27 for 59 items spanning 27 types,
         # claws and amulets alike.
         #
-        # TIDBI is still the only source for the 4,663 items whose DAT authors
-        # no requirement at all, and is read for them exactly as before.
-        lr = _num(rec.get('LEVEL_REQUIRED')) or _num(t.get('LEVEL_REQUIRED'))
+        # Where the DAT authors no requirement the game falls back to a curve.
+        # For a Normal-tier item that curve is ITEM_LEVEL_REQUIREMENTS_NORMAL --
+        # not the general ITEM_LEVEL_REQUIREMENTS that TIDBI renders and this
+        # build shipped until 2026-09-23. Nine tooltips read in game, all on
+        # Normal-tier items of level 6 to 13, land on NORMAL exactly (4, 7, 9,
+        # 7, 10, 4, 5, 7, 11); the general curve is a flat 5 high across that
+        # band, and the two diverge further apart from it.
+        #
+        # Normal tier only, deliberately. Every reading is Normal-tier, so every
+        # other rarity stays on the path it was already on -- and TIDBI cannot
+        # settle it for them, being a render of the general curve rather than a
+        # witness to the game: 5,755 of its 5,759 armour requirement cells are
+        # exactly floor(base*curve/100), and alfgeir's LevelRequirement is
+        # byte-identical to its LEVEL_REQUIRED on all 1,770 items carrying both.
+        # What the DAT authors itself *is* evidence, and it points the same way:
+        # of the 405 items authoring a requirement below level 50, 52 land
+        # exactly on NORMAL and 0 on the general curve, mean distance 2.25
+        # against 8.97. So widening this to the other rarities looks right and
+        # wants one in-game reading first; until then the `audit` below asserts
+        # that no non-Normal item's gate moved.
+        #
+        # NORMAL holds 50 points, so it answers for item levels 1-50, the base
+        # game's range -- the NG bands begin at 51. A level the curve does not
+        # reach is left to the old source rather than extrapolated.
+        lr = _num(rec.get('LEVEL_REQUIRED'))
         lr_probe.append((name, _num(rec.get('LEVEL_REQUIRED')),
                          _num(t.get('LEVEL_REQUIRED')), _num(o.get('ml'))))
-        if not lr and typ == 'Socketable':
-            # Neither table holds this for a socketable, so it comes from the
-            # game's own curve (see GRAPH_SOCKET_LEVEL). A level the curve does
-            # not reach leaves lr unset rather than guessing, the same as every
-            # other optional derivation here.
-            lr = socket_level_curve().get(_num(rec.get('LEVEL')))
+        if not lr:
+            if typ == 'Socketable':
+                # Neither table holds this for a socketable -- 0 of the 178
+                # carry a TIDBI LEVEL_REQUIRED -- so it comes from the game's
+                # own curve (see GRAPH_SOCKET_LEVEL). A level the curve does
+                # not reach leaves lr unset rather than guessing, the same as
+                # every other optional derivation here.
+                lr = socket_level_curve().get(_num(rec.get('LEVEL')))
+            elif o['q'] == 'Normal':
+                lr = level_normal_curve().get(_num(rec.get('LEVEL')))
+        if not lr:
+            lr = _num(t.get('LEVEL_REQUIRED'))
         if lr:
             o['lr'] = fmt(lr)
         rq = {}
@@ -1974,14 +2012,58 @@ def build():
     # items, no exceptions. TIDBI undershoots; it never overshoots.
     assert len(_moved) == 429, 'the two requirements disagree on %d items' % len(_moved)
     assert not [p for p in _moved if p[1] < p[2]], 'a DAT requirement below TIDBI\'s'
-    # And TIDBI is still read for every item whose DAT authors no requirement:
-    # 4,663 of them, the same population as before this rule changed.
+    # And 4,663 items are still TIDBI-only by *coverage* -- the DAT authors no
+    # requirement for them -- the same population as before the fallback curve
+    # changed underneath 956 of them. This counts what the DAT states, not which
+    # source ends up answering; the assertions below pin that part.
     assert len(_tidonly) == 4663, 'the TIDBI-only population drifted: %d' % len(_tidonly)
+
+    # The fallback curve, pinned against the tooltips it was derived from. Nine
+    # items read in game, each with the gate it showed: a curve that drifts
+    # fails on the row that moved, which a count hides.
+    _read = {'sword_n01b': 4, 'sword_n01c': 7, 'staff_n02': 9,
+             'cloth_a_belt_alt_b': 7, 'cloth_a_pants_alt_c': 10,
+             'cloth_a_boots': 4, 'light_01_pants_alt_c': 5,
+             'greataxe_n01c': 7, 'heavy_01_boots_alt_b': 11}
+    _by_id = {o['id'].lower(): o for o in out}
+    _wrong = [(k, want, (_by_id.get(k) or {}).get('lr'))
+              for k, want in _read.items()
+              if _num((_by_id.get(k) or {}).get('lr')) != want]
+    assert not _wrong, 'in-game level-gate readings not reproduced: %s' % _wrong
+    # The scope, asserted as hard as the readings: the curve answers for
+    # Normal-tier items that author no requirement of their own, and it must not
+    # have touched anything else. `_scope` is that population -- socketables are
+    # out of it, having had their own curve since long before this -- and
+    # `_drift` is every item outside it whose gate stopped being TIDBI's.
+    _rows = {it['name'].lower(): it for it in items}
+
+    def _rec(o):
+        return _rows[o['id'].lower()]['rec']
+
+    def _stated(o):
+        return _num(_rec(o).get('LEVEL_REQUIRED'))
+
+    def _socketable(o):
+        it = _rows[o['id'].lower()]
+        return classify_type(it['rec'], it['rec'].get('_folder'),
+                             it['tidbi'], it['alf'], tokens) == 'Socketable'
+
+    def _on_curve(o):
+        return level_normal_curve().get(_num(_rec(o).get('LEVEL'))) is not None
+
+    _scope = [o for o in out if o['q'] == 'Normal' and not _stated(o)
+              and not _socketable(o) and _on_curve(o)]
+    _drift = [(o['id'], o.get('lr'), _num((tidbi.get(o['id'].upper()) or {}).get('LEVEL_REQUIRED')))
+              for o in out
+              if o['q'] != 'Normal' and not _stated(o) and not _socketable(o)
+              and _num(o.get('lr')) != _num((tidbi.get(o['id'].upper()) or {}).get('LEVEL_REQUIRED'))]
+    assert not _drift, 'a non-Normal item\'s gate moved off TIDBI: %s' % _drift[:5]
+    assert len(_scope) == 1145, 'the level-gate curve\'s scope moved: %d' % len(_scope)
     print('  REQ LEVEL: DAT states it for %d (%d of %d within 4 of MINLEVEL, '
           'top offsets %s); TIDBI %d of %d; %d differ, DAT higher on every one; '
-          '%d TIDBI-only'
+          '%d TIDBI-only; Normal-tier gate from the NORMAL curve for %d'
           % (len(_dat), _dnear, len(_datml), _hist.most_common(2),
-             _tnear, len(_tidml), len(_moved), len(_tidonly)))
+             _tnear, len(_tidml), len(_moved), len(_tidonly), len(_scope)))
 
     # The set-bonus ladders the site prints. One entry per token an item names,
     # carrying the display name, how many pieces of it this corpus actually
