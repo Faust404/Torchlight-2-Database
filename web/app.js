@@ -703,21 +703,41 @@
 
   var lastList = [];
   var lastSig = null;
+  var lastGridKey = null;
 
   // A cheap fingerprint of everything the URL carries. Routing compares it so a
   // hashchange that merely echoes state we already painted is a no-op -- which
   // matters because on file:// writeHash falls back to setting location.hash
   // and that itself fires hashchange.
-  function sig() {
+  //
+  // Split in two rather than one string because the grid wants the same list
+  // short one field: see gridKey().
+  function sigParts(withItem) {
     // Array.from, not [].slice.call -- a Set has no .length, so slice() on one
     // silently yields [] and every facet would look unchanged.
     var s = function (set) { return Array.from(set).sort(); };
-    return JSON.stringify([S.q, s(S.types), s(S.tiers),
-      S.set, S.setOnly, s(S.sockSet), S.lvlMin, S.lvlMax, S.sort, S.dir, S.item,
-      typeSig(S.req),
+    var a = [S.q, s(S.types), s(S.tiers),
+      S.set, S.setOnly, s(S.sockSet), S.lvlMin, S.lvlMax, S.sort, S.dir];
+    // Pushed in the middle, not appended, so the string sig() produces is
+    // character for character the one it produced before this was split.
+    if (withItem) a.push(S.item);
+    return a.concat([typeSig(S.req),
       S.plrMin, S.plrMax, s(S.cls), typeSig(S.dmgv), typeSig(S.armv), S.setfx,
       S.aff.map(function (c) { return [c.stat, c.lo, c.hi]; })]);
   }
+
+  function sig() { return JSON.stringify(sigParts(true)); }
+
+  // What the grid is a picture of: every filter and the cap, but not which item
+  // is open -- that shapes the item panel and nothing else. paintGrid() repaints
+  // the grid when this moved, which is how a control calling apply() with an
+  // item open stays honest. Skipping the repaint in that case used to be
+  // invisible, because opening an item hid the grid; with the grid still on
+  // screen it would leave the old result set under the new one.
+  //
+  // showAll is module state outside S and render() reads it, so it is in here
+  // too -- "Show all" selects nothing, it only lifts the cap.
+  function gridKey() { return JSON.stringify([showAll, sigParts(false)]); }
 
   // A bound map's fingerprint, sorted. JSON.stringify keeps insertion order, so
   // without this `#dmgv=physical:,fire:` and `#dmgv=fire:,physical:` would look
@@ -734,6 +754,10 @@
   function render() {
     var list = filtered();
     lastList = list;
+    // Recorded first, so every way out of this function below -- the empty
+    // result included -- leaves paintGrid() able to tell whether the grid it is
+    // looking at is the one this state asks for.
+    lastGridKey = gridKey();
     var shown = showAll ? list : list.slice(0, CAP);
 
     document.getElementById('count').innerHTML =
@@ -2070,10 +2094,14 @@
 
   function paintGrid() {
     document.getElementById('app').className = S.item ? 'item' : '';
+    // The grid is painted from the filters alone, so it repaints when a filter
+    // moved -- including while an item is open, which is the point: the item
+    // panel sits beside the grid now, and Sort, Reverse and the facet boxes all
+    // leave the grid untouched by taking apply() straight to renderDetail().
+    if (gridKey() !== lastGridKey) render();
     if (S.item) {
       renderDetail(S.item);
     } else {
-      render();
       document.getElementById('detail').innerHTML = '';   // don't leave stale DOM behind
     }
     syncControls();
